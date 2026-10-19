@@ -4,28 +4,33 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>카메라 물품 위치 조회</title>
-<style>
-*{box-sizing:border-box}body{margin:0;background:#111820;color:#edf2f7;font-family:system-ui,sans-serif}main{max-width:700px;margin:auto;padding:14px}h1{font-size:22px}h2{font-size:18px}.panel{padding:14px;background:#1d2834;border-radius:12px;margin:12px 0}label{display:block;margin-bottom:8px}input,select{max-width:100%;font-size:16px}select{padding:7px;margin-top:10px;background:#fff;border-radius:7px}button{border:0;border-radius:8px;background:#2682e8;color:white;padding:11px 14px;font-size:15px;margin:5px 5px 5px 0}button:disabled{opacity:.4}#camera{display:block;width:100%;background:#060a0f;min-height:220px;max-height:65vh;object-fit:contain;border-radius:12px;cursor:pointer;touch-action:manipulation}#camera[hidden],#frozen[hidden]{display:none}#frozen{position:relative;width:100%}#snapshot{display:block;width:100%;height:auto;border-radius:12px}#boxes{position:absolute;inset:0;pointer-events:none}.code-box{position:absolute;margin:0;padding:0;border:2px solid #3cf39b;border-radius:3px;background:rgba(30,225,130,.24);pointer-events:auto;min-height:22px;touch-action:manipulation}.code-box.missing-box{border-color:#ffbd55;background:rgba(255,180,50,.24)}.box-label{position:absolute;left:100%;top:0;margin-left:4px;display:block;width:max-content;max-width:140px;padding:3px 5px;border-radius:4px;background:rgba(0,0,0,.75);color:white;font:12px system-ui;line-height:1.4;text-align:left;overflow-wrap:anywhere;pointer-events:none}.code-box.label-left .box-label{left:auto;right:100%;margin-left:0;margin-right:4px}.code-box:disabled{opacity:.75;border-style:dashed}#status{font-size:13px;min-height:36px;margin:8px 2px;line-height:1.5;color:#bcd1e5}#excelStatus,small{font-size:12px;color:#b1c3d4;line-height:1.6}#excelStatus{margin-top:10px}.record{padding:12px 0;border-bottom:1px solid #354351;overflow-wrap:anywhere;user-select:text}.missing{color:#ffcc82}.empty{font-size:13px;color:#b1c3d4}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px}summary{font-size:13px}#sheetLabel{margin-top:12px}#sheetLabel[hidden]{display:none}
-#camera{position:absolute;width:1px;height:1px;min-height:0;opacity:0;pointer-events:none}#liveView{position:relative;width:100%}#liveView[hidden]{display:none}#liveCanvas{display:block;width:100%;height:auto;min-height:220px;background:#060a0f;border-radius:12px;touch-action:manipulation;cursor:pointer}#dots{position:absolute;inset:0;pointer-events:none}.red-dot{position:absolute;width:7px;height:7px;background:#ff3030;border-radius:50%;box-shadow:0 0 3px #fff;transform:translate(-50%,-50%)}#strength{width:100%;margin:8px 0}#liveStatus{font-size:12px;color:#b1c3d4;margin:6px 0}.filter-panel{margin:8px 0}
-</style>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 <main>
-<h1>카메라 물품 위치 조회</h1>
+<h1>물품코드 스캐너</h1><p class="hint">이미지 선택 → 코드 인식 → 박스를 눌러 기록</p>
 <section class="panel">
 <label for="excel">엑셀 선택 · A열 물품코드 / B열 위치</label>
 <input id="excel" type="file" accept=".xlsx,.xls">
 <label id="sheetLabel" for="sheet" hidden>조회할 시트 <select id="sheet"></select></label>
 <div id="excelStatus" role="status">저장된 엑셀을 확인합니다…</div>
 </section>
-<button id="start" disabled>카메라 켜기</button><button id="stop" disabled>카메라 끄기</button><button id="resume" disabled>다시 촬영</button>
+<nav class="tabs" aria-label="인식 이미지 선택">
+<button type="button" data-tab="camera" aria-pressed="true">카메라</button>
+<button type="button" data-tab="photo" aria-pressed="false">사진</button>
+<button type="button" data-tab="test" aria-pressed="false">테스트 이미지</button>
+</nav>
+<div id="cameraControls"><button id="start">카메라 켜기</button><button id="stop" disabled>카메라 끄기</button><button id="resume" disabled>다시 촬영</button></div>
+<div id="photoControls" class="panel" hidden><label for="photoInput">휴대폰 사진 선택</label><input id="photoInput" type="file" accept="image/*"><small>사진은 서버에 업로드하지 않고 브라우저에서 처리합니다.</small></div>
+<div id="testControls" class="panel" hidden><p>샘플 코드 3개로 OCR을 확인합니다.</p><small>AB12-A00345 · 1234-123456 · ZX90-B67890<br>위치는 선택한 엑셀에서 조회합니다.</small></div>
+<button id="readImage" hidden disabled>이미지 인식</button>
 <div class="panel filter-panel"><label for="strength">흑백·대비 보정 강도 <output id="strengthValue">50</output>%</label><input id="strength" type="range" min="0" max="100" step="5" value="50"><small>0% 원본 · 100% 강한 흑백 보정</small></div>
 <video id="camera" autoplay muted playsinline aria-hidden="true"></video>
 <div id="liveView"><canvas id="liveCanvas" role="button" tabindex="0" aria-label="보정된 카메라 화면을 터치하여 코드 선택" aria-busy="false"></canvas><div id="dots"></div></div>
 <div id="liveStatus" role="status">빨간 점: 정규식에 맞는 코드 위치 · OCR 확인 후 표시됩니다.</div>
 <div id="frozen" hidden><canvas id="snapshot"></canvas><div id="boxes"></div></div>
-<div id="status" role="status" aria-live="polite">엑셀을 불러온 뒤 카메라를 켜세요.</div>
-<small>영상 터치 → 정지 화면 전체 인식 → 원하는 코드 박스 터치 → 목록에 추가.</small>
+<div id="status" role="status" aria-live="polite">카메라를 켜거나 사진을 선택하세요. 엑셀 없이도 인식할 수 있습니다.</div>
+<small>인식된 박스를 누르면 코드와 위치가 기록됩니다.</small>
 <section class="panel">
 <h2>조회 기록 <span id="count">0</span></h2>
 <div id="empty" class="empty">터치한 박스의 코드 - 위치만 한 줄씩 추가됩니다.</div>
@@ -37,409 +42,13 @@
 </main>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/tesseract.min.js"></script>
-<script>
-const excel=document.getElementById('excel'),sheet=document.getElementById('sheet');
-const excelStatus=document.getElementById('excelStatus'),camera=document.getElementById('camera');
-const start=document.getElementById('start'),stop=document.getElementById('stop');
-const status=document.getElementById('status'),records=document.getElementById('records');
-const raw=document.getElementById('raw'),frame=document.getElementById('snapshot');
-const frozen=document.getElementById('frozen'),boxes=document.getElementById('boxes'),resume=document.getElementById('resume');
-const liveView=document.getElementById('liveView'),liveCanvas=document.getElementById('liveCanvas'),dots=document.getElementById('dots');
-const strength=document.getElementById('strength'),strengthValue=document.getElementById('strengthValue'),liveStatus=document.getElementById('liveStatus');
-const liveFrame=document.createElement('canvas'),originalFrame=document.createElement('canvas');
-const scanStats=document.getElementById('scanStats');
-let recognitionStage='';
-let animationId=0,liveTimer=0,liveJob=null,workerPromise=null,liveEpoch=0,lastPaint=0;
-let workbook=null,locations=new Map(),stream=null,worker=null,busy=false,starting=false;
-let database=null,recordCount=0,frozenMode=false,detectedHits=[];
-
-// 픽셀에 흑백과 대비 보정을 적용한다. (어플라이 필터)
-// 강도 0은 원본이며 미리보기와 OCR에 동일한 픽셀을 사용한다.
-function applyFilter(pixels,amount){
- if(!amount)return;
- const mix=amount/100,contrast=1+mix*1.5;
- for(let i=0;i<pixels.length;i+=4){
-  const gray=pixels[i]*0.299+pixels[i+1]*0.587+pixels[i+2]*0.114;
-  for(let channel=0;channel<3;channel++){
-   const blended=pixels[i+channel]*(1-mix)+gray*mix;
-   pixels[i+channel]=Math.max(0,Math.min(255,(blended-128)*contrast+128));
-  }
- }
-}
-
-// 카메라 프레임을 보정해서 캔버스에 그린다. (드로 코렉티드)
-// 화면 전체 비율을 유지하며 이 영상에서 코드를 인식한다.
-function drawCorrected(target,amount=Number(strength.value)){
- if(camera.readyState<2||!camera.videoWidth)return false;
- const scale=Math.min(1,2200/Math.max(camera.videoWidth,camera.videoHeight));
- const width=Math.round(camera.videoWidth*scale),height=Math.round(camera.videoHeight*scale);
- if(target.width!==width||target.height!==height){target.width=width;target.height=height;}
- const ctx=target.getContext('2d',{willReadFrequently:true});ctx.drawImage(camera,0,0,width,height);
- if(amount){
-  const image=ctx.getImageData(0,0,width,height);applyFilter(image.data,amount);ctx.putImageData(image,0,0);
- }
- return true;
-}
-
-// 보정된 실시간 미리보기를 갱신한다. (페인트 라이브)
-// 약 10프레임마다 표시하고 정지 화면에서는 갱신을 멈춘다.
-function paintLive(time){
- if(!stream||frozenMode){animationId=0;return;}
- if(time-lastPaint>=100){drawCorrected(liveCanvas);lastPaint=time;}
- animationId=requestAnimationFrame(paintLive);
-}
-
-// OCR 엔진을 한 번 준비해 공유한다. (겟 워커)
-// 실시간 검사와 터치 인식을 같은 엔진에서 순서대로 처리한다.
-async function getWorker(){
- if(worker)return worker;
- if(!workerPromise)workerPromise=(async()=>{
-  if(!window.Tesseract)throw new Error('OCR 라이브러리 로딩 실패. 인터넷 연결 후 새로고침하세요.');
-  const created=await Tesseract.createWorker('eng',1,{logger:message=>{
-   if(busy&&frozenMode&&message.status==='recognizing text')status.textContent=recognitionStage+' 코드 인식 중… '+Math.round(message.progress*100)+'%';
-  }});
-  try{await created.setParameters({tessedit_pageseg_mode:'11'});}
-  catch(error){await created.terminate();throw error;}
-  worker=created;return created;
- })();
- try{return await workerPromise;}finally{workerPromise=null;}
-}
-
-// 인식된 각 코드의 중앙에 빨간 점을 표시한다. (쇼 도츠)
-// 엑셀 등록 여부와 관계없이 정규식에 맞는 코드만 표시한다.
-function showDots(hits){
- dots.replaceChildren();
- for(const hit of hits){
-  const dot=document.createElement('span'),b=hit.bbox;dot.className='red-dot';
-  dot.style.left=((b.x0+b.x1)/2/liveFrame.width*100)+'%';
-  dot.style.top=((b.y0+b.y1)/2/liveFrame.height*100)+'%';
-  dot.title=hit.code;dots.append(dot);
- }
-}
-
-// 터치 전에 화면 전체를 반복 검사한다. (체크 라이브)
-// 기록을 추가하지 않고 최신 검사 결과의 코드 위치에 점만 표시한다.
-async function checkLive(){
- clearTimeout(liveTimer);
- if(!stream||frozenMode)return;
- if(busy||starting||liveJob){liveTimer=setTimeout(checkLive,600);return;}
- const epoch=liveEpoch;dots.replaceChildren();liveStatus.textContent='화면 코드 확인 중…';
- liveJob=(async()=>{
-  if(!drawCorrected(liveFrame))return;
-  const engine=await getWorker();
-  if(epoch!==liveEpoch||frozenMode||!stream)return;
-  const {data}=await engine.recognize(liveFrame,{}, {text:true,blocks:true});
-  if(epoch!==liveEpoch||frozenMode||!stream)return;
-  const hits=collectHits(data);showDots(hits);
-  liveStatus.textContent=hits.length?hits.length+'곳 감지 · 빨간 점 위치의 코드를 확인하세요.':'정규식에 맞는 코드가 아직 보이지 않습니다.';
- })();
- try{await liveJob;}
- catch(error){if(epoch===liveEpoch&&!frozenMode)liveStatus.textContent='실시간 확인 실패: '+error.message;}
- finally{liveJob=null;if(stream&&!frozenMode)liveTimer=setTimeout(checkLive,600);}
-}
-
-// 미리보기와 주기적 OCR 검사를 시작한다. (비긴 라이브)
-// 이전 표시를 지우고 새 화면의 코드 위치를 검사한다.
-function beginLive(){
- liveEpoch++;dots.replaceChildren();clearTimeout(liveTimer);cancelAnimationFrame(animationId);
- lastPaint=0;animationId=requestAnimationFrame(paintLive);liveTimer=setTimeout(checkLive,600);
-}
-
-// 보정 강도를 바꾸고 이전 점 표시를 지운다. (체인지 필터)
-// 다음 검사부터 새 보정 강도로 코드를 읽는다.
-function changeFilter(){
- strengthValue.value=strength.value;liveEpoch++;dots.replaceChildren();
- if(stream&&!frozenMode){drawCorrected(liveCanvas);liveStatus.textContent='보정 변경 · 다음 코드 검사 중…';}
-}
-
-// 코드의 표기를 통일한다. (노멀라이즈 코드)
-// 공백과 하이픈을 정리해 엑셀 조회에 사용한다.
-function normalizeCode(value){
- return String(value??'').trim().replace(/[‐‑‒–—−﹣－]/g,'-').replace(/\s/g,'').toUpperCase();
-}
-
-// OCR 문장에서 규격에 맞는 코드와 문자열 위치를 찾는다. (파인드 코즈)
-// 코드 박스를 계산할 수 있도록 각 일치의 시작과 끝을 반환한다.
-function findCodes(text){
- const normalized=text.replace(/[‐‑‒–—−﹣－]/g,'-');
- const regex=/(?:^|[^A-Za-z0-9])([A-Za-z0-9]{4}[ \t]*-[ \t]*[A-Za-z0-9]{6})(?![A-Za-z0-9])/g;
- const matches=[];
- for(const match of normalized.matchAll(regex)){
-  const start=match.index+match[0].length-match[1].length;
-  matches.push({code:normalizeCode(match[1]),start,end:start+match[1].length});
- }
- return matches;
-}
-
-// 화면 전체 OCR에서 코드별 좌표를 구한다. (컬렉트 히츠)
-// 같은 코드가 여러 곳에 보여도 각 위치에 박스를 만든다.
-function collectHits(data){
- const hits=[];
- for(const block of data.blocks||[])for(const paragraph of block.paragraphs||[])for(const line of paragraph.lines||[]){
-  let text='';const spans=[];
-  for(const word of line.words||[]){
-   if(text)text+=' ';const start=text.length;text+=word.text;
-   spans.push({start,end:text.length,word});
-  }
-  for(const match of findCodes(text)){
-   const selected=spans.filter(span=>span.end>match.start&&span.start<match.end);
-   const bounds=[];
-   for(const span of selected){
-    const symbols=span.word.symbols||[];
-    if(symbols.length&&symbols.map(symbol=>symbol.text).join('')===span.word.text){
-     let offset=span.start;
-     for(const symbol of symbols){
-      const end=offset+symbol.text.length;
-      if(end>match.start&&offset<match.end&&symbol.bbox)bounds.push(symbol.bbox);
-      offset=end;
-     }
-    }else if(span.word.bbox)bounds.push(span.word.bbox);
-   }
-   if(!bounds.length)continue;
-   hits.push({code:match.code,bbox:{x0:Math.min(...bounds.map(b=>b.x0)),y0:Math.min(...bounds.map(b=>b.y0)),x1:Math.max(...bounds.map(b=>b.x1)),y1:Math.max(...bounds.map(b=>b.y1))}});
-  }
- }
- return hits;
-}
-
-// 두 인식 결과에서 같은 위치의 같은 코드를 합친다. (머지 히츠)
-// 다른 행의 동일 코드는 유지하고 겹치는 중복 박스만 제거한다.
-function mergeHits(groups){
- const merged=[];
- for(const hits of groups)for(const hit of hits){
-  const b=hit.bbox;
-  const duplicate=merged.some(existing=>{
-   if(existing.code!==hit.code)return false;
-   const a=existing.bbox;
-   const overlap=Math.max(0,Math.min(a.x1,b.x1)-Math.max(a.x0,b.x0))*Math.max(0,Math.min(a.y1,b.y1)-Math.max(a.y0,b.y0));
-   const smaller=Math.min((a.x1-a.x0)*(a.y1-a.y0),(b.x1-b.x0)*(b.y1-b.y0));
-   return smaller>0&&overlap/smaller>=0.5;
-  });
-  if(!duplicate)merged.push(hit);
- }
- return merged.sort((a,b)=>a.bbox.y0-b.bbox.y0||a.bbox.x0-b.bbox.x0);
-}
-
-// 코드 박스와 그 옆의 위치를 표시한다. (쇼 박시스)
-// 사용자가 누른 박스만 기록하고 같은 박스의 재추가를 막는다.
-function showBoxes(hits){
- boxes.replaceChildren();
- for(const hit of hits){
-  const button=document.createElement('button'),label=document.createElement('span');
-  const found=locations.get(hit.code),location=found?.length?found.join(' / '):'위치 없음';
-  const b=hit.bbox;
-  button.type='button';button.className='code-box';
-  if(!found?.length)button.classList.add('missing-box');
-  if(b.x1>frame.width/2)button.classList.add('label-left');
-  button.style.left=(b.x0/frame.width*100)+'%';button.style.top=(b.y0/frame.height*100)+'%';
-  button.style.width=((b.x1-b.x0)/frame.width*100)+'%';button.style.height=((b.y1-b.y0)/frame.height*100)+'%';
-  button.setAttribute('aria-label',hit.code+' - '+location+' 목록에 추가');
-  label.className='box-label';label.textContent=location;button.append(label);
-  button.addEventListener('click',event=>{
-   event.stopPropagation();if(busy||button.disabled)return;
-   addRecord(hit.code);button.disabled=true;status.textContent=hit.code+' - '+location+' 추가 완료';
-  });
-  boxes.append(button);
- }
-}
-
-// 정지 화면을 닫고 실시간 영상으로 돌아간다. (리줌 카메라)
-// 이전 박스를 지우고 다음 촬영을 준비한다.
-async function resumeCamera(){
- if(busy||!stream)return;
- try{
-  await camera.play();frozenMode=false;detectedHits=[];boxes.replaceChildren();
-  frozen.hidden=true;liveView.hidden=false;resume.disabled=true;strength.disabled=false;beginLive();
-  status.textContent='영상 화면을 터치하면 멈추고 전체 코드를 인식합니다.';
- }catch(error){status.textContent='영상 재생 실패: '+error.message;}
-}
-
-// 저장된 엑셀용 데이터베이스를 연다. (오픈 캐시)
-// 페이지를 다시 열 때도 같은 브라우저에서 데이터를 읽는다.
-function openCache(){
- return new Promise((resolve,reject)=>{
-  const request=indexedDB.open('item-location-cache',1);
-  request.onupgradeneeded=()=>request.result.createObjectStore('files');
-  request.onsuccess=()=>{database=request.result;resolve();};
-  request.onerror=()=>reject(request.error);
-  request.onblocked=()=>reject(new Error('다른 탭을 닫고 다시 시도하세요.'));
- });
-}
-
-// 엑셀 데이터 한 건을 읽거나 저장한다. (캐시 워크북)
-// 저장 완료 이후에만 다음 접속에서도 복원된다고 안내한다.
-function cacheWorkbook(value){
- return new Promise((resolve,reject)=>{
-  if(!database){reject(new Error('브라우저 저장소를 사용할 수 없습니다.'));return;}
-  const transaction=database.transaction('files',value===undefined?'readonly':'readwrite');
-  const store=transaction.objectStore('files');
-  const request=value===undefined?store.get('excel'):store.put(value,'excel');
-  transaction.oncomplete=()=>resolve(request.result);
-  transaction.onerror=()=>reject(transaction.error);
-  transaction.onabort=()=>reject(transaction.error||new Error('저장 중단'));
- });
-}
-
-// 선택한 시트의 코드와 위치를 조회표로 만든다. (빌드 로케이션스)
-// 헤더와 잘못된 코드는 제외하고 중복 코드의 위치는 함께 표시한다.
-function buildLocations(rows){
- const map=new Map();
- for(const row of rows){
-  const code=normalizeCode(row[0]);
-  if(!/^[A-Z0-9]{4}-[A-Z0-9]{6}$/.test(code))continue;
-  const location=String(row[1]??'').trim();
-  if(!map.has(code))map.set(code,[]);
-  if(location&&!map.get(code).includes(location))map.get(code).push(location);
- }
- return map;
-}
-
-// 불러온 엑셀의 시트와 조회표를 화면에 반영한다. (쇼 워크북)
-// 저장된 시트를 선택하고 유효한 물품코드 수를 표시한다.
-function showWorkbook(){
- sheet.replaceChildren();
- for(const name of Object.keys(workbook.sheets)){
-  const option=document.createElement('option');option.value=name;option.textContent=name;sheet.append(option);
- }
- if(!Object.hasOwn(workbook.sheets,workbook.selected))workbook.selected=sheet.value;
- sheet.value=workbook.selected;
- document.getElementById('sheetLabel').hidden=sheet.options.length<2;
- locations=buildLocations(workbook.sheets[workbook.selected]);
- if(frozenMode)showBoxes(detectedHits);
- excelStatus.textContent=workbook.name+' · '+workbook.selected+' · '+locations.size+'개 코드';
- start.disabled=!!stream||starting||!locations.size;
-}
-
-// 엑셀 파일을 읽고 다음 접속용 데이터를 저장한다. (로드 엑셀)
-// A열과 B열만 사용하며 기존 카메라와 기록은 유지한다.
-async function loadExcel(){
- const file=excel.files[0];if(!file)return;
- excel.disabled=true;sheet.disabled=true;start.disabled=true;busy=true;
- excelStatus.textContent='엑셀을 읽는 중…';
- try{
-  if(!window.XLSX)throw new Error('엑셀 라이브러리 로딩 실패. 인터넷 연결 후 새로고침하세요.');
-  const book=XLSX.read(await file.arrayBuffer(),{type:'array'}),sheets=Object.create(null);
-  for(const name of book.SheetNames){
-   const rows=XLSX.utils.sheet_to_json(book.Sheets[name],{header:1,raw:false,defval:''});
-   sheets[name]=rows.map(row=>[row[0]??'',row[1]??'']);
-  }
-  if(!book.SheetNames.length)throw new Error('시트가 없습니다.');
-  workbook={name:file.name,sheets,selected:book.SheetNames[0]};showWorkbook();
-  try{await cacheWorkbook(workbook);excelStatus.textContent+=' · 자동 복원 저장 완료';}
-  catch(error){excelStatus.textContent+=' · 저장 실패: 이번 접속에서만 사용 가능';}
-  status.textContent=locations.size?'카메라를 켜고 영상 화면을 터치하세요.':'이 시트에 규격에 맞는 코드가 없습니다. 다른 시트를 선택하세요.';
- }catch(error){excelStatus.textContent='엑셀 읽기 실패: '+error.message;if(workbook)showWorkbook();status.textContent='엑셀 파일을 다시 선택하세요.';}
- finally{excel.value='';excel.disabled=false;sheet.disabled=false;busy=false;start.disabled=!!stream||starting||!locations.size;}
-}
-
-// 조회할 시트를 바꾸고 선택을 저장한다. (체인지 시트)
-// 이후 코드 조회와 다음 접속에서 같은 시트를 사용한다.
-async function changeSheet(){
- if(!workbook||busy)return;
- busy=true;sheet.disabled=true;excel.disabled=true;
- workbook.selected=sheet.value;showWorkbook();
- try{await cacheWorkbook(workbook);excelStatus.textContent+=' · 자동 복원 저장 완료';}
- catch(error){excelStatus.textContent+=' · 시트 선택 저장 실패';}
- finally{busy=false;sheet.disabled=false;excel.disabled=false;}
-}
-
-// 후면 카메라를 켠다. (스타트 카메라)
-// 권한 거부와 HTTPS 미사용을 아래 상태 메시지로 안내한다.
-async function startCamera(){
- if(starting||stream||busy||!locations.size)return;
- starting=true;start.disabled=true;status.textContent='카메라를 켜는 중…';
- try{
-  if(!window.isSecureContext||!navigator.mediaDevices?.getUserMedia)throw new Error('HTTPS 주소에서 Chrome으로 열어주세요.');
-  stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}},audio:false});
-  camera.srcObject=stream;await camera.play();stop.disabled=false;
-  frozenMode=false;detectedHits=[];boxes.replaceChildren();frozen.hidden=true;liveView.hidden=false;resume.disabled=true;strength.disabled=false;beginLive();
-  status.textContent='영상 화면을 터치하면 멈추고 전체 코드를 인식합니다.';
- }catch(error){stopCamera();status.textContent=error.name==='NotAllowedError'?'카메라 권한이 거부되었습니다. 브라우저 사이트 설정에서 허용하세요.':'카메라 오류: '+error.message;}
- finally{starting=false;start.disabled=!!stream||!locations.size;}
-}
-
-// 사용 중인 카메라를 끈다. (스톱 카메라)
-// 모든 영상 트랙을 종료하고 다시 켜기 버튼을 활성화한다.
-function stopCamera(){
- if(stream)stream.getTracks().forEach(track=>track.stop());
- liveEpoch++;clearTimeout(liveTimer);cancelAnimationFrame(animationId);dots.replaceChildren();liveStatus.textContent='카메라 꺼짐';
- stream=null;camera.srcObject=null;stop.disabled=true;resume.disabled=true;start.disabled=busy||!locations.size;
- if(!busy)status.textContent='카메라가 꺼졌습니다.';
-}
-
-// 유효한 코드와 조회 위치를 한 줄로 기록한다. (애드 레코드)
-// 엑셀에 없는 코드도 위치 없음으로 추가하고 규격 밖 코드는 제외한다.
-function addRecord(code){
- if(!/^[A-Z0-9]{4}-[A-Z0-9]{6}$/.test(code))return;
- const row=document.createElement('div');row.className='record';
- const found=locations.get(code);
- if(!found){row.classList.add('missing');row.textContent=code+' - 위치 없음 (엑셀에 없는 코드)';}
- else if(!found.length){row.classList.add('missing');row.textContent=code+' - 위치 없음 (엑셀 위치 미입력)';}
- else row.textContent=code+' - '+found.join(' / ');
- records.append(row);document.getElementById('empty').hidden=true;
- document.getElementById('count').textContent=String(++recordCount);
-}
-
-// 같은 순간의 원본과 보정본을 각각 읽는다. (스캔 카메라)
-// 두 결과를 합쳐 박스로 표시하며 선택한 코드만 목록에 추가한다.
-async function scanCamera(){
- if(busy||starting||frozenMode)return;
- if(!stream||camera.readyState<2){status.textContent='카메라를 켜고 영상이 나올 때 터치하세요.';return;}
- if(!locations.size){status.textContent='유효한 코드가 있는 엑셀 시트를 먼저 선택하세요.';return;}
- busy=true;excel.disabled=true;sheet.disabled=true;resume.disabled=true;strength.disabled=true;liveCanvas.setAttribute('aria-busy','true');
- raw.textContent='';scanStats.textContent='';status.textContent='원본·보정본 인식을 준비합니다…';
- const started=performance.now(),amount=Number(strength.value);
- try{
-  if(!drawCorrected(originalFrame,0))throw new Error('영상이 아직 준비되지 않았습니다.');
-  frame.width=originalFrame.width;frame.height=originalFrame.height;
-  const ctx=frame.getContext('2d',{willReadFrequently:true});ctx.drawImage(originalFrame,0,0);
-  if(amount){const image=ctx.getImageData(0,0,frame.width,frame.height);applyFilter(image.data,amount);ctx.putImageData(image,0,0);}
-  camera.pause();frozenMode=true;liveEpoch++;clearTimeout(liveTimer);cancelAnimationFrame(animationId);dots.replaceChildren();
-  liveView.hidden=true;frozen.hidden=false;detectedHits=[];boxes.replaceChildren();liveStatus.textContent='정지 화면 · 인식 완료 후 박스를 선택하세요.';
-  if(liveJob)await liveJob.catch(()=>{});
-  const engine=await getWorker();
-  const passes=[{name:'원본',image:originalFrame}];
-  if(amount)passes.push({name:'보정본',image:frame});
-  const groups=[],stats=[],errors=[];
-  for(let i=0;i<passes.length;i++){
-   const pass=passes[i];recognitionStage=pass.name+' ('+(i+1)+'/'+passes.length+')';status.textContent=recognitionStage+' 코드 인식 중…';
-   try{
-    const {data}=await engine.recognize(pass.image,{}, {text:true,blocks:true});
-    const hits=collectHits(data);groups.push(hits);stats.push(pass.name+' '+hits.length+'곳');
-    raw.textContent+='['+pass.name+']\n'+data.text+'\n\n';
-   }catch(error){errors.push(pass.name+': '+error.message);raw.textContent+='['+pass.name+' 실패] '+error.message+'\n\n';}
-  }
-  if(!groups.length)throw new Error(errors.join(' / '));
-  detectedHits=mergeHits(groups);showBoxes(detectedHits);
-  const seconds=((performance.now()-started)/1000).toFixed(1);
-  scanStats.textContent=stats.join(' · ')+' → 합계 '+detectedHits.length+'곳 · '+seconds+'초'+(!amount?' · 보정 0%: 원본만 검사':'')+(errors.length?' · 일부 검사 실패':'');
-  status.textContent=detectedHits.length?detectedHits.length+'개 코드 표시 · 사진과 비교한 뒤 박스를 누르세요.':'코드를 찾지 못함 · 다시 촬영을 눌러 가까이 대고 재시도하세요.';
-  liveStatus.textContent='정지 화면 · 추가할 코드 박스를 선택하세요.';
- }catch(error){status.textContent='인식 실패: '+error.message;if(worker){await worker.terminate().catch(()=>{});worker=null;}}
- finally{recognitionStage='';busy=false;excel.disabled=false;sheet.disabled=false;liveCanvas.setAttribute('aria-busy','false');strength.disabled=frozenMode;resume.disabled=!stream||!frozenMode;start.disabled=!!stream||!locations.size;}
-}
-
-// 저장된 엑셀 데이터를 페이지 시작 시 복원한다. (리스토어 엑셀)
-// 파일을 다시 고르지 않고 이전 코드와 위치로 조회할 수 있게 한다.
-async function restoreExcel(){
- excel.disabled=true;
- try{
-  await openCache();const saved=await cacheWorkbook();
-  if(saved){workbook=saved;showWorkbook();excelStatus.textContent+=' · 저장 데이터 복원 완료';status.textContent='엑셀 복원 완료 · 카메라 켜기를 누르세요.';}
-  else excelStatus.textContent='엑셀을 한 번 선택하면 다음 접속부터 자동 복원합니다.';
- }catch(error){excelStatus.textContent='자동 저장소를 사용할 수 없습니다. 엑셀을 직접 선택하세요.';}
- finally{excel.disabled=false;}
-}
-excel.addEventListener('change',loadExcel);
-sheet.addEventListener('change',changeSheet);
-start.addEventListener('click',startCamera);
-stop.addEventListener('click',stopCamera);
-resume.addEventListener('click',resumeCamera);
-strength.addEventListener('input',changeFilter);
-liveCanvas.addEventListener('click',scanCamera);
-liveCanvas.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();scanCamera();}});
-window.addEventListener('pagehide',stopCamera);
-restoreExcel();
-</script>
+<script src="state.js"></script>
+<script src="image.js"></script>
+<script src="ocr.js"></script>
+<script src="camera.js"></script>
+<script src="excel.js"></script>
+<script src="records.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
+
