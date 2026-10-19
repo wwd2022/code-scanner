@@ -52,8 +52,8 @@ async function resumeCamera(){
  if(busy||!stream)return;
  try{
   await camera.play();frozenMode=false;detectedHits=[];boxes.replaceChildren();
-  frozen.hidden=true;zoomImage.hidden=true;liveView.hidden=false;resume.disabled=true;strength.disabled=false;beginLive();
-  status.textContent='영상 화면을 터치하면 멈추고 전체 코드를 인식합니다.';
+  frozen.hidden=true;zoomImage.hidden=true;liveView.hidden=false;resume.disabled=true;strength.disabled=false;readImage.disabled=false;beginLive();
+  status.textContent='코드 인식 시작 버튼을 누르면 화면을 멈추고 코드를 인식합니다.';
  }catch(error){status.textContent='영상 재생 실패: '+error.message;}
 }
 
@@ -77,6 +77,6 @@ async function startCamera(){
 function stopCamera(){
  if(stream)stream.getTracks().forEach(track=>track.stop());
  liveEpoch++;clearTimeout(liveTimer);cancelAnimationFrame(animationId);dots.replaceChildren();liveStatus.textContent='카메라 꺼짐';
- stream=null;camera.srcObject=null;stop.disabled=true;resume.disabled=true;start.disabled=busy;
+ stream=null;camera.srcObject=null;stop.disabled=true;resume.disabled=true;readImage.disabled=true;start.disabled=busy;
  if(!busy)status.textContent='카메라가 꺼졌습니다.';
 }
