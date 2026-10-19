@@ -52,7 +52,7 @@ async function resumeCamera(){
  if(busy||!stream)return;
  try{
   await camera.play();frozenMode=false;detectedHits=[];boxes.replaceChildren();
-  frozen.hidden=true;liveView.hidden=false;resume.disabled=true;strength.disabled=false;beginLive();
+  frozen.hidden=true;zoomImage.hidden=true;liveView.hidden=false;resume.disabled=true;strength.disabled=false;beginLive();
   status.textContent='영상 화면을 터치하면 멈추고 전체 코드를 인식합니다.';
  }catch(error){status.textContent='영상 재생 실패: '+error.message;}
 }
@@ -66,7 +66,7 @@ async function startCamera(){
   if(!window.isSecureContext||!navigator.mediaDevices?.getUserMedia)throw new Error('HTTPS 주소에서 Chrome으로 열어주세요.');
   stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}},audio:false});
   camera.srcObject=stream;await camera.play();stop.disabled=false;
-  frozenMode=false;detectedHits=[];boxes.replaceChildren();frozen.hidden=true;liveView.hidden=false;resume.disabled=true;strength.disabled=false;beginLive();
+  frozenMode=false;detectedHits=[];boxes.replaceChildren();frozen.hidden=true;zoomImage.hidden=true;liveView.hidden=false;resume.disabled=true;strength.disabled=false;beginLive();
   status.textContent='영상 화면을 터치하면 멈추고 전체 코드를 인식합니다.';
  }catch(error){stopCamera();status.textContent=error.name==='NotAllowedError'?'카메라 권한이 거부되었습니다. 브라우저 사이트 설정에서 허용하세요.':'카메라 오류: '+error.message;}
  finally{starting=false;lockInputs(false);start.disabled=!!stream;}

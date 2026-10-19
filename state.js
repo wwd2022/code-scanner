@@ -17,3 +17,8 @@ let activeTab='camera',photoReady=false;
 const photoSource=document.createElement('canvas');
 const photoInput=document.getElementById('photoInput'),readImage=document.getElementById('readImage');
 const tabButtons=[...document.querySelectorAll('[data-tab]')];
+
+const filterMode=document.getElementById('filterMode'),brightness=document.getElementById('brightness');
+const threshold=document.getElementById('threshold'),removeLines=document.getElementById('removeLines'),deepScan=document.getElementById('deepScan');
+const correctionInputs=[filterMode,brightness,threshold,removeLines,deepScan];
+const imageViewport=document.getElementById('imageViewport'),zoomImage=document.getElementById('zoomImage');

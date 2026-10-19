@@ -23,14 +23,17 @@ function normalizeCode(value){
 // OCR 문장에서 규격에 맞는 코드와 문자열 위치를 찾는다. (파인드 코즈)
 // 코드 박스를 계산할 수 있도록 각 일치의 시작과 끝을 반환한다.
 function findCodes(text){
- const normalized=text.replace(/[‐‑‒–—−﹣－]/g,'-');
- const regex=/(?:^|[^A-Za-z0-9])([A-Za-z0-9]{4}[ \t]*-[ \t]*[A-Za-z0-9]{6})(?![A-Za-z0-9])/g;
- const matches=[];
- for(const match of normalized.matchAll(regex)){
-  const start=match.index+match[0].length-match[1].length;
-  matches.push({code:normalizeCode(match[1]),start,end:start+match[1].length});
+ const normalized=text.replace(/[‐‑‒–—−﹣－~]/g,'-'),matches=[];
+ const patterns=[
+  {regex:/(?:^|[^A-Za-z0-9])([A-Za-z0-9]{4}[ \t]*-[ \t]*(?:[A-Za-z0-9]{6}|[0-9]{3}[ \t]+[0-9]{3}))(?![A-Za-z0-9])/g,review:false},
+  {regex:/(?:^|[^A-Za-z0-9])([0-9]{4}[ \t]*-[ \t]*(?:[0-9]{6}|[0-9]{3}[ \t]+[0-9]{3}))(?=[VvYy](?![A-Za-z0-9]))/g,review:true}
+ ];
+ for(const {regex,review} of patterns)for(const match of normalized.matchAll(regex)){
+  const start=match.index+match[0].length-match[1].length,end=start+match[1].length;
+  if(matches.some(item=>item.start===start))continue;
+  matches.push({code:normalizeCode(match[1]),start,end,review:review||text.slice(start,end).includes('~')});
  }
- return matches;
+ return matches.sort((a,b)=>a.start-b.start);
 }
 
 // 화면 전체 OCR에서 코드별 좌표를 구한다. (컬렉트 히츠)
@@ -55,42 +58,59 @@ function collectHits(data){
       if(end>match.start&&offset<match.end&&symbol.bbox)bounds.push(symbol.bbox);
       offset=end;
      }
-    }else if(span.word.bbox)bounds.push(span.word.bbox);
+    }else if(span.word.bbox){
+     const b=span.word.bbox,length=span.end-span.start;
+     bounds.push({...b,x0:b.x0+(b.x1-b.x0)*Math.max(0,match.start-span.start)/length,x1:b.x0+(b.x1-b.x0)*Math.min(length,match.end-span.start)/length});
+    }
    }
    if(!bounds.length)continue;
-   hits.push({code:match.code,bbox:{x0:Math.min(...bounds.map(b=>b.x0)),y0:Math.min(...bounds.map(b=>b.y0)),x1:Math.max(...bounds.map(b=>b.x1)),y1:Math.max(...bounds.map(b=>b.y1))}});
+   hits.push({code:match.code,review:match.review,confidence:Math.min(...selected.map(span=>span.word.confidence??0)),bbox:{x0:Math.min(...bounds.map(b=>b.x0)),y0:Math.min(...bounds.map(b=>b.y0)),x1:Math.max(...bounds.map(b=>b.x1)),y1:Math.max(...bounds.map(b=>b.y1))}});
   }
  }
  return hits;
 }
 
-// 두 인식 결과에서 같은 위치의 같은 코드를 합친다. (머지 히츠)
-// 다른 행의 동일 코드는 유지하고 겹치는 중복 박스만 제거한다.
+// 같은 위치에서 읽힌 후보들을 비교한다. (머지 히츠)
+// 다른 행은 유지하고 결과가 서로 다르면 확인 표시를 붙인다.
 function mergeHits(groups){
- const merged=[];
+ const clusters=[];
  for(const hits of groups)for(const hit of hits){
   const b=hit.bbox;
-  const duplicate=merged.some(existing=>{
-   if(existing.code!==hit.code)return false;
+  const cluster=clusters.find(items=>items.some(existing=>{
    const a=existing.bbox;
    const overlap=Math.max(0,Math.min(a.x1,b.x1)-Math.max(a.x0,b.x0))*Math.max(0,Math.min(a.y1,b.y1)-Math.max(a.y0,b.y0));
    const smaller=Math.min((a.x1-a.x0)*(a.y1-a.y0),(b.x1-b.x0)*(b.y1-b.y0));
    return smaller>0&&overlap/smaller>=0.5;
-  });
-  if(!duplicate)merged.push(hit);
+  }));
+  if(cluster)cluster.push(hit);else clusters.push([hit]);
  }
- return merged.sort((a,b)=>a.bbox.y0-b.bbox.y0||a.bbox.x0-b.bbox.x0);
+ return clusters.map(items=>{
+  const choices=new Map();
+  for(const hit of items){
+   const previous=choices.get(hit.code);
+   if(!previous)choices.set(hit.code,{...hit,votes:1});
+   else{
+    previous.votes++;previous.review=previous.review&&hit.review;
+    if(hit.confidence>previous.confidence){previous.confidence=hit.confidence;previous.bbox=hit.bbox;}
+   }
+  }
+  // 같은 보정 영상의 반복 오독이 신뢰도 높은 원본을 밀어내지 않게 한다.
+  const ranked=[...choices.values()].sort((a,b)=>((b.confidence||0)+Math.min(b.votes-1,2)*3)-((a.confidence||0)+Math.min(a.votes-1,2)*3));
+  const best=ranked[0];
+  return {...best,alternatives:ranked.slice(1).map(item=>item.code),review:!!best.review||ranked.length>1||(best.confidence??100)<60};
+ }).sort((a,b)=>a.bbox.y0-b.bbox.y0||a.bbox.x0-b.bbox.x0);
 }
 
 // 카메라 또는 선택한 이미지의 원본과 보정본을 읽는다. (스캔 카메라)
-// 두 결과를 합쳐 박스로 표시하며 선택한 코드만 목록에 추가한다.
+// 확대 검사 결과도 원본 위치에 표시하며 선택한 코드만 기록한다.
 async function scanCamera(){
  if(busy||starting||(activeTab==='camera'&&frozenMode))return;
  if(activeTab==='camera'&&(!stream||camera.readyState<2)){status.textContent='카메라를 켜고 영상이 나올 때 터치하세요.';return;}
  if(activeTab!=='camera'&&!photoReady)return;
  busy=true;lockInputs(true);excel.disabled=true;sheet.disabled=true;resume.disabled=true;strength.disabled=true;liveCanvas.setAttribute('aria-busy','true');
  raw.textContent='';scanStats.textContent='';status.textContent='원본·보정본 인식을 준비합니다…';
- const started=performance.now(),amount=Number(strength.value);
+ const started=performance.now();
+ const settings={mode:filterMode.value,brightness:Number(brightness.value),threshold:Number(threshold.value),removeLines:removeLines.checked,deep:deepScan.checked,strength:Number(strength.value)};
  try{
   if(activeTab==='camera'){
    if(!drawCorrected(originalFrame,0))throw new Error('영상이 아직 준비되지 않았습니다.');
@@ -100,27 +120,29 @@ async function scanCamera(){
   }
   frame.width=originalFrame.width;frame.height=originalFrame.height;
   const ctx=frame.getContext('2d',{willReadFrequently:true});ctx.drawImage(originalFrame,0,0);
-  if(amount){const image=ctx.getImageData(0,0,frame.width,frame.height);applyFilter(image.data,amount);ctx.putImageData(image,0,0);}
   camera.pause();frozenMode=true;liveEpoch++;clearTimeout(liveTimer);cancelAnimationFrame(animationId);dots.replaceChildren();
-  liveView.hidden=true;frozen.hidden=false;detectedHits=[];boxes.replaceChildren();liveStatus.textContent='정지 화면 · 인식 완료 후 박스를 선택하세요.';
+  liveView.hidden=true;frozen.hidden=false;zoomImage.hidden=false;detectedHits=[];boxes.replaceChildren();liveStatus.textContent='정지 화면 · 인식 완료 후 박스를 선택하세요.';
   if(liveJob)await liveJob.catch(()=>{});
   const engine=await getWorker();
-  const passes=[{name:'원본',image:originalFrame}];
-  if(amount)passes.push({name:'보정본',image:frame});
+  const passes=createScanPasses(originalFrame.width,originalFrame.height,settings);
   const groups=[],stats=[],errors=[];
   for(let i=0;i<passes.length;i++){
    const pass=passes[i];recognitionStage=pass.name+' ('+(i+1)+'/'+passes.length+')';status.textContent=recognitionStage+' 코드 인식 중…';
+   let rendered;
    try{
-    const {data}=await engine.recognize(pass.image,{}, {text:true,blocks:true});
-    const hits=collectHits(data);groups.push(hits);stats.push(pass.name+' '+hits.length+'곳');
+    rendered=renderScanPass(originalFrame,pass,settings);
+    const {data}=await engine.recognize(rendered.image,{}, {text:true,blocks:true});
+    const hits=mapScanHits(collectHits(data),pass,rendered.scaleX,rendered.scaleY);groups.push(hits);stats.push(pass.name+' '+hits.length+'곳');
+    detectedHits=mergeHits(groups);showBoxes(detectedHits);
     raw.textContent+='['+pass.name+']\n'+data.text+'\n\n';
    }catch(error){errors.push(pass.name+': '+error.message);raw.textContent+='['+pass.name+' 실패] '+error.message+'\n\n';}
+   finally{if(rendered)rendered.image.width=rendered.image.height=1;}
   }
   if(!groups.length)throw new Error(errors.join(' / '));
   detectedHits=mergeHits(groups);showBoxes(detectedHits);
   const seconds=((performance.now()-started)/1000).toFixed(1);
-  scanStats.textContent=stats.join(' · ')+' → 합계 '+detectedHits.length+'곳 · '+seconds+'초'+(!amount?' · 보정 0%: 원본만 검사':'')+(errors.length?' · 일부 검사 실패':'');
-  status.textContent=detectedHits.length?detectedHits.length+'개 코드 표시 · 사진과 비교한 뒤 박스를 누르세요.':'코드를 찾지 못함 · 보정 강도를 바꾸거나 다른 이미지로 재시도하세요.';
+  scanStats.textContent=stats.join(' · ')+' → 합계 '+detectedHits.length+'곳 · '+seconds+'초'+(errors.length?' · 일부 검사 실패':'');
+  status.textContent=detectedHits.length?detectedHits.length+'개 코드 표시 · 확인 표시가 있는 코드는 사진과 비교하세요.':'코드를 찾지 못함 · 보정 강도를 바꾸거나 다른 이미지로 재시도하세요.';
   liveStatus.textContent='정지 화면 · 추가할 코드 박스를 선택하세요.';
  }catch(error){status.textContent='인식 실패: '+error.message;if(worker){await worker.terminate().catch(()=>{});worker=null;}}
  finally{recognitionStage='';busy=false;lockInputs(false);excel.disabled=false;sheet.disabled=false;liveCanvas.setAttribute('aria-busy','false');strength.disabled=activeTab==='camera'&&frozenMode;resume.disabled=!stream||!frozenMode;start.disabled=!!stream;}

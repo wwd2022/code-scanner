@@ -8,14 +8,26 @@ function showBoxes(hits){
   const b=hit.bbox;
   button.disabled=!!hit.added;button.type='button';button.className='code-box';
   if(!found?.length)button.classList.add('missing-box');
+  if(hit.review)button.classList.add('needs-review');
+  if(hit.added)button.classList.add('checked');
   if(b.x1>frame.width/2)button.classList.add('label-left');
   button.style.left=(b.x0/frame.width*100)+'%';button.style.top=(b.y0/frame.height*100)+'%';
   button.style.width=((b.x1-b.x0)/frame.width*100)+'%';button.style.height=((b.y1-b.y0)/frame.height*100)+'%';
   button.setAttribute('aria-label',hit.code+' - '+location+' 목록에 추가');
-  label.className='box-label';label.textContent=location;button.append(label);
+  label.className='box-label';label.textContent=(hit.added?'✓ ':'')+hit.code+(hit.review?' · 확인':'');button.append(label);
+  button.title=hit.code+' - '+location;
   button.addEventListener('click',event=>{
    event.stopPropagation();if(busy||button.disabled)return;
-   addRecord(hit.code);hit.added=true;button.disabled=true;status.textContent=hit.code+' - '+location+' 추가 완료';
+   let code=hit.code;
+   if(hit.review){
+    const alternatives=hit.alternatives?.length?'\n다른 인식 후보: '+hit.alternatives.join(', '):'';
+    const entered=window.prompt('사진과 비교해 품목코드를 확인하거나 수정하세요.'+alternatives,code);
+    if(entered===null)return;
+    code=normalizeCode(entered);
+    if(!/^[A-Z0-9]{4}-[A-Z0-9]{6}$/.test(code)){status.textContent='코드는 영문·숫자 4자리-6자리로 입력하세요.';return;}
+   }
+   addRecord(code);hit.code=code;hit.added=true;hit.review=false;showBoxes(detectedHits);
+   status.textContent=code+' 추가 완료';
   });
   boxes.append(button);
  }

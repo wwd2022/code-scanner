@@ -24,20 +24,29 @@
 <div id="photoControls" class="panel" hidden><label for="photoInput">휴대폰 사진 선택</label><input id="photoInput" type="file" accept="image/*"><small>사진은 서버에 업로드하지 않고 브라우저에서 처리합니다.</small></div>
 <div id="testControls" class="panel" hidden><p>샘플 코드 3개로 OCR을 확인합니다.</p><small>AB12-A00345 · 1234-123456 · ZX90-B67890<br>위치는 선택한 엑셀에서 조회합니다.</small></div>
 <button id="readImage" hidden disabled>이미지 인식</button>
-<div class="panel filter-panel"><label for="strength">흑백·대비 보정 강도 <output id="strengthValue">50</output>%</label><input id="strength" type="range" min="0" max="100" step="5" value="50"><small>0% 원본 · 100% 강한 흑백 보정</small></div>
+<div class="panel filter-panel"><label for="strength">실시간 영상·대비 모드 강도 <output id="strengthValue">50</output>%</label><input id="strength" type="range" min="0" max="100" step="5" value="50"><small>0% 원본 · 100% 강한 흑백 보정. 인쇄물 모드는 아래 글자 농도를 사용합니다.</small></div>
+<details class="panel" id="advanced"><summary>인쇄물 보정 · 정밀 인식</summary>
+<label for="filterMode">보정 방식 <select id="filterMode"><option value="print" selected>인쇄물 · 그림자 보정</option><option value="contrast">기존 흑백·대비</option></select></label>
+<label for="brightness">밝기 <output id="brightnessValue">0</output><input id="brightness" type="range" min="-60" max="60" step="5" value="0"></label>
+<label for="threshold">인쇄물 글자 농도 <output id="thresholdValue">16</output><input id="threshold" type="range" min="4" max="32" step="2" value="16"></label>
+<label><input id="removeLines" type="checkbox" checked> 표 테두리 완화</label>
+<label><input id="deepScan" type="checkbox" checked> 정밀 인식 · 겹치는 6개 구역 확대 검사</label>
+<small>농도가 낮으면 옅은 글자를 더 남깁니다. 정밀 인식은 시간이 더 걸립니다. 실시간 영상에는 기존 흑백·대비만 적용합니다.</small>
+</details>
 <video id="camera" autoplay muted playsinline aria-hidden="true"></video>
 <div id="liveView"><canvas id="liveCanvas" role="button" tabindex="0" aria-label="보정된 카메라 화면을 터치하여 코드 선택" aria-busy="false"></canvas><div id="dots"></div></div>
 <div id="liveStatus" role="status">빨간 점: 정규식에 맞는 코드 위치 · OCR 확인 후 표시됩니다.</div>
-<div id="frozen" hidden><canvas id="snapshot"></canvas><div id="boxes"></div></div>
+<button id="zoomImage" type="button" aria-pressed="false" hidden>사진 2배 확대</button>
+<div id="imageViewport"><div id="frozen" hidden><canvas id="snapshot"></canvas><div id="boxes"></div></div></div>
 <div id="status" role="status" aria-live="polite">카메라를 켜거나 사진을 선택하세요. 엑셀 없이도 인식할 수 있습니다.</div>
-<small>인식된 박스를 누르면 코드와 위치가 기록됩니다.</small>
+<small>인식된 코드 박스를 누르면 기록됩니다. ‘확인’ 표시는 사진과 비교하고 수정할 수 있습니다.</small>
 <section class="panel">
 <h2>조회 기록 <span id="count">0</span></h2>
 <div id="empty" class="empty">터치한 박스의 코드 - 위치만 한 줄씩 추가됩니다.</div>
 <div id="records"></div>
 </section>
 <div id="scanStats" class="empty"></div>
-<details class="panel"><summary>원본·보정본 OCR 결과</summary><pre id="raw"></pre></details>
+<details class="panel"><summary>인식 상세 결과</summary><pre id="raw"></pre></details>
 <p><small>같은 브라우저·주소에서 엑셀 데이터를 자동 복원합니다. 엑셀 원본 변경 시 다시 선택하세요. 브라우저 데이터 삭제·시크릿 모드에서는 저장이 유지되지 않을 수 있습니다.<br>카메라는 HTTPS 페이지에서 사용하세요. OCR·엑셀 라이브러리 로딩에 인터넷이 필요합니다.</small></p>
 </main>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
