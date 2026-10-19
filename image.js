@@ -33,3 +33,88 @@ function changeFilter(){
  if(stream&&!frozenMode){drawCorrected(liveCanvas);liveStatus.textContent='보정 변경 · 다음 코드 검사 중…';}
  if(activeTab!=='camera'&&photoReady)previewPhoto();
 }
+
+// 그림자를 줄이고 인쇄 글자를 흑백으로 분리한다. (프린트 필터)
+// 원본은 보존하며 주변 밝기 기준과 긴 표 선만 보정한다.
+function printFilter(image,offset=16,cleanLines=true){
+ const {width:w,height:h,data}=image,n=w*h,gray=new Uint8Array(n),blur=new Uint8Array(n);
+ for(let i=0;i<n;i++)gray[i]=Math.round(data[i*4]*.299+data[i*4+1]*.587+data[i*4+2]*.114);
+ for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+  let sum=0;
+  for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+   sum+=gray[Math.max(0,Math.min(h-1,y+dy))*w+Math.max(0,Math.min(w-1,x+dx))]*(dy===0?2:1)*(dx===0?2:1);
+  }
+  blur[y*w+x]=Math.round(sum/16);
+ }
+ const stride=w+1,integral=new Float64Array(stride*(h+1)),mask=new Uint8Array(n);
+ for(let y=0;y<h;y++){
+  let sum=0;
+  for(let x=0;x<w;x++){sum+=blur[y*w+x];integral[(y+1)*stride+x+1]=integral[y*stride+x+1]+sum;}
+ }
+ for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+  const x0=Math.max(0,x-25),y0=Math.max(0,y-25),x1=Math.min(w,x+26),y1=Math.min(h,y+26);
+  const mean=(integral[y1*stride+x1]-integral[y0*stride+x1]-integral[y1*stride+x0]+integral[y0*stride+x0])/((x1-x0)*(y1-y0));
+  mask[y*w+x]=blur[y*w+x]<mean-offset?1:0;
+ }
+ if(cleanLines){
+  const lines=new Uint8Array(n),length=80;
+  for(let y=0;y<h;y++){
+   let begin=-1;
+   for(let x=0;x<=w;x++){
+    if(x<w&&mask[y*w+x]){if(begin<0)begin=x;}
+    else if(begin>=0){if(x-begin>=length)for(let xx=begin;xx<x;xx++)lines[y*w+xx]=1;begin=-1;}
+   }
+  }
+  for(let x=0;x<w;x++){
+   let begin=-1;
+   for(let y=0;y<=h;y++){
+    if(y<h&&mask[y*w+x]){if(begin<0)begin=y;}
+    else if(begin>=0){if(y-begin>=length)for(let yy=begin;yy<y;yy++)lines[yy*w+x]=1;begin=-1;}
+   }
+  }
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++)if(lines[y*w+x]){
+   for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++)if(x+dx>=0&&x+dx<w&&y+dy>=0&&y+dy<h)mask[(y+dy)*w+x+dx]=0;
+  }
+ }
+ for(let i=0;i<n;i++){const v=mask[i]?0:255;data[i*4]=data[i*4+1]=data[i*4+2]=v;}
+}
+
+// 전체 사진과 겹치는 확대 구역을 준비한다. (크리에이트 스캔 패시스)
+// 구역 경계의 코드도 포함하고 한 번에 캔버스 한 장씩 처리한다.
+function createScanPasses(width,height,settings){
+ const full={x:0,y:0,width,height};
+ const passes=[{...full,name:'전체 원본',mode:'original',scale:Math.min(1,2400/Math.max(width,height))}];
+ passes.push({...full,name:'전체 보정',mode:settings.mode,scale:Math.min(1,2400/Math.max(width,height))});
+ if(settings.deep){
+  const tw=Math.ceil(width*.5),th=Math.ceil(height*.65);
+  for(let row=0;row<2;row++)for(let col=0;col<3;col++)passes.push({
+   x:Math.round((width-tw)*col/2),y:(height-th)*row,width:tw,height:th,
+   name:'확대 '+(row*3+col+1),mode:settings.mode,scale:Math.min(2,2000/Math.max(tw,th))
+  });
+ }
+ return passes;
+}
+
+// 인식할 구역에 밝기와 인쇄물 보정을 적용한다. (렌더 스캔 패스)
+// 실제 확대 비율을 반환하여 박스를 원본 사진 좌표로 되돌린다.
+function renderScanPass(source,pass,settings){
+ const crop=document.createElement('canvas');crop.width=pass.width;crop.height=pass.height;
+ const ctx=crop.getContext('2d',{willReadFrequently:true});
+ ctx.drawImage(source,pass.x,pass.y,pass.width,pass.height,0,0,crop.width,crop.height);
+ if(pass.mode!=='original'){
+  const pixels=ctx.getImageData(0,0,crop.width,crop.height);
+  if(settings.brightness)for(let i=0;i<pixels.data.length;i+=4)for(let c=0;c<3;c++)pixels.data[i+c]+=settings.brightness;
+  if(pass.mode==='print')printFilter(pixels,settings.threshold,settings.removeLines);
+  else applyFilter(pixels.data,settings.strength);
+  ctx.putImageData(pixels,0,0);
+ }
+ const output=document.createElement('canvas');output.width=Math.max(1,Math.round(crop.width*pass.scale));output.height=Math.max(1,Math.round(crop.height*pass.scale));
+ output.getContext('2d').drawImage(crop,0,0,output.width,output.height);crop.width=crop.height=1;
+ return {image:output,scaleX:output.width/pass.width,scaleY:output.height/pass.height};
+}
+
+// 확대 구역의 박스를 원본 사진 위치로 변환한다. (맵 스캔 히츠)
+// 전체 화면과 확대 검사 결과를 같은 좌표계에서 비교한다.
+function mapScanHits(hits,pass,scaleX,scaleY){
+ return hits.map(hit=>({...hit,bbox:{x0:hit.bbox.x0/scaleX+pass.x,y0:hit.bbox.y0/scaleY+pass.y,x1:hit.bbox.x1/scaleX+pass.x,y1:hit.bbox.y1/scaleY+pass.y}}));
+}

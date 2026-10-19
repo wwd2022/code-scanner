@@ -2,19 +2,19 @@
 // 탭·파일 선택·인식 버튼의 활성 상태를 함께 바꾼다.
 function lockInputs(locked){
  tabButtons.forEach(button=>button.disabled=locked);
+ correctionInputs.forEach(input=>input.disabled=locked);
  photoInput.disabled=locked;readImage.disabled=locked||!photoReady;
 }
 
-// 원본 사진에 현재 보정을 적용해 표시한다. (프리뷰 포토)
+// 선택한 사진의 원본을 표시한다. (프리뷰 포토)
 // 이전 인식 박스를 지우며 원본 픽셀은 유지한다.
 function previewPhoto(){
  frame.width=photoSource.width;frame.height=photoSource.height;
  const ctx=frame.getContext('2d',{willReadFrequently:true});
  ctx.drawImage(photoSource,0,0);
- const pixels=ctx.getImageData(0,0,frame.width,frame.height);
- applyFilter(pixels.data,Number(strength.value));ctx.putImageData(pixels,0,0);
+ // 사진 원본 위에 인식 박스를 표시해 보정 결과와 비교한다.
  detectedHits=[];boxes.replaceChildren();raw.textContent='';scanStats.textContent='';
- frozenMode=true;frozen.hidden=false;liveView.hidden=true;
+ frozenMode=true;frozen.hidden=false;liveView.hidden=true;zoomImage.hidden=false;
  readImage.disabled=false;strength.disabled=false;
  status.textContent='이미지 인식을 누르세요. 인식한 박스를 누르면 기록됩니다.';
 }
@@ -34,6 +34,7 @@ function makeTestImage(){
 function switchTab(tab){
  if(busy||starting||activeTab===tab)return;
  stopCamera();activeTab=tab;photoReady=false;frozenMode=false;
+ imageViewport.classList.remove('zoomed');zoomImage.setAttribute('aria-pressed','false');zoomImage.textContent='사진 2배 확대';zoomImage.hidden=true;
  detectedHits=[];boxes.replaceChildren();raw.textContent='';scanStats.textContent='';
  tabButtons.forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.tab===tab)));
  document.getElementById('cameraControls').hidden=tab!=='camera';
@@ -48,7 +49,7 @@ function switchTab(tab){
 }
 
 // 선택한 사진을 읽고 크기를 줄여 미리 보여준다. (로드 포토)
-// 큰 사진은 긴 변 2200픽셀로 줄이고 임시 주소를 해제한다.
+// 큰 사진은 긴 변 3200픽셀로 줄이고 임시 주소를 해제한다.
 async function loadPhoto(){
  const file=photoInput.files[0];if(!file||busy||starting)return;
  busy=true;lockInputs(true);excel.disabled=true;sheet.disabled=true;strength.disabled=true;
@@ -56,25 +57,34 @@ async function loadPhoto(){
  try{
   status.textContent='사진을 읽는 중…';
   const picture=new Image();picture.src=url;await picture.decode();
-  const scale=Math.min(1,2200/Math.max(picture.naturalWidth,picture.naturalHeight));
+  const scale=Math.min(1,3200/Math.max(picture.naturalWidth,picture.naturalHeight));
   photoSource.width=Math.max(1,Math.round(picture.naturalWidth*scale));
   photoSource.height=Math.max(1,Math.round(picture.naturalHeight*scale));
   photoSource.getContext('2d').drawImage(picture,0,0,photoSource.width,photoSource.height);
   photoReady=true;previewPhoto();
  }catch(error){
-  photoReady=false;frozen.hidden=true;boxes.replaceChildren();
+  photoReady=false;frozen.hidden=true;zoomImage.hidden=true;boxes.replaceChildren();
   status.textContent='사진을 읽지 못했습니다. JPG 또는 PNG 사진으로 다시 선택하세요.';
  }finally{
   URL.revokeObjectURL(url);photoInput.value='';busy=false;lockInputs(false);
   excel.disabled=false;sheet.disabled=false;strength.disabled=false;
  }
 }
+// 작은 코드 박스를 확대하거나 원래 배율로 돌린다. (토글 이미지 줌)
+// 박스와 사진을 함께 확대하고 가로·세로 스크롤을 허용한다.
+function toggleImageZoom(){
+ const zoomed=imageViewport.classList.toggle('zoomed');
+ zoomImage.setAttribute('aria-pressed',String(zoomed));zoomImage.textContent=zoomed?'사진 원래 크기':'사진 2배 확대';
+}
+zoomImage.addEventListener('click',toggleImageZoom);
 excel.addEventListener('change',loadExcel);
 sheet.addEventListener('change',changeSheet);
 start.addEventListener('click',startCamera);
 stop.addEventListener('click',stopCamera);
 resume.addEventListener('click',resumeCamera);
 strength.addEventListener('input',changeFilter);
+brightness.addEventListener('input',()=>document.getElementById('brightnessValue').value=brightness.value);
+threshold.addEventListener('input',()=>document.getElementById('thresholdValue').value=threshold.value);
 liveCanvas.addEventListener('click',scanCamera);
 liveCanvas.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();scanCamera();}});
 tabButtons.forEach(button=>button.addEventListener('click',()=>switchTab(button.dataset.tab)));
