@@ -1,0 +1,19 @@
+const excel=document.getElementById('excel'),sheet=document.getElementById('sheet');
+const excelStatus=document.getElementById('excelStatus'),camera=document.getElementById('camera');
+const start=document.getElementById('start'),stop=document.getElementById('stop');
+const status=document.getElementById('status'),records=document.getElementById('records');
+const raw=document.getElementById('raw'),frame=document.getElementById('snapshot');
+const frozen=document.getElementById('frozen'),boxes=document.getElementById('boxes'),resume=document.getElementById('resume');
+const liveView=document.getElementById('liveView'),liveCanvas=document.getElementById('liveCanvas'),dots=document.getElementById('dots');
+const strength=document.getElementById('strength'),strengthValue=document.getElementById('strengthValue'),liveStatus=document.getElementById('liveStatus');
+const liveFrame=document.createElement('canvas'),originalFrame=document.createElement('canvas');
+const scanStats=document.getElementById('scanStats');
+let recognitionStage='';
+let animationId=0,liveTimer=0,liveJob=null,workerPromise=null,liveEpoch=0,lastPaint=0;
+let workbook=null,locations=new Map(),stream=null,worker=null,busy=false,starting=false;
+let database=null,recordCount=0,frozenMode=false,detectedHits=[];
+
+let activeTab='camera',photoReady=false;
+const photoSource=document.createElement('canvas');
+const photoInput=document.getElementById('photoInput'),readImage=document.getElementById('readImage');
+const tabButtons=[...document.querySelectorAll('[data-tab]')];
