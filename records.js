@@ -33,15 +33,19 @@ function showBoxes(hits){
  }
 }
 
-// 유효한 코드와 조회 위치를 한 줄로 기록한다. (애드 레코드)
+// 품목코드를 왼쪽, 조회 위치를 오른쪽에 기록한다. (애드 레코드)
 // 엑셀에 없는 코드도 위치 없음으로 추가하고 규격 밖 코드는 제외한다.
 function addRecord(code){
  if(!/^[A-Z0-9]{4}-[A-Z0-9]{6}$/.test(code))return;
  const row=document.createElement('div');row.className='record';
+ const codeCell=document.createElement('span'),locationCell=document.createElement('span');
+ codeCell.className='record-code';codeCell.textContent=code;
+ locationCell.className='record-location';
  const found=locations.get(code);
- if(!found){row.classList.add('missing');row.textContent=code+' - 위치 없음 (엑셀에 없는 코드)';}
- else if(!found.length){row.classList.add('missing');row.textContent=code+' - 위치 없음 (엑셀 위치 미입력)';}
- else row.textContent=code+' - '+found.join(' / ');
+ if(!found){row.classList.add('missing');locationCell.textContent='위치 없음 (엑셀에 없는 코드)';}
+ else if(!found.length){row.classList.add('missing');locationCell.textContent='위치 없음 (엑셀 위치 미입력)';}
+ else locationCell.textContent=found.join(' / ');
+ row.append(codeCell,locationCell);
  records.append(row);document.getElementById('empty').hidden=true;
  document.getElementById('count').textContent=String(++recordCount);
 }
