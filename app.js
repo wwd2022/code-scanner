@@ -3,7 +3,7 @@
 function lockInputs(locked){
  tabButtons.forEach(button=>button.disabled=locked);
  correctionInputs.forEach(input=>input.disabled=locked);
- photoInput.disabled=locked;readImage.disabled=locked||!photoReady;
+ photoInput.disabled=locked;readImage.disabled=locked||(activeTab==='camera'?(!stream||frozenMode):!photoReady);
 }
 
 // 선택한 사진의 원본을 표시한다. (프리뷰 포토)
@@ -40,11 +40,11 @@ function switchTab(tab){
  document.getElementById('cameraControls').hidden=tab!=='camera';
  document.getElementById('photoControls').hidden=tab!=='photo';
  document.getElementById('testControls').hidden=tab!=='test';
- readImage.hidden=tab==='camera';readImage.disabled=true;
+ readImage.disabled=true;
  liveView.hidden=tab!=='camera';liveStatus.hidden=tab!=='camera';frozen.hidden=true;
  strength.disabled=false;photoInput.value='';
  liveCanvas.getContext('2d').clearRect(0,0,liveCanvas.width,liveCanvas.height);
- status.textContent=tab==='camera'?'카메라를 켜고 화면을 터치하세요.':'휴대폰에 저장된 사진을 선택하세요.';
+ status.textContent=tab==='camera'?'카메라를 켠 다음 코드 인식 시작을 누르세요.':'사진을 선택한 뒤 코드 인식 시작을 누르세요.';
  if(tab==='test')makeTestImage();
 }
 
@@ -102,8 +102,6 @@ resume.addEventListener('click',resumeCamera);
 strength.addEventListener('input',changeFilter);
 brightness.addEventListener('input',()=>document.getElementById('brightnessValue').value=brightness.value);
 threshold.addEventListener('input',()=>document.getElementById('thresholdValue').value=threshold.value);
-liveCanvas.addEventListener('click',scanCamera);
-liveCanvas.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();scanCamera();}});
 tabButtons.forEach(button=>button.addEventListener('click',()=>switchTab(button.dataset.tab)));
 photoInput.addEventListener('change',loadPhoto);
 readImage.addEventListener('click',scanCamera);
