@@ -76,6 +76,23 @@ function toggleImageZoom(){
  const zoomed=imageViewport.classList.toggle('zoomed');
  zoomImage.setAttribute('aria-pressed',String(zoomed));zoomImage.textContent=zoomed?'사진 원래 크기':'사진 2배 확대';
 }
+// 인식 박스의 진하기만 조절한다. (체인지 박스 오패시티)
+// 원본 사진·인식 결과·박스 클릭 영역은 유지한다.
+function changeBoxOpacity(){
+ boxOpacityValue.value=boxOpacity.value;
+ boxes.style.setProperty('--box-opacity',String(Number(boxOpacity.value)/100));
+}
+
+// 선택한 이미지 보정 탭을 바꾼다. (스위치 코렉션 모드)
+// OCR에 적용될 보정 방식과 탭 표시를 함께 갱신한다.
+function switchCorrectionMode(mode){
+ if(busy||starting)return;
+ filterMode.value=mode;
+ correctionModeButtons.forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.filterMode===mode)));
+}
+boxOpacity.addEventListener('input',changeBoxOpacity);
+correctionModeButtons.forEach(button=>button.addEventListener('click',()=>switchCorrectionMode(button.dataset.filterMode)));
+changeBoxOpacity();
 zoomImage.addEventListener('click',toggleImageZoom);
 excel.addEventListener('change',loadExcel);
 sheet.addEventListener('change',changeSheet);
