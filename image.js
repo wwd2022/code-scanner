@@ -12,14 +12,22 @@ function applyFilter(pixels,amount){
  }
 }
 
-// 카메라 프레임을 보정해서 캔버스에 그린다. (드로 코렉티드)
-// 화면 전체 비율을 유지하며 이 영상에서 코드를 인식한다.
+// 카메라를 화면 비율로 잘라 캔버스에 그린다. (드로 코렉티드)
+// 미리보기·실시간 OCR·촬영에 같은 중앙 영역을 사용한다.
 function drawCorrected(target,amount=Number(strength.value)){
  if(camera.readyState<2||!camera.videoWidth)return false;
- const scale=Math.min(1,2200/Math.max(camera.videoWidth,camera.videoHeight));
- const width=Math.round(camera.videoWidth*scale),height=Math.round(camera.videoHeight*scale);
+ const viewWidth=liveView.clientWidth,viewHeight=liveView.clientHeight;
+ if(!viewWidth||!viewHeight)return false;
+ const ratio=viewWidth/viewHeight;
+ let sourceWidth=camera.videoWidth,sourceHeight=camera.videoHeight;
+ if(sourceWidth/sourceHeight>ratio)sourceWidth=sourceHeight*ratio;
+ else sourceHeight=sourceWidth/ratio;
+ const sourceX=(camera.videoWidth-sourceWidth)/2,sourceY=(camera.videoHeight-sourceHeight)/2;
+ const scale=Math.min(1,2200/Math.max(sourceWidth,sourceHeight));
+ const width=Math.max(1,Math.round(sourceWidth*scale)),height=Math.max(1,Math.round(sourceHeight*scale));
  if(target.width!==width||target.height!==height){target.width=width;target.height=height;}
- const ctx=target.getContext('2d',{willReadFrequently:true});ctx.drawImage(camera,0,0,width,height);
+ const ctx=target.getContext('2d',{willReadFrequently:true});
+ ctx.drawImage(camera,sourceX,sourceY,sourceWidth,sourceHeight,0,0,width,height);
  if(amount){
   const image=ctx.getImageData(0,0,width,height);applyFilter(image.data,amount);ctx.putImageData(image,0,0);
  }
