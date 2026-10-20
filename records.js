@@ -1,25 +1,25 @@
-// 인식 코드와 엑셀 위치를 박스 아래 양쪽에 표시한다. (쇼 박시스)
-// 박스는 코드와 엑셀 위치만 보여주며 클릭 동작은 없다.
+// 인식한 코드 위에 코드 박스, 지정 방향에 위치 박스를 그린다. (쇼 박시스)
+// OCR 좌표를 유지하며 투명도는 코드 박스에만 적용한다.
 function showBoxes(hits){
  boxes.replaceChildren();
+ const angle=(Number(locationDirectionIndex)-8)*Math.PI/16;
+ const dx=Math.cos(angle)*110,dy=Math.sin(angle)*65;
  for(const hit of hits){
-  const button=document.createElement('div'),label=document.createElement('span');
-  const found=locations.get(hit.code),location=found?.length?found.join(' / '):'ㅡ없음';
-  const b=hit.bbox;
-  button.className='code-box';
-  if(!found?.length)button.classList.add('missing-box');
-  if(hit.review)button.classList.add('needs-review');
-  if(b.x1>frame.width/2)button.classList.add('label-left');
-  button.style.left=b.x0/frame.width*100+'%';button.style.top=b.y0/frame.height*100+'%';
-  button.style.width=(b.x1-b.x0)/frame.width*100+'%';button.style.height=(b.y1-b.y0)/frame.height*100+'%';
-  button.setAttribute('aria-label',hit.code+' · 위치 '+location);
-  label.className='box-label';
-  const codeText=document.createElement('span'),locationText=document.createElement('span');
-  codeText.textContent=hit.code+(hit.review?' · 확인':'');
-  locationText.textContent=location;
-  label.append(codeText,locationText);button.append(label);
-  button.title=hit.code+' / '+location;
-  boxes.append(button);
+  const b=hit.bbox,found=locations.get(hit.code),location=found?.length?found.join(' / '):'ㅡ없음';
+  const code=document.createElement('div'),place=document.createElement('div');
+  code.className='code-box';
+  if(!found?.length)code.classList.add('missing-box');
+  if(hit.review)code.classList.add('needs-review');
+  code.style.left=b.x0/frame.width*100+'%';code.style.top=b.y0/frame.height*100+'%';
+  code.style.width=(b.x1-b.x0)/frame.width*100+'%';code.style.height=(b.y1-b.y0)/frame.height*100+'%';
+  code.textContent=hit.code+(hit.review?' · 확인':'');
+  code.style.opacity=Number(boxOpacity.value)/100;
+  place.className='location-box';place.textContent=location;
+  place.style.left=(b.x0+b.x1)/2/frame.width*100+'%';
+  place.style.top=(b.y0+b.y1)/2/frame.height*100+'%';
+  place.style.transform='translate(calc(-50% + '+dx+'px),calc(-50% + '+dy+'px))';
+  place.title=hit.code+' / '+location;
+  boxes.append(code,place);
  }
 }
 
