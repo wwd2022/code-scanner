@@ -41,7 +41,7 @@ function setPhotoZoom(value,centerX=imageViewport.clientWidth/2,centerY=imageVie
  const next=Math.max(1,Math.min(6,value)),ratio=next/photoZoom;
  const left=(imageViewport.scrollLeft+centerX)*ratio-centerX;
  const top=(imageViewport.scrollTop+centerY)*ratio-centerY;
- photoZoom=next;imageViewport.style.setProperty('--photo-zoom',String(next));
+ photoZoom=next;frozen.style.width=(next*100)+'%';
  imageViewport.scrollLeft=left;imageViewport.scrollTop=top;
  zoomLevel.textContent=Math.round(next*100)+'%';
 }
