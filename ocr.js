@@ -201,5 +201,5 @@ async function scanCamera(){
   status.textContent=detectedHits.length?detectedHits.length+'개 코드 표시 · 확인 표시는 사진과 비교하세요.':'코드를 찾지 못함 · 확대 위치나 보정 설정을 바꿔 재검사하세요.';
   liveStatus.textContent='정지 화면 · 코드와 위치를 확인하세요.';
  }catch(error){status.textContent='인식 실패: '+error.message;if(worker){await worker.terminate().catch(()=>{});worker=null;}}
- finally{recognitionStage='';busy=false;lockInputs(false);excel.disabled=false;sheet.disabled=false;liveCanvas.setAttribute('aria-busy','false');strength.disabled=activeTab==='camera'&&frozenMode;resume.disabled=!stream||!frozenMode;start.disabled=!!stream;}
+ finally{recognitionStage='';busy=false;lockInputs(false);excel.disabled=false;sheet.disabled=false;liveCanvas.setAttribute('aria-busy','false');strength.disabled=activeTab==='camera'&&frozenMode;resume.disabled=!stream||!frozenMode;start.disabled=!!stream;readImage.textContent=activeTab==='camera'&&frozenMode?'다시 촬영':'코드 인식';}
 }
