@@ -18,7 +18,7 @@ function makeTestImage(){
  const ctx=photoSource.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,1200,700);
  ctx.fillStyle='#111';ctx.font='bold 64px monospace';
  ['AB12-A00345','1234-123456','ZX90-B67890'].forEach((code,index)=>ctx.fillText(code,100,160+index*190));
- photoReady=true;previewPhoto();setPhotoZoom(1);
+ photoReady=true;previewPhoto();setPhotoZoom(1);imageViewport.scrollLeft=0;imageViewport.scrollTop=0;
 }
 
 // 선택한 사진을 읽고 크기를 줄여 미리 보여준다. (로드 포토)
@@ -34,7 +34,7 @@ async function loadPhoto(){
   photoSource.width=Math.max(1,Math.round(picture.naturalWidth*scale));
   photoSource.height=Math.max(1,Math.round(picture.naturalHeight*scale));
   photoSource.getContext('2d').drawImage(picture,0,0,photoSource.width,photoSource.height);
-  photoReady=true;previewPhoto();setPhotoZoom(1);
+  photoReady=true;previewPhoto();setPhotoZoom(1);imageViewport.scrollLeft=0;imageViewport.scrollTop=0;
  }catch(error){
   photoReady=false;frozen.hidden=true;imageViewport.hidden=true;zoomLevel.hidden=true;zoomHint.hidden=true;boxes.replaceChildren();
   status.textContent='사진을 읽지 못했습니다. JPG 또는 PNG 사진으로 다시 선택하세요.';
