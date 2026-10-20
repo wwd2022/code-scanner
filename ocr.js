@@ -149,7 +149,7 @@ function mergeHits(groups){
 }
 
 // 카메라 또는 선택한 이미지의 원본과 보정본을 읽는다. (스캔 카메라)
-// 확대 검사 결과도 원본 위치에 표시하며 선택한 코드만 기록한다.
+// 확대 사진에서는 보이는 부분만 검사하고 박스는 원본 위치에 표시한다.
 async function scanCamera(){
  if(busy||starting||(activeTab==='camera'&&frozenMode))return;
  if(activeTab==='camera'&&(!stream||camera.readyState<2)){status.textContent='카메라를 켠 다음 코드 인식 시작을 누르세요.';return;}
@@ -168,23 +168,31 @@ async function scanCamera(){
   frame.width=originalFrame.width;frame.height=originalFrame.height;
   const ctx=frame.getContext('2d',{willReadFrequently:true});ctx.drawImage(originalFrame,0,0);
   if(activeTab==='camera')camera.pause();frozenMode=true;liveEpoch++;clearTimeout(liveTimer);cancelAnimationFrame(animationId);dots.replaceChildren();
-  liveView.hidden=true;frozen.hidden=false;zoomImage.hidden=false;detectedHits=[];boxes.replaceChildren();liveStatus.textContent='정지 화면 · 인식 결과를 확인하세요.';
+  liveView.hidden=true;imageViewport.hidden=false;frozen.hidden=false;zoomLevel.hidden=activeTab==='camera';zoomHint.hidden=activeTab==='camera';detectedHits=[];boxes.replaceChildren();liveStatus.textContent='정지 화면 · 인식 결과를 확인하세요.';
   if(liveJob)await liveJob.catch(()=>{});
-  const passes=createScanPasses(originalFrame.width,originalFrame.height,settings);
+  const area=activeTab==='camera'?null:getVisiblePhotoRegion();
+  let scanSource=originalFrame;
+  if(area){
+   scanSource=document.createElement('canvas');scanSource.width=area.width;scanSource.height=area.height;
+   scanSource.getContext('2d').drawImage(originalFrame,area.x,area.y,area.width,area.height,0,0,area.width,area.height);
+  }
+  const passes=createScanPasses(scanSource.width,scanSource.height,settings);
   const groups=[],stats=[],errors=[];
   // 확대 검사도 같은 최대 2개 워커 풀을 사용한다.
-  const results=await runParallelPasses(passes,settings,originalFrame);
+  const results=await runParallelPasses(passes,settings,scanSource);
+  if(area)scanSource.width=scanSource.height=1;
   for(let i=0;i<results.length;i++){
    const pass=passes[i],result=results[i];
    if(result.error){errors.push(pass.name+': '+result.error);raw.textContent+='['+pass.name+' 실패] '+result.error+'\\n\\n';continue;}
-   groups.push(result.hits);stats.push(pass.name+' '+result.hits.length+'곳');
+   groups.push(area?result.hits.map(hit=>({...hit,bbox:{x0:hit.bbox.x0+area.x,y0:hit.bbox.y0+area.y,x1:hit.bbox.x1+area.x,y1:hit.bbox.y1+area.y}})):result.hits);
+   stats.push(pass.name+' '+result.hits.length+'곳');
    raw.textContent+='['+pass.name+']\\n'+result.text+'\\n\\n';
   }
   if(!groups.length)throw new Error(errors.join(' / '));
   detectedHits=mergeHits(groups);showBoxes(detectedHits);
   const seconds=((performance.now()-started)/1000).toFixed(1);
-  scanStats.textContent=stats.join(' · ')+' → 합계 '+detectedHits.length+'곳 · '+seconds+'초'+(errors.length?' · 일부 검사 실패':'');
-  status.textContent=detectedHits.length?detectedHits.length+'개 코드 표시 · 확인 표시가 있는 코드는 사진과 비교하세요.':'코드를 찾지 못함 · 보정 강도를 바꾸거나 다른 이미지로 재시도하세요.';
+  scanStats.textContent=(area?'확대 영역 · ':'전체 이미지 · ')+stats.join(' · ')+' → 합계 '+detectedHits.length+'곳 · '+seconds+'초'+(errors.length?' · 일부 검사 실패':'');
+  status.textContent=detectedHits.length?detectedHits.length+'개 코드 표시 · 확인 표시는 사진과 비교하세요.':'코드를 찾지 못함 · 확대 위치나 보정 설정을 바꿔 재검사하세요.';
   liveStatus.textContent='정지 화면 · 코드와 위치를 확인하세요.';
  }catch(error){status.textContent='인식 실패: '+error.message;if(worker){await worker.terminate().catch(()=>{});worker=null;}}
  finally{recognitionStage='';busy=false;lockInputs(false);excel.disabled=false;sheet.disabled=false;liveCanvas.setAttribute('aria-busy','false');strength.disabled=activeTab==='camera'&&frozenMode;resume.disabled=!stream||!frozenMode;start.disabled=!!stream;}
