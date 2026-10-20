@@ -6,9 +6,9 @@ function previewPhoto(){
  ctx.drawImage(photoSource,0,0);
  // 사진 원본 위에 인식 박스를 표시해 보정 결과와 비교한다.
  detectedHits=[];boxes.replaceChildren();raw.textContent='';scanStats.textContent='';
- frozenMode=true;frozen.hidden=false;liveView.hidden=true;zoomImage.hidden=false;
+ frozenMode=true;frozen.hidden=false;imageViewport.hidden=false;liveView.hidden=true;zoomLevel.hidden=false;zoomHint.hidden=false;
  readImage.disabled=false;strength.disabled=false;
- status.textContent='이미지 인식을 누르세요. 인식한 박스를 누르면 기록됩니다.';
+ status.textContent='두 손가락 확대·이동 / 두 번 터치 또는 인식 버튼으로 검사';
 }
 
 // 테스트용 코드 이미지를 만든다. (메이크 테스트 이미지)
@@ -18,7 +18,7 @@ function makeTestImage(){
  const ctx=photoSource.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,1200,700);
  ctx.fillStyle='#111';ctx.font='bold 64px monospace';
  ['AB12-A00345','1234-123456','ZX90-B67890'].forEach((code,index)=>ctx.fillText(code,100,160+index*190));
- photoReady=true;previewPhoto();
+ photoReady=true;previewPhoto();setPhotoZoom(1);
 }
 
 // 선택한 사진을 읽고 크기를 줄여 미리 보여준다. (로드 포토)
@@ -34,9 +34,9 @@ async function loadPhoto(){
   photoSource.width=Math.max(1,Math.round(picture.naturalWidth*scale));
   photoSource.height=Math.max(1,Math.round(picture.naturalHeight*scale));
   photoSource.getContext('2d').drawImage(picture,0,0,photoSource.width,photoSource.height);
-  photoReady=true;previewPhoto();
+  photoReady=true;previewPhoto();setPhotoZoom(1);
  }catch(error){
-  photoReady=false;frozen.hidden=true;zoomImage.hidden=true;boxes.replaceChildren();
+  photoReady=false;frozen.hidden=true;imageViewport.hidden=true;zoomLevel.hidden=true;zoomHint.hidden=true;boxes.replaceChildren();
   status.textContent='사진을 읽지 못했습니다. JPG 또는 PNG 사진으로 다시 선택하세요.';
  }finally{
   URL.revokeObjectURL(url);photoInput.value='';busy=false;lockInputs(false);
