@@ -19,7 +19,7 @@ button:disabled{opacity:.45;cursor:default}button:focus-visible,input:focus-visi
 #boxes,#dots{position:absolute;inset:0;pointer-events:none}
 #boxes{opacity:var(--box-opacity,.65)}
 #boxOpacity{display:block;width:100%;margin:6px 0}
-.code-box{position:absolute;pointer-events:auto;border:2px solid #16833d;background:rgba(20,180,80,.18);padding:0;margin:0;border-radius:2px;min-height:22px}
+.code-box{position:absolute;pointer-events:none;border:2px solid #16833d;background:rgba(20,180,80,.18);padding:0;margin:0;border-radius:2px;min-height:22px}
 .code-box.missing-box{border-color:#b16b00;background:rgba(255,180,50,.2)}
 .code-box:disabled{border-style:dashed;opacity:.65}
 .box-label{position:absolute;top:100%;left:0;display:flex;justify-content:space-between;gap:10px;min-width:160px;width:max-content;max-width:280px;background:#222;color:#fff;padding:3px 5px;font-size:11px;line-height:1.4;pointer-events:none}.box-label span{white-space:nowrap}
