@@ -35,7 +35,7 @@ button:disabled{opacity:.45;cursor:default}button:focus-visible,input:focus-visi
 #zoomLevel{top:8px;right:8px}
 #zoomHint{left:8px;bottom:8px}
 #status{color:#566375;min-height:18px;max-height:40px;overflow:hidden;font-size:12px;flex-shrink:0}
-#readImage{width:100%;min-height:48px;background:#182e4e;color:white;font-weight:700;border-color:#182e4e;margin:0;flex-shrink:0}
+#readImage{width:100%;min-height:60px;background:#182e4e;color:white;font-weight:700;border-color:#182e4e;margin:0;flex-shrink:0}
 .tool-menu{display:flex;gap:6px;position:relative;z-index:10;flex-shrink:0}
 .tool-drawer{flex:1;min-width:0}
 .tool-drawer>summary{list-style:none;display:flex;align-items:center;justify-content:center;gap:4px;min-height:40px;background:#eef2f7;border:1px solid #dce3ec;border-radius:9px;font-weight:600;cursor:pointer}
