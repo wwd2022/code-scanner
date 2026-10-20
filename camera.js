@@ -52,7 +52,7 @@ async function resumeCamera(){
  if(busy||!stream)return;
  try{
   await camera.play();frozenMode=false;detectedHits=[];boxes.replaceChildren();
-  frozen.hidden=true;imageViewport.hidden=true;zoomLevel.hidden=true;zoomHint.hidden=true;liveView.hidden=false;resume.disabled=true;strength.disabled=false;readImage.disabled=false;beginLive();
+  frozen.hidden=true;imageViewport.hidden=true;zoomLevel.hidden=true;zoomHint.hidden=true;liveView.hidden=false;resume.disabled=true;strength.disabled=false;readImage.disabled=false;readImage.textContent='코드 인식';beginLive();
   status.textContent='코드 인식 시작 버튼을 누르면 화면을 멈추고 코드를 인식합니다.';
  }catch(error){status.textContent='영상 재생 실패: '+error.message;}
 }
