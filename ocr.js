@@ -167,7 +167,13 @@ async function scanCamera(){
   }
   frame.width=originalFrame.width;frame.height=originalFrame.height;
   const ctx=frame.getContext('2d',{willReadFrequently:true});ctx.drawImage(originalFrame,0,0);
+  // 정지 화면도 카메라 미리보기와 같은 대비 강도로 표시한다.
+  if(activeTab==='camera'&&Number(strength.value)){
+   const pixels=ctx.getImageData(0,0,frame.width,frame.height);
+   applyFilter(pixels.data,Number(strength.value));ctx.putImageData(pixels,0,0);
+  }
   if(activeTab==='camera')camera.pause();frozenMode=true;liveEpoch++;clearTimeout(liveTimer);cancelAnimationFrame(animationId);dots.replaceChildren();
+  imageViewport.classList.toggle('camera-shot',activeTab==='camera');
   liveView.hidden=true;imageViewport.hidden=false;frozen.hidden=false;zoomLevel.hidden=activeTab==='camera';zoomHint.hidden=activeTab==='camera';detectedHits=[];boxes.replaceChildren();liveStatus.textContent='정지 화면 · 인식 결과를 확인하세요.';
   if(liveJob)await liveJob.catch(()=>{});
   const area=activeTab==='camera'?null:getVisiblePhotoRegion();
