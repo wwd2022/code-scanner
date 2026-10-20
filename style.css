@@ -61,3 +61,11 @@ button:disabled{opacity:.45;cursor:default}button:focus-visible,input:focus-visi
 .record{padding:8px 0;border-bottom:1px solid #eee;overflow-wrap:anywhere}.missing{color:#875500}
 .raw-details{margin-top:12px;border-top:1px solid #ddd;padding-top:10px}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px}
 @media(max-height:600px){main{gap:5px;padding-top:max(5px,env(safe-area-inset-top))}.app-header{min-height:24px}#readImage{min-height:42px}.mode-controls{min-height:36px}}
+
+.test-controls{flex-wrap:wrap;align-content:center;gap:4px;min-height:0}
+.test-controls label{display:flex;align-items:center;gap:4px;font-size:11px;white-space:nowrap}
+.test-controls input[type=number]{width:47px;padding:5px}
+.test-controls select{padding:5px}
+.test-controls input[type=range]{width:64px}
+.test-controls button{flex:1 1 85px;min-height:31px;padding:4px;font-size:12px}
+.test-controls .test-check{white-space:nowrap}
