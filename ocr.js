@@ -101,6 +101,49 @@ function mergeHits(groups){
  }).sort((a,b)=>a.bbox.y0-b.bbox.y0||a.bbox.x0-b.bbox.x0);
 }
 
+// 선택한 박스 주변만 확대하여 OCR을 다시 실행한다. (리체크 코드)
+// 원본 좌표를 유지하며 재인식 성공 시 코드와 엑셀 위치 라벨을 갱신한다.
+async function recheckCode(hit){
+ if(busy||starting||!frozenMode)return;
+ busy=true;lockInputs(true);excel.disabled=true;sheet.disabled=true;strength.disabled=true;
+ const previous=hit.code,b=hit.bbox;
+ status.textContent=previous+' 영역 재인식 중…';
+ try{
+  const padX=Math.max(20,(b.x1-b.x0)*0.65),padY=Math.max(15,(b.y1-b.y0)*1.2);
+  const x=Math.max(0,Math.floor(b.x0-padX)),y=Math.max(0,Math.floor(b.y0-padY));
+  const w=Math.min(originalFrame.width-x,Math.ceil(b.x1+padX)-x);
+  const h=Math.min(originalFrame.height-y,Math.ceil(b.y1+padY)-y);
+  if(w<=0||h<=0)throw new Error('이미지 영역이 올바르지 않습니다.');
+  const settings={mode:filterMode.value,brightness:Number(brightness.value),threshold:Number(threshold.value),removeLines:removeLines.checked,strength:Number(strength.value)};
+  const scale=Math.min(4,Math.max(1,1400/Math.max(w,h)));
+  const pass={x,y,width:w,height:h,mode:'original',scale};
+  const engine=await getWorker(),candidates=[];
+  for(const mode of ['original',settings.mode]){
+   pass.mode=mode;
+   const rendered=renderScanPass(originalFrame,pass,settings);
+   try{
+    const {data}=await engine.recognize(rendered.image,{}, {text:true,blocks:true});
+    const hits=mapScanHits(collectHits(data),pass,rendered.scaleX,rendered.scaleY);
+    candidates.push(...hits);
+   }finally{rendered.image.width=rendered.image.height=1;}
+  }
+  const centerX=(b.x0+b.x1)/2,centerY=(b.y0+b.y1)/2;
+  const nearby=candidates.filter(candidate=>{
+   const c=candidate.bbox,cx=(c.x0+c.x1)/2,cy=(c.y0+c.y1)/2;
+   return Math.abs(cx-centerX)<=Math.max(30,(b.x1-b.x0)*1.1)&&Math.abs(cy-centerY)<=Math.max(20,(b.y1-b.y0)*1.8);
+  });
+  nearby.sort((a,b)=>b.confidence-a.confidence);
+  if(!nearby.length){status.textContent=previous+' 재인식 실패 · 기존 코드를 유지합니다.';return;}
+  const best=nearby[0];
+  hit.code=best.code;hit.confidence=best.confidence;
+  hit.review=nearby.some(candidate=>candidate.code!==best.code)||best.confidence<60;
+  hit.alternatives=[...new Set(nearby.map(candidate=>candidate.code).filter(code=>code!==best.code))];
+  showBoxes(detectedHits);
+  status.textContent=previous===best.code?best.code+' 재인식 완료 · 기존 코드와 일치':previous+' → '+best.code+' 재인식으로 수정 · 엑셀 위치 갱신';
+ }catch(error){status.textContent='재인식 실패 · 기존 코드 유지: '+error.message;}
+ finally{busy=false;lockInputs(false);excel.disabled=false;sheet.disabled=false;strength.disabled=activeTab==='camera'&&frozenMode;}
+}
+
 // 카메라 또는 선택한 이미지의 원본과 보정본을 읽는다. (스캔 카메라)
 // 확대 검사 결과도 원본 위치에 표시하며 선택한 코드만 기록한다.
 async function scanCamera(){
