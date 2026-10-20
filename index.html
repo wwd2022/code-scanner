@@ -37,6 +37,7 @@
 <div id="imageViewport" hidden aria-label="사진 보기 · 두 손가락 확대 및 이동 · 두 번 터치 인식">
 <div id="frozen" hidden><canvas id="snapshot"></canvas><div id="boxes"></div></div>
 </div>
+<div id="boxVisibility" class="box-visibility" hidden>박스 표시</div>
 <div id="zoomLevel" hidden>100%</div>
 <div id="zoomHint" hidden>두 손가락 확대 · 두 번 터치 인식</div>
 </section>
@@ -73,7 +74,7 @@
 </div>
 <label for="boxOpacity">코드 박스 투명도 <output id="boxOpacityValue">65</output>%</label>
 <input id="boxOpacity" type="range" min="10" max="100" step="5" value="65">
-<label>위치 박스 방향 (32방향)</label>
+<label>위치 박스 방향 (16방향 · 드래그)</label>
 <div id="locationDial" class="location-dial" role="group" aria-label="위치 박스 표시 방향"></div>
 <small id="locationDirection">왼쪽</small>
 <small>인쇄물 모드는 그림자를 보정합니다. 설정은 세 가지 입력 모드에 공통 적용됩니다.</small>
