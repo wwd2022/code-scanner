@@ -24,7 +24,7 @@ button:disabled{opacity:.45;cursor:default}button:focus-visible,input:focus-visi
 #liveCanvas{background:#222;cursor:pointer}
 #imageViewport{touch-action:none;scrollbar-width:none}
 #imageViewport::-webkit-scrollbar{display:none}
-#frozen{position:relative;width:calc(100% * var(--photo-zoom,1));max-width:none}
+#frozen{position:relative;width:100%;max-width:none}
 #boxes,#dots{position:absolute;inset:0;pointer-events:none}
 #boxes{opacity:var(--box-opacity,.65)}
 #liveStatus{position:absolute;left:8px;right:8px;bottom:8px;background:#18212bbd;color:#fff;padding:6px 8px;border-radius:6px;font-size:11px;pointer-events:none;max-height:42px;overflow:hidden}
