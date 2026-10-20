@@ -64,7 +64,8 @@ async function startCamera(){
  starting=true;lockInputs(true);start.disabled=true;status.textContent='카메라를 켜는 중…';
  try{
   if(!window.isSecureContext||!navigator.mediaDevices?.getUserMedia)throw new Error('HTTPS 주소에서 Chrome으로 열어주세요.');
-  stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}},audio:false});
+  const ratio=liveView.clientWidth/Math.max(1,liveView.clientHeight);
+  stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080},aspectRatio:{ideal:ratio}},audio:false});
   camera.srcObject=stream;await camera.play();stop.disabled=false;
   frozenMode=false;detectedHits=[];boxes.replaceChildren();frozen.hidden=true;imageViewport.hidden=true;zoomLevel.hidden=true;zoomHint.hidden=true;liveView.hidden=false;resume.disabled=true;strength.disabled=false;beginLive();
   status.textContent='코드 인식 시작 버튼을 누르면 화면을 멈추고 코드를 인식합니다.';
