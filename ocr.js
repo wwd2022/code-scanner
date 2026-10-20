@@ -105,7 +105,7 @@ function mergeHits(groups){
 // 확대 검사 결과도 원본 위치에 표시하며 선택한 코드만 기록한다.
 async function scanCamera(){
  if(busy||starting||(activeTab==='camera'&&frozenMode))return;
- if(activeTab==='camera'&&(!stream||camera.readyState<2)){status.textContent='카메라를 켜고 영상이 나올 때 터치하세요.';return;}
+ if(activeTab==='camera'&&(!stream||camera.readyState<2)){status.textContent='카메라를 켠 다음 코드 인식 시작을 누르세요.';return;}
  if(activeTab!=='camera'&&!photoReady)return;
  busy=true;lockInputs(true);excel.disabled=true;sheet.disabled=true;resume.disabled=true;strength.disabled=true;liveCanvas.setAttribute('aria-busy','true');
  raw.textContent='';scanStats.textContent='';status.textContent='원본·보정본 인식을 준비합니다…';
@@ -120,7 +120,7 @@ async function scanCamera(){
   }
   frame.width=originalFrame.width;frame.height=originalFrame.height;
   const ctx=frame.getContext('2d',{willReadFrequently:true});ctx.drawImage(originalFrame,0,0);
-  camera.pause();frozenMode=true;liveEpoch++;clearTimeout(liveTimer);cancelAnimationFrame(animationId);dots.replaceChildren();
+  if(activeTab==='camera')camera.pause();frozenMode=true;liveEpoch++;clearTimeout(liveTimer);cancelAnimationFrame(animationId);dots.replaceChildren();
   liveView.hidden=true;frozen.hidden=false;zoomImage.hidden=false;detectedHits=[];boxes.replaceChildren();liveStatus.textContent='정지 화면 · 인식 완료 후 박스를 선택하세요.';
   if(liveJob)await liveJob.catch(()=>{});
   const engine=await getWorker();
