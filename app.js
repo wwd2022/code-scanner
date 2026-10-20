@@ -169,28 +169,6 @@ imageViewport.addEventListener('pointerup',event=>{
  tapStart=null;
 });
 imageViewport.addEventListener('click',event=>{if(event.pointerType!=='touch')toggleBoxes();});
-// 화면에 적용 중인 인식 설정을 하나의 객체로 읽는다. (리드 세팅스)
-// OCR 보정과 박스 표시값만 수집하고 사진·엑셀은 포함하지 않는다.
-function readSettings(){
- return {strength:Number(strength.value),filterMode:filterMode.value,brightness:Number(brightness.value),threshold:Number(threshold.value),removeLines:removeLines.checked,deepScan:deepScan.checked,boxOpacity:Number(boxOpacity.value),locationDirection:locationDirectionIndex};
-}
-// 설정이 변경된 경우에만 서버에 최신값을 전송한다. (싱크 세팅스)
-// 10초 간격으로 확인하며 이전 요청 중에는 중복 전송하지 않는다.
-let lastSettings=JSON.stringify(readSettings()),settingsSending=false;
-async function syncSettings(){
- const current=JSON.stringify(readSettings());
- if(settingsSending||current===lastSettings)return;
- settingsSending=true;
- const label=document.getElementById('settingsSyncStatus');
- label.textContent='설정 저장 중…';
- try{
-  const response=await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:current});
-  if(!response.ok)throw new Error('HTTP '+response.status);
-  lastSettings=current;label.textContent='설정 저장됨 · GitHub settings/current.json';
- }catch(error){label.textContent='설정 저장 실패 · 서버 설정 확인 필요 ('+error.message+')';}
- finally{settingsSending=false;}
-}
-setInterval(syncSettings,10000);
 boxOpacity.addEventListener('input',changeBoxOpacity);
 correctionModeButtons.forEach(button=>button.addEventListener('click',()=>switchCorrectionMode(button.dataset.filterMode)));
 changeBoxOpacity();
