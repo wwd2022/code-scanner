@@ -23,4 +23,4 @@ const threshold=document.getElementById('threshold'),removeLines=document.getEle
 const correctionModeButtons=[...document.querySelectorAll("[data-filter-mode]")];
 const correctionInputs=[...correctionModeButtons,brightness,threshold,removeLines,deepScan];
 const boxOpacity=document.getElementById("boxOpacity"),boxOpacityValue=document.getElementById("boxOpacityValue");
-const imageViewport=document.getElementById('imageViewport'),zoomImage=document.getElementById('zoomImage');
+const imageViewport=document.getElementById('imageViewport'),zoomLevel=document.getElementById('zoomLevel'),zoomHint=document.getElementById('zoomHint');
