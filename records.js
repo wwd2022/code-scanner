@@ -16,21 +16,27 @@ function showBoxes(hits){
   button.setAttribute('aria-label',hit.code+' - '+location+' 목록에 추가');
   label.className='box-label';label.textContent=(hit.added?'✓ ':'')+hit.code+(hit.review?' · 확인':'');button.append(label);
   button.title=hit.code+' - '+location;
-  button.addEventListener('click',event=>{
-   event.stopPropagation();if(busy||button.disabled)return;
-   let code=hit.code;
-   if(hit.review){
-    const alternatives=hit.alternatives?.length?'\n다른 인식 후보: '+hit.alternatives.join(', '):'';
-    const entered=window.prompt('사진과 비교해 품목코드를 확인하거나 수정하세요.'+alternatives,code);
-    if(entered===null)return;
-    code=normalizeCode(entered);
-    if(!/^[A-Z0-9]{4}-[A-Z0-9]{6}$/.test(code)){status.textContent='코드는 영문·숫자 4자리-6자리로 입력하세요.';return;}
-   }
-   addRecord(code);hit.code=code;hit.added=true;hit.review=false;showBoxes(detectedHits);
-   status.textContent=code+' 추가 완료';
-  });
+  button.addEventListener('click',event=>{event.stopPropagation();confirmCode(hit);});
   boxes.append(button);
  }
+}
+
+// 선택한 인식 결과를 확인하고 기록한다. (컨펌 코드)
+// 수정 취소·규격 오류 시 박스를 유지하고 정상 저장 후에만 체크한다.
+function confirmCode(hit){
+ if(busy||hit.added)return;
+ let code=hit.code;
+ if(hit.review){
+  const alternatives=hit.alternatives?.length?'\n다른 인식 후보: '+hit.alternatives.join(', '):'';
+  const entered=window.prompt('사진과 비교해 품목코드를 확인하거나 수정하세요.'+alternatives,code);
+  if(entered===null)return;
+  code=normalizeCode(entered);
+  if(!/^[A-Z0-9]{4}-[A-Z0-9]{6}$/.test(code)){
+   status.textContent='코드는 영문·숫자 4자리-6자리로 입력하세요.';return;
+  }
+ }
+ addRecord(code);hit.code=code;hit.added=true;hit.review=false;showBoxes(detectedHits);
+ status.textContent=code+' 추가 완료';
 }
 
 // 유효한 코드와 조회 위치를 한 줄로 기록한다. (애드 레코드)
