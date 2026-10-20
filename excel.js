@@ -71,7 +71,7 @@ async function loadExcel(){
   workbook={name:file.name,sheets,selected:book.SheetNames[0]};showWorkbook();
   try{await cacheWorkbook(workbook);excelStatus.textContent+=' · 자동 복원 저장 완료';}
   catch(error){excelStatus.textContent+=' · 저장 실패: 이번 접속에서만 사용 가능';}
-  status.textContent=locations.size?'카메라를 켜고 영상 화면을 터치하세요.':'이 시트에 규격에 맞는 코드가 없습니다. 다른 시트를 선택하세요.';
+  status.textContent=locations.size?'엑셀 준비 완료 · 인식 버튼으로 코드를 검사하세요.':'이 시트에 규격에 맞는 코드가 없습니다. 다른 시트를 선택하세요.';
  }catch(error){excelStatus.textContent='엑셀 읽기 실패: '+error.message;if(workbook)showWorkbook();status.textContent='엑셀 파일을 다시 선택하세요.';}
  finally{excel.value='';excel.disabled=false;sheet.disabled=false;busy=false;start.disabled=!!stream||starting;}
 }
