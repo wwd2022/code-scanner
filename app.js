@@ -186,7 +186,6 @@ tabButtons.forEach(button=>button.addEventListener('click',()=>switchTab(button.
 photoInput.addEventListener('change',loadPhoto);
 document.getElementById('testGenerate').addEventListener('click',makeTestImage);
 document.getElementById('testExport').addEventListener('click',exportTestExcel);
-document.getElementById('testExcel').addEventListener('change',makeTestImage);
 document.getElementById('testCount').addEventListener('change',makeTestImage);
 document.getElementById('testLayout').addEventListener('change',makeTestImage);
 document.getElementById('testNoise').addEventListener('change',makeTestImage);
