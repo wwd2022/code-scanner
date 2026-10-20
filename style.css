@@ -53,8 +53,8 @@ button:disabled{opacity:.45;cursor:default}button:focus-visible,input:focus-visi
 .code-box{position:absolute;pointer-events:none;border:2px solid #16833d;background:rgba(20,180,80,.18);border-radius:2px;min-height:2px}
 .code-box.missing-box{border-color:#b16b00;background:rgba(255,180,50,.2)}
 .code-box.needs-review{border-style:dashed}
-.box-label{position:absolute;top:100%;left:0;display:flex;justify-content:space-between;gap:10px;min-width:160px;width:max-content;max-width:280px;background:#222;color:#fff;padding:3px 5px;font-size:11px;line-height:1.4;pointer-events:none}
-.box-label span{white-space:nowrap}.label-left .box-label{left:auto;right:0}
+.box-label{position:absolute;top:50%;left:100%;transform:translateY(-50%);display:flex;justify-content:space-between;gap:10px;min-width:160px;width:max-content;max-width:280px;background:#222;color:#fff;padding:3px 5px;font-size:11px;line-height:1.4;pointer-events:none}
+.box-label span{white-space:nowrap}.label-left .box-label{left:auto;right:100%}
 .red-dot{position:absolute;width:7px;height:7px;background:#e11;border-radius:50%;transform:translate(-50%,-50%)}
 .record{padding:8px 0;border-bottom:1px solid #eee;overflow-wrap:anywhere}.missing{color:#875500}
 .raw-details{margin-top:12px;border-top:1px solid #ddd;padding-top:10px}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px}
