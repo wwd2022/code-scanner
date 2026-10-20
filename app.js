@@ -169,6 +169,15 @@ imageViewport.addEventListener('pointerup',event=>{
  tapStart=null;
 });
 imageViewport.addEventListener('click',event=>{if(event.pointerType!=='touch')toggleBoxes();});
+// 현재 인식 설정을 JSON 파일 하나로 내려받는다. (익스포트 세팅스)
+// 서버 전송 없이 사용자 기기에 설정값과 저장 시각만 기록한다.
+function exportSettings(){
+ const settings={savedAt:new Date().toISOString(),strength:Number(strength.value),filterMode:filterMode.value,brightness:Number(brightness.value),threshold:Number(threshold.value),removeLines:removeLines.checked,deepScan:deepScan.checked,boxOpacity:Number(boxOpacity.value),locationDirection:locationDirectionIndex};
+ const url=URL.createObjectURL(new Blob([JSON.stringify(settings,null,2)],{type:'application/json'}));
+ const link=document.createElement('a');link.href=url;link.download='code-scanner-settings.json';link.click();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+document.getElementById('exportSettings').addEventListener('click',exportSettings);
 boxOpacity.addEventListener('input',changeBoxOpacity);
 correctionModeButtons.forEach(button=>button.addEventListener('click',()=>switchCorrectionMode(button.dataset.filterMode)));
 changeBoxOpacity();
