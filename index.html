@@ -27,7 +27,14 @@
 <input id="photoInput" class="visually-hidden" type="file" accept="image/*">
 <span class="mode-note">선택한 사진은 기기에서 처리됩니다.</span>
 </div>
-<div class="mode-controls" id="testControls" hidden><span class="mode-note">샘플 코드 3개로 OCR 검사</span></div>
+<div class="mode-controls test-controls" id="testControls" hidden>
+<label>코드 <input id="testCount" type="number" min="1" max="12" value="3"></label>
+<label>배치 <select id="testLayout"><option value="grid">격자</option><option value="random">무작위</option><option value="column">세로</option></select></label>
+<label>노이즈 <input id="testNoise" type="range" min="0" max="100" step="10" value="0"><output id="testNoiseValue">0%</output></label>
+<label class="test-check"><input id="testExcel" type="checkbox" checked>가상 엑셀</label>
+<button id="testGenerate" type="button">이미지 생성</button>
+<button id="testExport" type="button">엑셀 생성</button>
+</div>
 <video id="camera" autoplay muted playsinline aria-hidden="true"></video>
 <section id="workspace" aria-label="인식 이미지">
 <div id="liveView">
