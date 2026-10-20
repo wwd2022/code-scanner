@@ -110,7 +110,7 @@ function handlePhotoPointer(event){
 // 이미지나 OCR 결과는 수정하지 않는다.
 function changeBoxOpacity(){
  boxOpacityValue.value=boxOpacity.value;
- boxes.style.setProperty('--box-opacity',String(Number(boxOpacity.value)/100));
+ boxes.querySelectorAll('.code-box').forEach(box=>box.style.opacity=Number(boxOpacity.value)/100);
 }
 
 // 이미지 보정 방식을 변경한다. (스위치 코렉션 모드)
@@ -129,6 +129,30 @@ imageViewport.addEventListener('dblclick',event=>{
  if(activeTab==='camera'||event.sourceCapabilities?.firesTouchEvents)return;
  closeTools();scanCamera();
 });
+// 32개 방향 버튼으로 위치 박스 방향을 선택한다. (셋 로케이션 디렉션)
+// 설정 변경 시 기존 인식 결과 박스만 다시 배치한다.
+let locationDirectionIndex=24;
+const locationDial=document.getElementById('locationDial');
+function setLocationDirection(index){
+ locationDirectionIndex=index;
+ for(const button of locationDial.children)button.setAttribute('aria-pressed',String(Number(button.dataset.direction)===index));
+ document.getElementById('locationDirection').textContent='방향 '+(index+1)+'/32';
+ if(detectedHits.length)showBoxes(detectedHits);
+}
+// 원형 다이얼에 32방향을 배치한다. (빌드 로케이션 다이얼)
+// 화면 설정에서 직접 선택하며 OCR 데이터는 건드리지 않는다.
+function buildLocationDial(){
+ for(let i=0;i<32;i++){
+  const angle=(i-8)*Math.PI/16,button=document.createElement('button');
+  button.type='button';button.dataset.direction=i;button.className='dial-step';
+  button.style.left='calc(50% + '+Math.cos(angle)*71+'px)';
+  button.style.top='calc(50% + '+Math.sin(angle)*71+'px)';
+  button.setAttribute('aria-label',(i+1)+'번째 방향');
+  button.addEventListener('click',()=>setLocationDirection(i));locationDial.append(button);
+ }
+ setLocationDirection(24);
+}
+buildLocationDial();
 boxOpacity.addEventListener('input',changeBoxOpacity);
 correctionModeButtons.forEach(button=>button.addEventListener('click',()=>switchCorrectionMode(button.dataset.filterMode)));
 changeBoxOpacity();
