@@ -21,7 +21,7 @@ function switchTab(tab){
  if(busy||starting||activeTab===tab)return;
  stopCamera();activeTab=tab;photoReady=false;frozenMode=false;
  setPhotoZoom(1);imageViewport.classList.remove('camera-shot');imageViewport.scrollLeft=0;imageViewport.scrollTop=0;closeTools();zoomLevel.hidden=true;zoomHint.hidden=true;
- detectedHits=[];boxes.replaceChildren();raw.textContent='';scanStats.textContent='';
+ detectedHits=[];boxes.hidden=false;document.getElementById('boxVisibility').hidden=true;boxes.replaceChildren();raw.textContent='';scanStats.textContent='';
  tabButtons.forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.tab===tab)));
  document.getElementById('cameraControls').hidden=tab!=='camera';
  document.getElementById('photoControls').hidden=tab!=='photo';
@@ -129,30 +129,46 @@ imageViewport.addEventListener('dblclick',event=>{
  if(activeTab==='camera'||event.sourceCapabilities?.firesTouchEvents)return;
  closeTools();scanCamera();
 });
-// 32개 방향 버튼으로 위치 박스 방향을 선택한다. (셋 로케이션 디렉션)
-// 설정 변경 시 기존 인식 결과 박스만 다시 배치한다.
-let locationDirectionIndex=24;
+// 위치 박스를 16방향으로 움직인다. (셋 로케이션 디렉션)
+// 드래그 중 기존 OCR 결과의 박스 배치만 갱신한다.
+let locationDirectionIndex=12;
 const locationDial=document.getElementById('locationDial');
 function setLocationDirection(index){
- locationDirectionIndex=index;
- for(const button of locationDial.children)button.setAttribute('aria-pressed',String(Number(button.dataset.direction)===index));
- document.getElementById('locationDirection').textContent='방향 '+(index+1)+'/32';
+ locationDirectionIndex=(index+16)%16;
+ const angle=(locationDirectionIndex-4)*Math.PI/8;
+ locationDial.style.setProperty('--stick-x',Math.cos(angle)*55+'px');
+ locationDial.style.setProperty('--stick-y',Math.sin(angle)*55+'px');
+ document.getElementById('locationDirection').textContent='방향 '+(locationDirectionIndex+1)+'/16';
  if(detectedHits.length)showBoxes(detectedHits);
 }
-// 원형 다이얼에 32방향을 배치한다. (빌드 로케이션 다이얼)
-// 화면 설정에서 직접 선택하며 OCR 데이터는 건드리지 않는다.
-function buildLocationDial(){
- for(let i=0;i<32;i++){
-  const angle=(i-8)*Math.PI/16,button=document.createElement('button');
-  button.type='button';button.dataset.direction=i;button.className='dial-step';
-  button.style.left='calc(50% + '+Math.cos(angle)*71+'px)';
-  button.style.top='calc(50% + '+Math.sin(angle)*71+'px)';
-  button.setAttribute('aria-label',(i+1)+'번째 방향');
-  button.addEventListener('click',()=>setLocationDirection(i));locationDial.append(button);
- }
- setLocationDirection(24);
+// 조이스틱 드래그를 16개 방향으로 맞춘다. (핸들 로케이션 스틱)
+// 터치·마우스 포인터의 각도를 이용해 위치 표시 방향을 변경한다.
+function handleLocationStick(event){
+ if(event.type==='pointerdown')locationDial.setPointerCapture(event.pointerId);
+ if(event.type==='pointermove'&&!locationDial.hasPointerCapture(event.pointerId))return;
+ if(event.type==='pointerup'||event.type==='pointercancel')return;
+ const rect=locationDial.getBoundingClientRect();
+ const dx=event.clientX-rect.left-rect.width/2,dy=event.clientY-rect.top-rect.height/2;
+ if(Math.hypot(dx,dy)>8)setLocationDirection(Math.round((Math.atan2(dy,dx)+Math.PI/2)/(Math.PI*2)*16));
 }
-buildLocationDial();
+locationDial.addEventListener('pointerdown',handleLocationStick);
+locationDial.addEventListener('pointermove',handleLocationStick);
+setLocationDirection(12);
+// 사진을 한 번 누르면 두 종류의 박스를 함께 숨기거나 표시한다. (토글 박시스)
+// OCR 결과는 그대로 두고 화면 구석의 표시 상태만 변경한다.
+function toggleBoxes(){
+ if(imageViewport.hidden||!detectedHits.length)return;
+ boxes.hidden=!boxes.hidden;
+ const indicator=document.getElementById('boxVisibility');
+ indicator.hidden=false;indicator.textContent=boxes.hidden?'박스 숨김':'박스 표시';
+}
+let tapStart=null;
+imageViewport.addEventListener('pointerdown',event=>{if(event.isPrimary)tapStart={x:event.clientX,y:event.clientY};});
+imageViewport.addEventListener('pointerup',event=>{
+ if(event.pointerType==='touch'&&event.isPrimary&&tapStart&&Math.hypot(event.clientX-tapStart.x,event.clientY-tapStart.y)<10&&!multiTouch)toggleBoxes();
+ tapStart=null;
+});
+imageViewport.addEventListener('click',event=>{if(event.pointerType!=='touch')toggleBoxes();});
 boxOpacity.addEventListener('input',changeBoxOpacity);
 correctionModeButtons.forEach(button=>button.addEventListener('click',()=>switchCorrectionMode(button.dataset.filterMode)));
 changeBoxOpacity();
