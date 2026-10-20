@@ -19,7 +19,7 @@ function closeTools(except=null){
 function switchTab(tab){
  if(busy||starting||activeTab===tab)return;
  stopCamera();activeTab=tab;photoReady=false;frozenMode=false;
- setPhotoZoom(1);closeTools();zoomLevel.hidden=true;zoomHint.hidden=true;
+ setPhotoZoom(1);imageViewport.scrollLeft=0;imageViewport.scrollTop=0;closeTools();zoomLevel.hidden=true;zoomHint.hidden=true;
  detectedHits=[];boxes.replaceChildren();raw.textContent='';scanStats.textContent='';
  tabButtons.forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.tab===tab)));
  document.getElementById('cameraControls').hidden=tab!=='camera';
