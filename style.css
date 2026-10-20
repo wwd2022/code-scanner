@@ -29,7 +29,7 @@ button:disabled{opacity:.45;cursor:default}button:focus-visible,input:focus-visi
 #imageViewport.camera-shot #frozen{width:100%!important;height:100%}
 #imageViewport.camera-shot #snapshot{width:100%;height:100%}
 #boxes,#dots{position:absolute;inset:0;pointer-events:none}
-#boxes{opacity:var(--box-opacity,.65)}
+#boxes{opacity:1}
 #liveStatus{position:absolute;left:8px;right:8px;bottom:8px;background:#18212bbd;color:#fff;padding:6px 8px;border-radius:6px;font-size:11px;pointer-events:none;max-height:42px;overflow:hidden}
 #zoomLevel,#zoomHint{position:absolute;color:white;background:#18212bba;border-radius:6px;padding:5px 7px;font-size:11px;pointer-events:none}
 #zoomLevel{top:8px;right:8px}
@@ -50,11 +50,13 @@ button:disabled{opacity:.45;cursor:default}button:focus-visible,input:focus-visi
 .drawer-body .inline-label{display:flex;align-items:center;gap:8px}
 .correction-tabs{margin:10px 0}.correction-tabs button{min-height:36px}
 #count{font-size:12px}
-.code-box{position:absolute;pointer-events:none;border:2px solid #16833d;background:rgba(20,180,80,.18);border-radius:2px;min-height:2px}
-.code-box.missing-box{border-color:#b16b00;background:rgba(255,180,50,.2)}
+.code-box{position:absolute;display:flex;align-items:center;justify-content:center;border:2px solid #16833d;background:#166c42;color:white;border-radius:3px;font-size:11px;font-weight:700;white-space:nowrap;min-height:18px;min-width:max-content;pointer-events:none}
+.code-box.missing-box{border-color:#b16b00;background:#8c520a}
 .code-box.needs-review{border-style:dashed}
-.box-label{position:absolute;top:50%;left:100%;transform:translateY(-50%);display:flex;justify-content:space-between;gap:10px;min-width:160px;width:max-content;max-width:280px;background:#222;color:#fff;padding:3px 5px;font-size:11px;line-height:1.4;pointer-events:none}
-.box-label span{white-space:nowrap}.label-left .box-label{left:auto;right:100%}
+.location-box{position:absolute;z-index:1;background:#202b3c;color:white;padding:4px 7px;border-radius:5px;font-size:12px;font-weight:700;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+.location-dial{position:relative;width:190px;height:190px;margin:4px auto 8px;border:1px solid #d6dce5;border-radius:50%;background:radial-gradient(circle,#edf2f8 0 24px,transparent 25px)}
+.dial-step{position:absolute;transform:translate(-50%,-50%);width:20px;height:20px;min-height:20px;padding:0;border-radius:50%;background:#d5dfe9;border:1px solid #8195aa}
+.dial-step[aria-pressed=true]{background:#176fc1;border:3px solid #073767}
 .red-dot{position:absolute;width:7px;height:7px;background:#e11;border-radius:50%;transform:translate(-50%,-50%)}
 .record{padding:8px 0;border-bottom:1px solid #eee;overflow-wrap:anywhere}.missing{color:#875500}
 .raw-details{margin-top:12px;border-top:1px solid #ddd;padding-top:10px}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px}
