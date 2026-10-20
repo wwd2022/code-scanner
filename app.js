@@ -4,7 +4,8 @@ function lockInputs(locked){
  tabButtons.forEach(button=>button.disabled=locked);
  correctionInputs.forEach(input=>input.disabled=locked);
  photoInput.disabled=locked;
- readImage.disabled=locked||(activeTab==='camera'?(!stream||frozenMode):!photoReady);
+ readImage.disabled=locked||(activeTab==='camera'?!stream:!photoReady);
+ readImage.textContent=activeTab==='camera'&&frozenMode?'다시 촬영':'코드 인식';
 }
 
 // 하단 메뉴에서 열린 패널 하나만 유지한다. (클로즈 툴스)
@@ -141,6 +142,13 @@ brightness.addEventListener('input',()=>document.getElementById('brightnessValue
 threshold.addEventListener('input',()=>document.getElementById('thresholdValue').value=threshold.value);
 tabButtons.forEach(button=>button.addEventListener('click',()=>switchTab(button.dataset.tab)));
 photoInput.addEventListener('change',loadPhoto);
-readImage.addEventListener('click',()=>{closeTools();scanCamera();});
+// 카메라 정지 상태에서는 재촬영, 그 외에는 코드 인식을 실행한다. (핸들 스캔 버튼)
+// 기존 OCR과 카메라 재개 기능을 변경하지 않고 연결한다.
+function handleScanButton(){
+ closeTools();
+ if(activeTab==='camera'&&frozenMode)resumeCamera();
+ else scanCamera();
+}
+readImage.addEventListener('click',handleScanButton);
 window.addEventListener('pagehide',stopCamera);
 restoreExcel();
