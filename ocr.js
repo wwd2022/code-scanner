@@ -14,6 +14,53 @@ async function getWorker(){
  try{return await workerPromise;}finally{workerPromise=null;}
 }
 
+// 확대 OCR에 사용할 보조 워커를 최대 두 개 준비한다. (겟 패러렐 워커스)
+// 기존 실시간 워커는 유지하며 보조 워커 생성 실패 시 순차 인식으로 돌아간다.
+let parallelWorkers=[],parallelPromise=null;
+async function getParallelWorkers(){
+ if(parallelWorkers.length)return parallelWorkers;
+ if(!parallelPromise)parallelPromise=(async()=>{
+  const created=[];
+  try{
+   for(let i=0;i<2;i++){
+    const engine=await Tesseract.createWorker('eng',1);
+    await engine.setParameters({tessedit_pageseg_mode:'11'});
+    created.push(engine);
+   }
+   parallelWorkers=created;return created;
+  }catch(error){
+   await Promise.all(created.map(engine=>engine.terminate().catch(()=>{})));
+   return [];
+  }
+ })();
+ try{return await parallelPromise;}finally{parallelPromise=null;}
+}
+
+// 원본과 보정본을 독립 워커에서 병렬 검사한다. (런 패러렐 패시스)
+// 검사별 결과를 원래 순서로 반환하고 캔버스를 사용 후 해제한다.
+async function runParallelPasses(passes,settings,source,onResult){
+ const engines=await getParallelWorkers();
+ const results=new Array(passes.length),count=engines.length||1;
+ let next=0;
+ async function consume(index){
+  const engine=engines[index]||await getWorker();
+  while(next<passes.length){
+   const i=next++,pass=passes[i];
+   let rendered;
+   try{
+    rendered=renderScanPass(source,pass,settings);
+    const {data}=await engine.recognize(rendered.image,{}, {text:true,blocks:true});
+    const hits=mapScanHits(collectHits(data),pass,rendered.scaleX,rendered.scaleY);
+    results[i]={hits,text:data.text};
+   }catch(error){results[i]={hits:[],error:error.message};}
+   finally{if(rendered)rendered.image.width=rendered.image.height=1;}
+   if(onResult)onResult(i,results[i]);
+  }
+ }
+ await Promise.all(Array.from({length:Math.min(count,passes.length)},(_,i)=>consume(i)));
+ return results;
+}
+
 // 코드의 표기를 통일한다. (노멀라이즈 코드)
 // 공백과 하이픈을 정리해 엑셀 조회에 사용한다.
 function normalizeCode(value){
@@ -101,6 +148,43 @@ function mergeHits(groups){
  }).sort((a,b)=>a.bbox.y0-b.bbox.y0||a.bbox.x0-b.bbox.x0);
 }
 
+// 선택한 박스 주변만 확대하여 OCR을 다시 실행한다. (리체크 코드)
+// 원본 좌표를 유지하며 재인식 성공 시 코드와 엑셀 위치 라벨을 갱신한다.
+async function recheckCode(hit){
+ if(busy||starting||!frozenMode)return;
+ busy=true;lockInputs(true);excel.disabled=true;sheet.disabled=true;strength.disabled=true;
+ const previous=hit.code,b=hit.bbox;
+ status.textContent=previous+' 영역 재인식 중…';
+ try{
+  const padX=Math.max(20,(b.x1-b.x0)*0.65),padY=Math.max(15,(b.y1-b.y0)*1.2);
+  const x=Math.max(0,Math.floor(b.x0-padX)),y=Math.max(0,Math.floor(b.y0-padY));
+  const w=Math.min(originalFrame.width-x,Math.ceil(b.x1+padX)-x);
+  const h=Math.min(originalFrame.height-y,Math.ceil(b.y1+padY)-y);
+  if(w<=0||h<=0)throw new Error('이미지 영역이 올바르지 않습니다.');
+  const settings={mode:filterMode.value,brightness:Number(brightness.value),threshold:Number(threshold.value),removeLines:removeLines.checked,strength:Number(strength.value)};
+  const scale=Math.min(4,Math.max(1,1400/Math.max(w,h)));
+  const pass={x,y,width:w,height:h,mode:'original',scale};
+  const candidates=[];
+  const passes=['original',settings.mode].map(mode=>({...pass,mode}));
+  const results=await runParallelPasses(passes,settings,originalFrame);
+  for(const result of results)candidates.push(...result.hits);
+  const centerX=(b.x0+b.x1)/2,centerY=(b.y0+b.y1)/2;
+  const nearby=candidates.filter(candidate=>{
+   const c=candidate.bbox,cx=(c.x0+c.x1)/2,cy=(c.y0+c.y1)/2;
+   return Math.abs(cx-centerX)<=Math.max(30,(b.x1-b.x0)*1.1)&&Math.abs(cy-centerY)<=Math.max(20,(b.y1-b.y0)*1.8);
+  });
+  nearby.sort((a,b)=>b.confidence-a.confidence);
+  if(!nearby.length){status.textContent=previous+' 재인식 실패 · 기존 코드를 유지합니다.';return;}
+  const best=nearby[0];
+  hit.code=best.code;hit.confidence=best.confidence;
+  hit.review=nearby.some(candidate=>candidate.code!==best.code)||best.confidence<60;
+  hit.alternatives=[...new Set(nearby.map(candidate=>candidate.code).filter(code=>code!==best.code))];
+  showBoxes(detectedHits);
+  status.textContent=previous===best.code?best.code+' 재인식 완료 · 기존 코드와 일치':previous+' → '+best.code+' 재인식으로 수정 · 엑셀 위치 갱신';
+ }catch(error){status.textContent='재인식 실패 · 기존 코드 유지: '+error.message;}
+ finally{busy=false;lockInputs(false);excel.disabled=false;sheet.disabled=false;strength.disabled=activeTab==='camera'&&frozenMode;}
+}
+
 // 카메라 또는 선택한 이미지의 원본과 보정본을 읽는다. (스캔 카메라)
 // 확대 검사 결과도 원본 위치에 표시하며 선택한 코드만 기록한다.
 async function scanCamera(){
@@ -123,20 +207,15 @@ async function scanCamera(){
   if(activeTab==='camera')camera.pause();frozenMode=true;liveEpoch++;clearTimeout(liveTimer);cancelAnimationFrame(animationId);dots.replaceChildren();
   liveView.hidden=true;frozen.hidden=false;zoomImage.hidden=false;detectedHits=[];boxes.replaceChildren();liveStatus.textContent='정지 화면 · 인식 완료 후 박스를 선택하세요.';
   if(liveJob)await liveJob.catch(()=>{});
-  const engine=await getWorker();
   const passes=createScanPasses(originalFrame.width,originalFrame.height,settings);
   const groups=[],stats=[],errors=[];
-  for(let i=0;i<passes.length;i++){
-   const pass=passes[i];recognitionStage=pass.name+' ('+(i+1)+'/'+passes.length+')';status.textContent=recognitionStage+' 코드 인식 중…';
-   let rendered;
-   try{
-    rendered=renderScanPass(originalFrame,pass,settings);
-    const {data}=await engine.recognize(rendered.image,{}, {text:true,blocks:true});
-    const hits=mapScanHits(collectHits(data),pass,rendered.scaleX,rendered.scaleY);groups.push(hits);stats.push(pass.name+' '+hits.length+'곳');
-    detectedHits=mergeHits(groups);showBoxes(detectedHits);
-    raw.textContent+='['+pass.name+']\n'+data.text+'\n\n';
-   }catch(error){errors.push(pass.name+': '+error.message);raw.textContent+='['+pass.name+' 실패] '+error.message+'\n\n';}
-   finally{if(rendered)rendered.image.width=rendered.image.height=1;}
+  // 확대 검사도 같은 최대 2개 워커 풀을 사용한다.
+  const results=await runParallelPasses(passes,settings,originalFrame);
+  for(let i=0;i<results.length;i++){
+   const pass=passes[i],result=results[i];
+   if(result.error){errors.push(pass.name+': '+result.error);raw.textContent+='['+pass.name+' 실패] '+result.error+'\\n\\n';continue;}
+   groups.push(result.hits);stats.push(pass.name+' '+result.hits.length+'곳');
+   raw.textContent+='['+pass.name+']\\n'+result.text+'\\n\\n';
   }
   if(!groups.length)throw new Error(errors.join(' / '));
   detectedHits=mergeHits(groups);showBoxes(detectedHits);
