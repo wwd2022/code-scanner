@@ -11,18 +11,23 @@ function previewPhoto(){
  status.textContent='두 손가락 확대·이동 / 두 번 터치 또는 인식 버튼으로 검사';
 }
 
-// 테스트용 물품코드를 개수에 맞춰 만든다. (겟 테스트 로우스)
-// 이미지·가상 엑셀·엑셀 파일이 동일한 코드 목록을 공유한다.
+// 불러온 엑셀 시트에서 중복 없이 무작위 코드를 고른다. (겟 테스트 로우스)
+// 실제 엑셀 조회표와 같은 유효 코드만 사용하며 원본 파일은 수정하지 않는다.
 function getTestRows(){
+ if(!workbook)return [];
+ const rows=[...buildLocations(workbook.sheets[workbook.selected]).entries()];
+ for(let i=rows.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[rows[i],rows[j]]=[rows[j],rows[i]];}
  const count=Math.max(1,Math.min(12,Number(document.getElementById('testCount').value)||3));
- return Array.from({length:count},(_,i)=>['TS'+String(i+1).padStart(2,'0')+'-'+String(100001+i).padStart(6,'0'),'TEST-'+String(i+1).padStart(2,'0')]);
+ return rows.slice(0,count);
 }
 
-// 테스트용 이미지와 임시 엑셀 조회표를 만든다. (메이크 테스트 이미지)
-// 실제 OCR 입력 경로를 유지하고 사용자가 불러온 엑셀은 변경하지 않는다.
+// 등록된 엑셀에서 고른 코드로 OCR 테스트 이미지를 만든다. (메이크 테스트 이미지)
+// 노이즈·배치는 조절하고 원본 엑셀과 OCR 인식 경로는 변경하지 않는다.
 function makeTestImage(){
  if(busy||starting)return;
- const rows=getTestRows(),layout=document.getElementById('testLayout').value,noise=Number(document.getElementById('testNoise').value);
+ const rows=getTestRows();
+ if(!rows.length){photoReady=false;readImage.disabled=true;imageViewport.hidden=true;frozen.hidden=true;status.textContent='먼저 엑셀 탭에서 파일을 등록하세요.';return;}
+ const layout=document.getElementById('testLayout').value,noise=Number(document.getElementById('testNoise').value);
  document.getElementById('testNoiseValue').value=noise+'%';
  const cols=layout==='column'?1:layout==='random'?3:2;
  const width=1200,cellW=width/cols,cellH=145,height=Math.max(530,Math.ceil(rows.length/cols)*cellH+80);
@@ -47,21 +52,16 @@ function makeTestImage(){
   for(let i=0;i<Math.floor(noise/8);i++){ctx.fillStyle=random()<.5?'#888':'#fff';ctx.fillRect(random()*width,random()*height,5+random()*130,2+random()*7);}
   ctx.globalAlpha=1;
  }
- locations=document.getElementById('testExcel').checked?buildLocations(rows):new Map();
- excelStatus.textContent='테스트 · '+(document.getElementById('testExcel').checked?rows.length+'개 가상 엑셀 코드':'엑셀 조회 끔');
+ locations=buildLocations(workbook.sheets[workbook.selected]);
+ excelStatus.textContent=workbook.name+' · '+workbook.selected+' · '+locations.size+'개 코드';
  photoReady=true;previewPhoto();setPhotoZoom(1);imageViewport.scrollLeft=0;imageViewport.scrollTop=0;
  status.textContent='테스트 이미지 '+rows.length+'개 생성 · 코드 인식으로 OCR 검사';
 }
 
-// 테스트 코드 목록을 실제 엑셀 파일로 내보낸다. (익스포트 테스트 엑셀)
-// 현재 불러온 엑셀과 브라우저 자동 복원 데이터는 수정하지 않는다.
-function exportTestExcel(){
- if(!window.XLSX){status.textContent='엑셀 라이브러리를 불러오지 못했습니다.';return;}
- const rows=[['코드','위치'],...getTestRows()];
- const book=XLSX.utils.book_new();
- XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet(rows),'테스트');
- XLSX.writeFile(book,'scanner-test.xlsx');
-}
+// 엑셀에서 새로운 무작위 코드들을 가져온다. (익스포트 테스트 엑셀)
+// 기존 이미지의 코드만 교체하고 엑셀 파일을 생성하지 않는다.
+function exportTestExcel(){makeTestImage();}
+
 // 선택한 사진을 읽고 크기를 줄여 미리 보여준다. (로드 포토)
 // 큰 사진은 긴 변 3200픽셀로 줄이고 임시 주소를 해제한다.
 async function loadPhoto(){
