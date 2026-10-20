@@ -2,8 +2,9 @@
 // OCR 좌표를 유지하며 투명도는 코드 박스에만 적용한다.
 function showBoxes(hits){
  boxes.replaceChildren();
- const angle=(Number(locationDirectionIndex)-8)*Math.PI/16;
- const dx=Math.cos(angle)*110,dy=Math.sin(angle)*65;
+ document.getElementById("boxVisibility").hidden=false;
+ document.getElementById("boxVisibility").textContent=boxes.hidden?"박스 숨김":"박스 표시";
+ const angle=(Number(locationDirectionIndex)-4)*Math.PI/8;
  for(const hit of hits){
   const b=hit.bbox,found=locations.get(hit.code),location=found?.length?found.join(' / '):'ㅡ없음';
   const code=document.createElement('div'),place=document.createElement('div');
@@ -12,14 +13,17 @@ function showBoxes(hits){
   if(hit.review)code.classList.add('needs-review');
   code.style.left=b.x0/frame.width*100+'%';code.style.top=b.y0/frame.height*100+'%';
   code.style.width=(b.x1-b.x0)/frame.width*100+'%';code.style.height=(b.y1-b.y0)/frame.height*100+'%';
-  code.textContent=hit.code+(hit.review?' · 확인':'');
+  code.textContent=hit.code;
+  code.title=hit.review?'확인 필요: '+hit.code:hit.code;
   code.style.opacity=Number(boxOpacity.value)/100;
   place.className='location-box';place.textContent=location;
   place.style.left=(b.x0+b.x1)/2/frame.width*100+'%';
   place.style.top=(b.y0+b.y1)/2/frame.height*100+'%';
-  place.style.transform='translate(calc(-50% + '+dx+'px),calc(-50% + '+dy+'px))';
   place.title=hit.code+' / '+location;
   boxes.append(code,place);
+  const dx=Math.cos(angle)*((code.offsetWidth+place.offsetWidth)/2+2);
+  const dy=Math.sin(angle)*((code.offsetHeight+place.offsetHeight)/2+2);
+  place.style.transform='translate(calc(-50% + '+dx+'px),calc(-50% + '+dy+'px))';
  }
 }
 
