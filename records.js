@@ -1,34 +1,47 @@
-// 인식한 코드 위에 코드 박스, 지정 방향에 위치 박스를 그린다. (쇼 박시스)
-// OCR 좌표를 유지하며 투명도는 코드 박스에만 적용한다.
+// OCR 글자를 가리지 않는 방향에 표시 박스를 배치한다. (플레이스 레이블)
+// 화면 경계·다른 인식 글자·이미 배치한 박스와의 겹침을 최소화한다.
+function placeLabel(element,anchor,angle,obstacles,placed,width,height){
+ const w=element.offsetWidth,h=element.offsetHeight,gap=5;
+ const overlap=(a,b)=>Math.max(0,Math.min(a.x+a.w,b.x+b.w)-Math.max(a.x,b.x))*Math.max(0,Math.min(a.y+a.h,b.y+b.h)-Math.max(a.y,b.y));
+ let best=null,bestScore=Infinity;
+ for(let step=0;step<16;step++){
+  const theta=angle+(step%2? -1:1)*Math.ceil(step/2)*Math.PI/8;
+  const dx=Math.cos(theta),dy=Math.sin(theta);
+  const distance=Math.min((anchor.w/2+gap)/Math.max(.01,Math.abs(dx)),(anchor.h/2+gap)/Math.max(.01,Math.abs(dy)));
+  const x=Math.max(0,Math.min(width-w,anchor.x+anchor.w/2+dx*(distance+Math.max(w,h)/2)-w/2));
+  const y=Math.max(0,Math.min(height-h,anchor.y+anchor.h/2+dy*(distance+Math.max(w,h)/2)-h/2));
+  const rect={x,y,w,h};
+  const score=obstacles.reduce((s,r)=>s+overlap(rect,r)*100,s=0)+placed.reduce((s,r)=>s+overlap(rect,r)*10,0)+step*2;
+  if(score<bestScore){bestScore=score;best=rect;}
+  if(score===0)break;
+ }
+ element.style.left=best.x+'px';element.style.top=best.y+'px';
+ placed.push(best);
+}
+
+// 인식한 글자 바깥에 코드·위치 박스를 배치한다. (쇼 박시스)
+// OCR 좌표와 사용자 설정은 유지하고 기준 글자의 가림만 줄인다.
 function showBoxes(hits){
  boxes.replaceChildren();
- document.getElementById("boxVisibility").hidden=false;
- document.getElementById("boxVisibility").textContent=boxes.hidden?"박스 숨김":"박스 표시";
- const angle=(Number(locationDirectionIndex)-4)*Math.PI/8;
- for(const hit of hits){
-  const b=hit.bbox,found=locations.get(hit.code),location=found?.length?found.join(' / '):'ㅡ없음';
+ const indicator=document.getElementById('boxVisibility');
+ indicator.hidden=false;indicator.textContent=boxes.hidden?'박스 숨김':'박스 표시';
+ const width=boxes.clientWidth,height=boxes.clientHeight;
+ if(!width||!height||!frame.width||!frame.height)return;
+ const obstacles=hits.map(hit=>({x:hit.bbox.x0/frame.width*width,y:hit.bbox.y0/frame.height*height,w:(hit.bbox.x1-hit.bbox.x0)/frame.width*width,h:(hit.bbox.y1-hit.bbox.y0)/frame.height*height}));
+ const placed=[];
+ const codeAngle=codeDirectionIndex===null?-Math.PI/2:(codeDirectionIndex-4)*Math.PI/8;
+ const placeAngle=(locationDirectionIndex-4)*Math.PI/8;
+ for(let i=0;i<hits.length;i++){
+  const hit=hits[i],found=locations.get(hit.code),location=found?.length?found.join(' / '):'ㅡ없음';
   const code=document.createElement('div'),place=document.createElement('div');
   code.className='code-box';
   if(!found?.length)code.classList.add('missing-box');
   if(hit.review)code.classList.add('needs-review');
-  code.style.left=b.x0/frame.width*100+'%';code.style.top=b.y0/frame.height*100+'%';
-  code.style.width=(b.x1-b.x0)/frame.width*100+'%';code.style.height=(b.y1-b.y0)/frame.height*100+'%';
-  code.textContent=hit.code;
-  code.title=hit.review?'확인 필요: '+hit.code:hit.code;
-  place.className='location-box';place.textContent=location;
-  place.style.left=(b.x0+b.x1)/2/frame.width*100+'%';
-  place.style.top=(b.y0+b.y1)/2/frame.height*100+'%';
-  place.title=hit.code+' / '+location;
+  code.textContent=hit.code;code.title=hit.review?'확인 필요: '+hit.code:hit.code;
+  place.className='location-box';place.textContent=location;place.title=hit.code+' / '+location;
   boxes.append(code,place);
-  if(codeDirectionIndex!==null){
-   const codeAngle=(codeDirectionIndex-4)*Math.PI/8;
-   const x=Math.cos(codeAngle)*(code.offsetWidth/2+8);
-   const y=Math.sin(codeAngle)*(code.offsetHeight/2+8);
-   code.style.transform='translate('+x+'px,'+y+'px)';
-  }
-  const dx=Math.cos(angle)*((code.offsetWidth+place.offsetWidth)/2+2);
-  const dy=Math.sin(angle)*((code.offsetHeight+place.offsetHeight)/2+2);
-  place.style.transform='translate(calc(-50% + '+dx+'px),calc(-50% + '+dy+'px))';
+  placeLabel(code,obstacles[i],codeAngle,obstacles,placed,width,height);
+  placeLabel(place,obstacles[i],placeAngle,obstacles,placed,width,height);
  }
 }
 
