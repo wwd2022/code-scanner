@@ -22,6 +22,8 @@ function drawCorrected(target,amount=Number(strength.value)){
  let sourceWidth=camera.videoWidth,sourceHeight=camera.videoHeight;
  if(sourceWidth/sourceHeight>ratio)sourceWidth=sourceHeight*ratio;
  else sourceHeight=sourceWidth/ratio;
+ const zoom=window.liveZoom||1;
+ sourceWidth/=zoom;sourceHeight/=zoom;
  const sourceX=(camera.videoWidth-sourceWidth)/2,sourceY=(camera.videoHeight-sourceHeight)/2;
  const scale=Math.min(1,2200/Math.max(sourceWidth,sourceHeight));
  const width=Math.max(1,Math.round(sourceWidth*scale)),height=Math.max(1,Math.round(sourceHeight*scale));
