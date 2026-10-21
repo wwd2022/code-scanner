@@ -78,8 +78,18 @@
 <label class="inline-label"><input id="removeLines" type="checkbox" checked> 표 테두리 완화</label>
 <label class="inline-label"><input id="deepScan" type="checkbox" checked> 정밀 인식 · 6구역 확대 검사</label>
 </div>
-<label for="boxOpacity">코드 박스 투명도 <output id="boxOpacityValue">65</output>%</label>
-<input id="boxOpacity" type="range" min="10" max="100" step="5" value="65">
+<div class="box-style-settings">
+<h3>코드 박스</h3>
+<label>글꼴 <select id="codeFont"><option value="monospace">고정폭</option><option value="sans-serif">기본</option><option value="serif">명조</option></select></label>
+<label>글자 크기 <input id="codeSize" type="range" min="8" max="32" value="11"> <output id="codeSizeValue">11px</output></label>
+<label>투명도 <input id="codeOpacity" type="range" min="10" max="100" step="5" value="65"> <output id="codeOpacityValue">65%</output></label>
+<label>배경색 <input id="codeBg" type="color" value="#d1eadc"></label>
+<h3>위치 박스</h3>
+<label>글꼴 <select id="placeFont"><option value="sans-serif">기본</option><option value="monospace">고정폭</option><option value="serif">명조</option></select></label>
+<label>글자 크기 <input id="placeSize" type="range" min="8" max="32" value="12"> <output id="placeSizeValue">12px</output></label>
+<label>투명도 <input id="placeOpacity" type="range" min="10" max="100" step="5" value="100"> <output id="placeOpacityValue">100%</output></label>
+<label>배경색 <input id="placeBg" type="color" value="#202b3c"></label>
+</div>
 <label>위치 박스 방향 (16방향 · 드래그)</label>
 <div id="locationDial" class="location-dial" role="group" aria-label="위치 박스 표시 방향"></div>
 <small id="locationDirection">왼쪽</small>
