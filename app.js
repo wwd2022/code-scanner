@@ -44,7 +44,7 @@ function setPhotoZoom(value,centerX=imageViewport.clientWidth/2,centerY=imageVie
  const next=Math.max(1,Math.min(6,value)),ratio=next/photoZoom;
  const left=(imageViewport.scrollLeft+centerX)*ratio-centerX;
  const top=(imageViewport.scrollTop+centerY)*ratio-centerY;
- photoZoom=next;frozen.style.width=(next*100)+'%';
+ photoZoom=next;imageViewport.classList.toggle('zoomed',next>1.01);frozen.style.width=(next*100)+'%';
  imageViewport.scrollLeft=left;imageViewport.scrollTop=top;
  zoomLevel.textContent=Math.round(next*100)+'%';
 }
@@ -67,7 +67,7 @@ function getVisiblePhotoRegion(){
 const photoPointers=new Map();
 let pinchDistance=0,multiTouch=false,lastTap=0,lastTapX=0,lastTapY=0;
 function handlePhotoPointer(event){
- if(activeTab==='camera'||imageViewport.hidden||busy||!frozenMode||event.pointerType!=='touch')return;
+ if(imageViewport.hidden||busy||!frozenMode||event.pointerType!=='touch')return;
  if(event.type==='pointerdown'){
   imageViewport.setPointerCapture(event.pointerId);
   photoPointers.set(event.pointerId,{x:event.clientX,y:event.clientY,startX:event.clientX,startY:event.clientY,moved:false});
@@ -102,7 +102,7 @@ function handlePhotoPointer(event){
  if(event.type==='pointerup'&&!multiTouch&&!prev.moved){
   const now=performance.now();
   if(now-lastTap<330&&Math.hypot(event.clientX-lastTapX,event.clientY-lastTapY)<35){
-   lastTap=0;closeTools();scanCamera();
+   lastTap=0;if(activeTab!=='camera'){closeTools();scanCamera();}
   }else{lastTap=now;lastTapX=event.clientX;lastTapY=event.clientY;}
  }
  if(!photoPointers.size){pinchDistance=0;multiTouch=false;}
@@ -116,10 +116,14 @@ function updateBoxStyle(){
   const size=document.getElementById(type+'Size').value;
   const opacity=document.getElementById(type+'Opacity').value;
   const bg=document.getElementById(type+'Bg').value;
+  const color=document.getElementById(type+'Color').value;
+  const border=document.getElementById(type+'Border').value;
   boxes.style.setProperty('--'+type+'-font',font);
   boxes.style.setProperty('--'+type+'-size',size+'px');
   boxes.style.setProperty('--'+type+'-opacity',opacity/100);
   boxes.style.setProperty('--'+type+'-bg',bg);
+  boxes.style.setProperty('--'+type+'-color',color);
+  boxes.style.setProperty('--'+type+'-border',border);
   document.getElementById(type+'SizeValue').value=size+'px';
   document.getElementById(type+'OpacityValue').value=opacity+'%';
  }
@@ -235,8 +239,9 @@ function showScanStart(){
 // 카메라와 사진은 기존 화면 비율을 유지한다.
 function showScanFrame(){
  imageViewport.classList.toggle('camera-shot',activeTab==='camera');
+ if(activeTab==='camera')setPhotoZoom(1);
  liveView.hidden=true;imageViewport.hidden=false;frozen.hidden=false;
- zoomLevel.hidden=activeTab==='camera';zoomHint.hidden=activeTab==='camera';
+ zoomLevel.hidden=false;zoomHint.hidden=false;
  boxes.replaceChildren();liveStatus.textContent='정지 화면 · 인식 결과를 확인하세요.';
 }
 
