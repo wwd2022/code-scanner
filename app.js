@@ -108,11 +108,22 @@ function handlePhotoPointer(event){
  if(!photoPointers.size){pinchDistance=0;multiTouch=false;}
 }
 
-// 인식 박스 투명도를 변경한다. (체인지 박스 오패시티)
-// 이미지나 OCR 결과는 수정하지 않는다.
-function changeBoxOpacity(){
- boxOpacityValue.value=boxOpacity.value;
- boxes.querySelectorAll('.code-box').forEach(box=>box.style.opacity=Number(boxOpacity.value)/100);
+// 코드·위치 박스의 글꼴과 색상 등을 변경한다. (업데이트 박스 스타일)
+// OCR 데이터는 유지하고 글자 크기 변경 시 박스 위치를 다시 계산한다.
+function updateBoxStyle(){
+ for(const type of ['code','place']){
+  const font=document.getElementById(type+'Font').value;
+  const size=document.getElementById(type+'Size').value;
+  const opacity=document.getElementById(type+'Opacity').value;
+  const bg=document.getElementById(type+'Bg').value;
+  boxes.style.setProperty('--'+type+'-font',font);
+  boxes.style.setProperty('--'+type+'-size',size+'px');
+  boxes.style.setProperty('--'+type+'-opacity',opacity/100);
+  boxes.style.setProperty('--'+type+'-bg',bg);
+  document.getElementById(type+'SizeValue').value=size+'px';
+  document.getElementById(type+'OpacityValue').value=opacity+'%';
+ }
+ if(detectedHits.length)showBoxes(detectedHits);
 }
 
 // 이미지 보정 방식을 변경한다. (스위치 코렉션 모드)
@@ -171,9 +182,9 @@ imageViewport.addEventListener('pointerup',event=>{
  tapStart=null;
 });
 imageViewport.addEventListener('click',event=>{if(event.pointerType!=='touch')toggleBoxes();});
-boxOpacity.addEventListener('input',changeBoxOpacity);
+document.querySelectorAll('.box-style-settings input,.box-style-settings select').forEach(input=>input.addEventListener('input',updateBoxStyle));
 correctionModeButtons.forEach(button=>button.addEventListener('click',()=>switchCorrectionMode(button.dataset.filterMode)));
-changeBoxOpacity();
+updateBoxStyle();
 excel.addEventListener('change',loadExcel);
 sheet.addEventListener('change',changeSheet);
 start.addEventListener('click',startCamera);
