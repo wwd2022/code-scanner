@@ -5,7 +5,7 @@ async function getWorker(){
  if(!workerPromise)workerPromise=(async()=>{
   if(!window.Tesseract)throw new Error('OCR 라이브러리 로딩 실패. 인터넷 연결 후 새로고침하세요.');
   const created=await Tesseract.createWorker('eng',1,{logger:message=>{
-   if(busy&&frozenMode&&message.status==='recognizing text')status.textContent=recognitionStage+' 코드 인식 중… '+Math.round(message.progress*100)+'%';
+   if(busy&&frozenMode&&message.status==='recognizing text')showScanProgress(message.progress);
   }});
   try{await created.setParameters({tessedit_pageseg_mode:'11'});}
   catch(error){await created.terminate();throw error;}
@@ -152,10 +152,9 @@ function mergeHits(groups){
 // 확대 사진에서는 보이는 부분만 검사하고 박스는 원본 위치에 표시한다.
 async function scanCamera(){
  if(busy||starting||(activeTab==='camera'&&frozenMode))return;
- if(activeTab==='camera'&&(!stream||camera.readyState<2)){status.textContent='카메라를 켠 다음 코드 인식 시작을 누르세요.';return;}
+ if(activeTab==='camera'&&(!stream||camera.readyState<2)){showScanCameraRequired();return;}
  if(activeTab!=='camera'&&!photoReady)return;
- busy=true;lockInputs(true);excel.disabled=true;sheet.disabled=true;resume.disabled=true;strength.disabled=true;liveCanvas.setAttribute('aria-busy','true');
- raw.textContent='';scanStats.textContent='';status.textContent='원본·보정본 인식을 준비합니다…';
+ busy=true;showScanStart();
  const started=performance.now();
  const settings={mode:filterMode.value,brightness:Number(brightness.value),threshold:Number(threshold.value),removeLines:removeLines.checked,deep:deepScan.checked,strength:Number(strength.value)};
  try{
@@ -173,8 +172,7 @@ async function scanCamera(){
    applyFilter(pixels.data,Number(strength.value));ctx.putImageData(pixels,0,0);
   }
   if(activeTab==='camera')camera.pause();frozenMode=true;liveEpoch++;clearTimeout(liveTimer);cancelAnimationFrame(animationId);dots.replaceChildren();
-  imageViewport.classList.toggle('camera-shot',activeTab==='camera');
-  liveView.hidden=true;imageViewport.hidden=false;frozen.hidden=false;zoomLevel.hidden=activeTab==='camera';zoomHint.hidden=activeTab==='camera';detectedHits=[];boxes.replaceChildren();liveStatus.textContent='정지 화면 · 인식 결과를 확인하세요.';
+  detectedHits=[];showScanFrame();
   if(liveJob)await liveJob.catch(()=>{});
   const area=activeTab==='camera'?null:getVisiblePhotoRegion();
   let scanSource=originalFrame;
@@ -189,17 +187,15 @@ async function scanCamera(){
   if(area)scanSource.width=scanSource.height=1;
   for(let i=0;i<results.length;i++){
    const pass=passes[i],result=results[i];
-   if(result.error){errors.push(pass.name+': '+result.error);raw.textContent+='['+pass.name+' 실패] '+result.error+'\\n\\n';continue;}
+   if(result.error){errors.push(pass.name+': '+result.error);appendScanRaw(pass.name,result.error,true);continue;}
    groups.push(area?result.hits.map(hit=>({...hit,bbox:{x0:hit.bbox.x0+area.x,y0:hit.bbox.y0+area.y,x1:hit.bbox.x1+area.x,y1:hit.bbox.y1+area.y}})):result.hits);
    stats.push(pass.name+' '+result.hits.length+'곳');
-   raw.textContent+='['+pass.name+']\\n'+result.text+'\\n\\n';
+   appendScanRaw(pass.name,result.text,false);
   }
   if(!groups.length)throw new Error(errors.join(' / '));
-  detectedHits=mergeHits(groups);showBoxes(detectedHits);
+  detectedHits=mergeHits(groups);
   const seconds=((performance.now()-started)/1000).toFixed(1);
-  scanStats.textContent=(area?'확대 영역 · ':'전체 이미지 · ')+stats.join(' · ')+' → 합계 '+detectedHits.length+'곳 · '+seconds+'초'+(errors.length?' · 일부 검사 실패':'');
-  status.textContent=detectedHits.length?detectedHits.length+'개 코드 표시 · 확인 표시는 사진과 비교하세요.':'코드를 찾지 못함 · 확대 위치나 보정 설정을 바꿔 재검사하세요.';
-  liveStatus.textContent='정지 화면 · 코드와 위치를 확인하세요.';
- }catch(error){status.textContent='인식 실패: '+error.message;if(worker){await worker.terminate().catch(()=>{});worker=null;}}
- finally{recognitionStage='';busy=false;lockInputs(false);excel.disabled=false;sheet.disabled=false;liveCanvas.setAttribute('aria-busy','false');strength.disabled=activeTab==='camera'&&frozenMode;resume.disabled=!stream||!frozenMode;start.disabled=!!stream;readImage.textContent=activeTab==='camera'&&frozenMode?'다시 촬영':'코드 인식';}
+  showScanResults(detectedHits,area,stats,seconds,errors.length);
+ }catch(error){showScanFailure(error);if(worker){await worker.terminate().catch(()=>{});worker=null;}}
+ finally{recognitionStage='';busy=false;showScanEnd();}
 }
