@@ -273,3 +273,44 @@ function showScanEnd(){
  strength.disabled=activeTab==='camera'&&frozenMode;resume.disabled=!stream||!frozenMode;
  start.disabled=!!stream;readImage.textContent=activeTab==='camera'&&frozenMode?'다시 촬영':'코드 인식';
 }
+
+// 꺼진 카메라는 더블탭으로 켜고, 실행 중에는 두 손가락으로 확대한다. (핸들 라이브 터치)
+// 미리보기와 촬영 이미지에 같은 확대 영역을 적용한다.
+window.liveZoom=1;
+const liveTouches=new Map();
+let livePinch=0,liveLastTap=0,liveTapPoint=null;
+function handleLiveTouch(event){
+ if(activeTab!=='camera'||frozenMode||busy||starting||event.pointerType!=='touch')return;
+ if(event.type==='pointerdown'){
+  liveView.setPointerCapture(event.pointerId);
+  liveTouches.set(event.pointerId,{x:event.clientX,y:event.clientY,startX:event.clientX,startY:event.clientY});
+  if(liveTouches.size===2){
+   const [a,b]=[...liveTouches.values()];
+   livePinch=Math.hypot(a.x-b.x,a.y-b.y);liveLastTap=0;
+  }
+  return;
+ }
+ const point=liveTouches.get(event.pointerId);
+ if(!point)return;
+ if(event.type==='pointermove'){
+  point.x=event.clientX;point.y=event.clientY;
+  if(liveTouches.size===2&&stream){
+   const [a,b]=[...liveTouches.values()],distance=Math.hypot(a.x-b.x,a.y-b.y);
+   if(livePinch)window.liveZoom=Math.max(1,Math.min(6,window.liveZoom*distance/livePinch));
+   livePinch=distance;
+   liveStatus.textContent='카메라 확대 '+window.liveZoom.toFixed(1)+'배';
+  }
+  return;
+ }
+ const tapped=Math.hypot(point.x-point.startX,point.y-point.startY)<20;
+ liveTouches.delete(event.pointerId);
+ if(!liveTouches.size)livePinch=0;
+ if(event.type==='pointerup'&&tapped&&!livePinch&&!stream){
+  const now=performance.now();
+  if(now-liveLastTap<350&&liveTapPoint&&Math.hypot(point.x-liveTapPoint.x,point.y-liveTapPoint.y)<40){
+   liveLastTap=0;startCamera();
+  }else{liveLastTap=now;liveTapPoint=point;}
+ }
+}
+['pointerdown','pointermove','pointerup','pointercancel'].forEach(type=>liveView.addEventListener(type,handleLiveTouch));
+liveView.addEventListener('dblclick',()=>{if(activeTab==='camera'&&!stream&&!starting)startCamera();});
