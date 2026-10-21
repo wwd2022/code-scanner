@@ -15,7 +15,6 @@ function showBoxes(hits){
   code.style.width=(b.x1-b.x0)/frame.width*100+'%';code.style.height=(b.y1-b.y0)/frame.height*100+'%';
   code.textContent=hit.code;
   code.title=hit.review?'확인 필요: '+hit.code:hit.code;
-  code.style.opacity=Number(boxOpacity.value)/100;
   place.className='location-box';place.textContent=location;
   place.style.left=(b.x0+b.x1)/2/frame.width*100+'%';
   place.style.top=(b.y0+b.y1)/2/frame.height*100+'%';
