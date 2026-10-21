@@ -46,14 +46,18 @@ function beginLive(){
  lastPaint=0;animationId=requestAnimationFrame(paintLive);liveTimer=setTimeout(checkLive,600);
 }
 
-// 정지 화면을 닫고 실시간 영상으로 돌아간다. (리줌 카메라)
-// 이전 박스를 지우고 다음 촬영을 준비한다.
+// 다시 촬영 시 카메라 미리보기만 재개한다. (리줌 카메라)
+// 반복 OCR을 멈추고 새 촬영 버튼 입력을 기다린다.
 async function resumeCamera(){
- if(busy||!stream)return;
+ if(busy||starting)return;
+ if(!stream){await startCamera();return;}
  try{
-  await camera.play();frozenMode=false;detectedHits=[];boxes.replaceChildren();
-  frozen.hidden=true;imageViewport.hidden=true;zoomLevel.hidden=true;zoomHint.hidden=true;liveView.hidden=false;resume.disabled=true;strength.disabled=false;readImage.disabled=false;readImage.textContent='코드 인식';beginLive();
-  status.textContent='코드 인식 시작 버튼을 누르면 화면을 멈추고 코드를 인식합니다.';
+  liveEpoch++;clearTimeout(liveTimer);cancelAnimationFrame(animationId);
+  await camera.play();frozenMode=false;detectedHits=[];boxes.replaceChildren();dots.replaceChildren();
+  frozen.hidden=true;imageViewport.hidden=true;zoomLevel.hidden=true;zoomHint.hidden=true;liveView.hidden=false;resume.disabled=true;strength.disabled=false;readImage.disabled=false;readImage.textContent='코드 인식';
+  lastPaint=0;animationId=requestAnimationFrame(paintLive);
+  liveStatus.textContent='촬영 준비 완료';
+  status.textContent='코드 인식 버튼을 누르면 새 화면을 촬영합니다.';
  }catch(error){status.textContent='영상 재생 실패: '+error.message;}
 }
 
