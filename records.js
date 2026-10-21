@@ -20,6 +20,12 @@ function showBoxes(hits){
   place.style.top=(b.y0+b.y1)/2/frame.height*100+'%';
   place.title=hit.code+' / '+location;
   boxes.append(code,place);
+  if(codeDirectionIndex!==null){
+   const codeAngle=(codeDirectionIndex-4)*Math.PI/8;
+   const x=Math.cos(codeAngle)*(code.offsetWidth/2+8);
+   const y=Math.sin(codeAngle)*(code.offsetHeight/2+8);
+   code.style.transform='translate('+x+'px,'+y+'px)';
+  }
   const dx=Math.cos(angle)*((code.offsetWidth+place.offsetWidth)/2+2);
   const dy=Math.sin(angle)*((code.offsetHeight+place.offsetHeight)/2+2);
   place.style.transform='translate(calc(-50% + '+dx+'px),calc(-50% + '+dy+'px))';
