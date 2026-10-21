@@ -45,6 +45,7 @@ function setPhotoZoom(value,centerX=imageViewport.clientWidth/2,centerY=imageVie
  const left=(imageViewport.scrollLeft+centerX)*ratio-centerX;
  const top=(imageViewport.scrollTop+centerY)*ratio-centerY;
  photoZoom=next;imageViewport.classList.toggle('zoomed',next>1.01);frozen.style.width=(next*100)+'%';
+ if(detectedHits.length)showBoxes(detectedHits);
  imageViewport.scrollLeft=left;imageViewport.scrollTop=top;
  zoomLevel.textContent=Math.round(next*100)+'%';
 }
