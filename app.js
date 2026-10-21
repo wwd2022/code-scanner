@@ -199,3 +199,61 @@ function handleScanButton(){
 readImage.addEventListener('click',handleScanButton);
 window.addEventListener('pagehide',stopCamera);
 restoreExcel();
+
+// OCR 진행 상태를 화면에 표시한다. (쇼 스캔 프로그레스)
+// 인식 엔진 데이터는 변경하지 않는다.
+function showScanProgress(progress){
+ status.textContent=recognitionStage+' 코드 인식 중… '+Math.round(progress*100)+'%';
+}
+
+// 카메라 준비 안내를 표시한다. (쇼 스캔 카메라 리콰이어드)
+// 촬영 상태는 변경하지 않는다.
+function showScanCameraRequired(){
+ status.textContent='카메라를 켠 다음 코드 인식 시작을 누르세요.';
+}
+
+// 인식 시작 시 입력과 결과 화면을 잠근다. (쇼 스캔 스타트)
+// OCR 실행 중 설정 변경을 방지한다.
+function showScanStart(){
+ lockInputs(true);excel.disabled=true;sheet.disabled=true;resume.disabled=true;strength.disabled=true;
+ liveCanvas.setAttribute('aria-busy','true');
+ raw.textContent='';scanStats.textContent='';status.textContent='원본·보정본 인식을 준비합니다…';
+}
+
+// 촬영한 이미지를 결과 화면에 표시한다. (쇼 스캔 프레임)
+// 카메라와 사진은 기존 화면 비율을 유지한다.
+function showScanFrame(){
+ imageViewport.classList.toggle('camera-shot',activeTab==='camera');
+ liveView.hidden=true;imageViewport.hidden=false;frozen.hidden=false;
+ zoomLevel.hidden=activeTab==='camera';zoomHint.hidden=activeTab==='camera';
+ boxes.replaceChildren();liveStatus.textContent='정지 화면 · 인식 결과를 확인하세요.';
+}
+
+// OCR 원문과 오류를 상세 창에 추가한다. (어펜드 스캔 로)
+// 기록 데이터와 인식 결과에는 영향을 주지 않는다.
+function appendScanRaw(name,value,failed){
+ raw.textContent+='['+name+(failed?' 실패':'')+']\\n'+value+'\\n\\n';
+}
+
+// 인식 결과 박스와 상태 메시지를 표시한다. (쇼 스캔 리절츠)
+// OCR 결과를 수정하지 않고 화면에만 반영한다.
+function showScanResults(hits,area,stats,seconds,errorCount){
+ showBoxes(hits);
+ scanStats.textContent=(area?'확대 영역 · ':'전체 이미지 · ')+stats.join(' · ')+' → 합계 '+hits.length+'곳 · '+seconds+'초'+(errorCount?' · 일부 검사 실패':'');
+ status.textContent=hits.length?hits.length+'개 코드 표시 · 확인 표시는 사진과 비교하세요.':'코드를 찾지 못함 · 확대 위치나 보정 설정을 바꿔 재검사하세요.';
+ liveStatus.textContent='정지 화면 · 코드와 위치를 확인하세요.';
+}
+
+// 인식 오류를 화면에 표시한다. (쇼 스캔 페일러)
+// OCR 워커 종료와 복구는 기존 인식 코드에서 처리한다.
+function showScanFailure(error){
+ status.textContent='인식 실패: '+error.message;
+}
+
+// 인식 완료 후 입력과 버튼 상태를 복원한다. (쇼 스캔 엔드)
+// 다시 촬영 기능 및 사진 모드를 유지한다.
+function showScanEnd(){
+ lockInputs(false);excel.disabled=false;sheet.disabled=false;liveCanvas.setAttribute('aria-busy','false');
+ strength.disabled=activeTab==='camera'&&frozenMode;resume.disabled=!stream||!frozenMode;
+ start.disabled=!!stream;readImage.textContent=activeTab==='camera'&&frozenMode?'다시 촬영':'코드 인식';
+}
