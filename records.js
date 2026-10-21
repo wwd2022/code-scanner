@@ -11,7 +11,7 @@ function placeLabel(element,anchor,angle,obstacles,placed,width,height){
   const x=Math.max(0,Math.min(width-w,anchor.x+anchor.w/2+dx*(distance+Math.max(w,h)/2)-w/2));
   const y=Math.max(0,Math.min(height-h,anchor.y+anchor.h/2+dy*(distance+Math.max(w,h)/2)-h/2));
   const rect={x,y,w,h};
-  const score=obstacles.reduce((s,r)=>s+overlap(rect,r)*100,s=0)+placed.reduce((s,r)=>s+overlap(rect,r)*10,0)+step*2;
+  const score=obstacles.reduce((s,r)=>s+overlap(rect,r)*100,0)+placed.reduce((s,r)=>s+overlap(rect,r)*10,0)+step*2;
   if(score<bestScore){bestScore=score;best=rect;}
   if(score===0)break;
  }
