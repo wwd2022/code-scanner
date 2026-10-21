@@ -158,18 +158,37 @@ function setLocationDirection(index){
  document.getElementById('locationDirection').textContent='방향 '+(locationDirectionIndex+1)+'/16';
  if(detectedHits.length)showBoxes(detectedHits);
 }
+// 코드 박스를 원래 인식 좌표 기준으로 이동한다. (셋 코드 디렉션)
+// OCR 좌표는 유지하고 박스 표시 위치만 바꾼다.
+let codeDirectionIndex=null;
+const codeDial=document.getElementById('codeDial');
+function setCodeDirection(index){
+ codeDirectionIndex=(index+16)%16;
+ const angle=(codeDirectionIndex-4)*Math.PI/8;
+ codeDial.style.setProperty('--stick-x',Math.cos(angle)*55+'px');
+ codeDial.style.setProperty('--stick-y',Math.sin(angle)*55+'px');
+ document.getElementById('codeDirection').textContent='방향 '+(codeDirectionIndex+1)+'/16';
+ if(detectedHits.length)showBoxes(detectedHits);
+}
 // 조이스틱 드래그를 16개 방향으로 맞춘다. (핸들 로케이션 스틱)
 // 터치·마우스 포인터의 각도를 이용해 위치 표시 방향을 변경한다.
 function handleLocationStick(event){
- if(event.type==='pointerdown')locationDial.setPointerCapture(event.pointerId);
- if(event.type==='pointermove'&&!locationDial.hasPointerCapture(event.pointerId))return;
+ if(event.type==='pointerdown')event.currentTarget.setPointerCapture(event.pointerId);
+ if(event.type==='pointermove'&&!event.currentTarget.hasPointerCapture(event.pointerId))return;
  if(event.type==='pointerup'||event.type==='pointercancel')return;
- const rect=locationDial.getBoundingClientRect();
+ const dial=event.currentTarget;
+ const rect=dial.getBoundingClientRect();
  const dx=event.clientX-rect.left-rect.width/2,dy=event.clientY-rect.top-rect.height/2;
- if(Math.hypot(dx,dy)>8)setLocationDirection(Math.round((Math.atan2(dy,dx)+Math.PI/2)/(Math.PI*2)*16));
+ if(Math.hypot(dx,dy)>8){
+  const index=Math.round((Math.atan2(dy,dx)+Math.PI/2)/(Math.PI*2)*16);
+  if(dial===codeDial)setCodeDirection(index);
+  else setLocationDirection(index);
+ }
 }
 locationDial.addEventListener('pointerdown',handleLocationStick);
 locationDial.addEventListener('pointermove',handleLocationStick);
+codeDial.addEventListener('pointerdown',handleLocationStick);
+codeDial.addEventListener('pointermove',handleLocationStick);
 setLocationDirection(12);
 // 사진을 한 번 누르면 두 종류의 박스를 함께 숨기거나 표시한다. (토글 박시스)
 // OCR 결과는 그대로 두고 화면 구석의 표시 상태만 변경한다.
