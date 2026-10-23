@@ -149,11 +149,12 @@ imageViewport.addEventListener('dblclick',event=>{
  closeTools();scanCamera();
 });
 // 위치 박스를 16방향으로 움직인다. (셋 로케이션 디렉션)
-// 드래그 중 기존 OCR 결과의 박스 배치만 갱신한다.
+// 방향 변경 즉시 저장하며 초기화·복원 중에는 저장을 건너뛴다.
 let locationDirectionIndex=12;
 const locationDial=document.getElementById('locationDial');
-function setLocationDirection(index){
- locationDirectionIndex=(index+16)%16;
+function setLocationDirection(index,persist=true){
+ locationDirectionIndex=((index%16)+16)%16;
+ if(persist)saveSettings();
  const angle=(locationDirectionIndex-4)*Math.PI/8;
  locationDial.style.setProperty('--stick-x',Math.cos(angle)*55+'px');
  locationDial.style.setProperty('--stick-y',Math.sin(angle)*55+'px');
@@ -161,11 +162,12 @@ function setLocationDirection(index){
  if(detectedHits.length)showBoxes(detectedHits);
 }
 // 코드 박스를 원래 인식 좌표 기준으로 이동한다. (셋 코드 디렉션)
-// OCR 좌표는 유지하고 박스 표시 위치만 바꾼다.
+// OCR 좌표는 유지하고 방향 변경 즉시 저장한다.
 let codeDirectionIndex=null;
 const codeDial=document.getElementById('codeDial');
-function setCodeDirection(index){
- codeDirectionIndex=(index+16)%16;
+function setCodeDirection(index,persist=true){
+ codeDirectionIndex=((index%16)+16)%16;
+ if(persist)saveSettings();
  const angle=(codeDirectionIndex-4)*Math.PI/8;
  codeDial.style.setProperty('--stick-x',Math.cos(angle)*55+'px');
  codeDial.style.setProperty('--stick-y',Math.sin(angle)*55+'px');
@@ -185,14 +187,12 @@ function handleLocationStick(event){
   const index=Math.round((Math.atan2(dy,dx)+Math.PI/2)/(Math.PI*2)*16);
   if(dial===codeDial)setCodeDirection(index);
   else setLocationDirection(index);
-  saveSettings();
  }
 }
 locationDial.addEventListener('pointerdown',handleLocationStick);
 locationDial.addEventListener('pointermove',handleLocationStick);
 codeDial.addEventListener('pointerdown',handleLocationStick);
 codeDial.addEventListener('pointermove',handleLocationStick);
-setLocationDirection(12);
 // 사진을 한 번 누르면 두 종류의 박스를 함께 숨기거나 표시한다. (토글 박시스)
 // OCR 결과는 그대로 두고 화면 구석의 표시 상태만 변경한다.
 function toggleBoxes(){
@@ -358,9 +358,10 @@ function saveSettings(){
 function restoreSettings(){
  try{
   const saved=JSON.parse(localStorage.getItem(settingsKey)||'null');
-  if(!saved||!saved.values||typeof saved.values!=='object')return;
+  if(!saved||typeof saved!=='object')return;
+  const values=saved.values&&typeof saved.values==='object'?saved.values:{};
   for(const input of settingsFields){
-   const value=saved.values[input.id];
+   const value=values[input.id];
    if(input.type==='checkbox'){
     if(typeof value==='boolean')input.checked=value;
    }else if(typeof value==='string'){
@@ -374,8 +375,9 @@ function restoreSettings(){
     input.value=value;
    }
   }
-  if(Number.isInteger(saved.codeDirection)&&saved.codeDirection>=0&&saved.codeDirection<16)setCodeDirection(saved.codeDirection);
-  if(Number.isInteger(saved.locationDirection)&&saved.locationDirection>=0&&saved.locationDirection<16)setLocationDirection(saved.locationDirection);
+  const codeDirection=Number(saved.codeDirection),locationDirection=Number(saved.locationDirection);
+  if(saved.codeDirection!=null&&Number.isInteger(codeDirection)&&codeDirection>=0&&codeDirection<16)setCodeDirection(codeDirection,false);
+  if(saved.locationDirection!=null&&Number.isInteger(locationDirection)&&locationDirection>=0&&locationDirection<16)setLocationDirection(locationDirection,false);
   strengthValue.value=strength.value;
   document.getElementById('brightnessValue').value=brightness.value;
   document.getElementById('thresholdValue').value=threshold.value;
@@ -391,4 +393,5 @@ settingsFields.forEach(input=>{
  input.addEventListener('change',saveSettings);
 });
 correctionModeButtons.forEach(button=>button.addEventListener('click',saveSettings));
+setLocationDirection(locationDirectionIndex,false);
 restoreSettings();
