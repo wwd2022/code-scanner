@@ -39,21 +39,30 @@ function drawCorrected(target,amount=null,maxSize=2200){
  return true;
 }
 
-// 원본 또는 현재 설정의 보정 이미지를 표시한다. (렌더 프리뷰)
-// OCR 보정 함수를 재사용하고 원본 픽셀과 결과 좌표를 유지한다.
+// 조절 중에는 작은 이미지에 보정하고 표시 크기는 유지한다.
+// 원본·OCR 좌표는 보존하며 미리보기용 캔버스를 재사용한다.
+const previewBuffer=document.createElement('canvas');
 function renderPreview(source,target){
- let rendered;
- if(previewCorrection.checked||settingsAdjusting){
-  const settings={mode:filterMode.value,brightness:Number(brightness.value),threshold:Number(threshold.value),removeLines:removeLines.checked,strength:Number(strength.value)};
-  rendered=renderScanPass(source,{x:0,y:0,width:source.width,height:source.height,scale:1,mode:settings.mode},settings);
+ const width=source.width,height=source.height;
+ const corrected=previewCorrection.checked||settingsAdjusting;
+ let image=source;
+ if(corrected){
+  const scale=settingsAdjusting?Math.min(1,640/Math.max(width,height)):1;
+  const w=Math.max(1,Math.round(width*scale)),h=Math.max(1,Math.round(height*scale));
+  if(previewBuffer.width!==w)previewBuffer.width=w;
+  if(previewBuffer.height!==h)previewBuffer.height=h;
+  const ctx=previewBuffer.getContext('2d',{willReadFrequently:true});
+  ctx.drawImage(source,0,0,w,h);
+  const pixels=ctx.getImageData(0,0,w,h);
+  applyCorrection(pixels,{mode:filterMode.value,brightness:Number(brightness.value),threshold:Number(threshold.value),removeLines:removeLines.checked,strength:Number(strength.value)});
+  ctx.putImageData(pixels,0,0);
+  image=previewBuffer;
  }
- const image=rendered?rendered.image:source;
  if(target!==image){
-  if(target.width!==image.width)target.width=image.width;
-  if(target.height!==image.height)target.height=image.height;
-  target.getContext('2d').drawImage(image,0,0);
+  if(target.width!==width)target.width=width;
+  if(target.height!==height)target.height=height;
+  target.getContext('2d').drawImage(image,0,0,width,height);
  }
- if(rendered)rendered.image.width=rendered.image.height=1;
 }
 
 // 표시 옵션과 보정 설정을 즉시 반영한다. (업데이트 프리뷰)
@@ -61,18 +70,17 @@ function renderPreview(source,target){
 function updatePreview(){
  document.getElementById('previewCorrectionValue').value=settingsAdjusting?'조절 중 · 보정':previewCorrection.checked?'ON · 보정':'OFF · 원본';
  if(activeTab==='camera'&&!frozenMode){
-  if(stream&&drawCorrected(liveCanvas,0,previewCorrection.checked||settingsAdjusting?960:2200))renderPreview(liveCanvas,liveCanvas);
+  if(stream&&drawCorrected(liveCanvas,0,settingsAdjusting?640:previewCorrection.checked?960:2200))renderPreview(liveCanvas,liveCanvas);
  }else if(frozenMode){
   const source=activeTab==='camera'?originalFrame:photoSource;
   if(source.width&&source.height)renderPreview(source,frame);
  }
 }
 
-// 보정 강도와 미리보기를 변경한다. (체인지 필터)
-// 다음 OCR에 새 강도를 적용하고 기존 인식 박스는 유지한다.
+// 보정 강도 표시와 다음 OCR 설정을 갱신한다.
+// 미리보기는 설정창의 공통 입력 처리에서 한 번만 갱신한다.
 function changeFilter(){
  strengthValue.value=strength.value;liveEpoch++;dots.replaceChildren();
- updatePreview();
 }
 
 // 그림자를 줄이고 인쇄 글자를 흑백으로 분리한다. (프린트 필터)

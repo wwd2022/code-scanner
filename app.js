@@ -215,8 +215,8 @@ start.addEventListener('click',startCamera);
 stop.addEventListener('click',stopCamera);
 resume.addEventListener('click',resumeCamera);
 strength.addEventListener('input',changeFilter);
-brightness.addEventListener('input',()=>{document.getElementById('brightnessValue').value=brightness.value;updatePreview();});
-threshold.addEventListener('input',()=>{document.getElementById('thresholdValue').value=threshold.value;updatePreview();});
+brightness.addEventListener('input',()=>{document.getElementById('brightnessValue').value=brightness.value;});
+threshold.addEventListener('input',()=>{document.getElementById('thresholdValue').value=threshold.value;});
 removeLines.addEventListener('change',updatePreview);
 previewCorrection.addEventListener('change',updatePreview);
 tabButtons.forEach(button=>button.addEventListener('click',()=>switchTab(button.dataset.tab)));
@@ -397,14 +397,21 @@ restoreSettings();
 // 슬라이더 조절 중 설정창 뒤에 보정 화면을 비춘다. (비긴 세팅스 프리뷰)
 // 원본 표시 설정은 유지하고 조절하는 동안만 보정 미리보기를 사용한다.
 const settingsDrawer=document.getElementById('settingsDrawer');
-let adjustmentPointer=null,adjustmentTimer=0;
+let adjustmentPointer=null,adjustmentTimer=0,adjustmentFrame=0;
 function beginSettingsPreview(event){
  if(!event.target.matches('input[type=range]')||busy||starting)return;
  if(event.type==='pointerdown')adjustmentPointer=event.pointerId;
  clearTimeout(adjustmentTimer);
  settingsAdjusting=true;settingsDrawer.classList.add('adjusting');
- updatePreview();
+ if(!adjustmentFrame)adjustmentFrame=requestAnimationFrame(paintSettingsPreview);
  if(adjustmentPointer===null)adjustmentTimer=setTimeout(endSettingsPreview,700);
+}
+
+// 여러 입력 이벤트를 한 화면 갱신으로 모은다.
+// 가장 최근 설정값만 사용하고 중간 값의 중복 보정은 생략한다.
+function paintSettingsPreview(){
+ adjustmentFrame=0;
+ if(settingsAdjusting)updatePreview();
 }
 
 // 슬라이더 조절이 끝나면 원래 표시 설정으로 돌아간다. (엔드 세팅스 프리뷰)
@@ -412,6 +419,7 @@ function beginSettingsPreview(event){
 function endSettingsPreview(event){
  if(event?.pointerId!==undefined&&event.pointerId!==adjustmentPointer)return;
  clearTimeout(adjustmentTimer);adjustmentPointer=null;
+ cancelAnimationFrame(adjustmentFrame);adjustmentFrame=0;
  if(!settingsAdjusting)return;
  settingsAdjusting=false;settingsDrawer.classList.remove('adjusting');
  updatePreview();

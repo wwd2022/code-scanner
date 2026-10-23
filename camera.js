@@ -1,8 +1,8 @@
 // 원본 또는 보정된 실시간 미리보기를 갱신한다. (페인트 라이브)
-// 보정은 긴 변 960픽셀·초당 최대 4회로 표시하고 OCR 해상도는 유지한다.
+// 슬라이더 조절 중에는 공통 입력 처리에 미리보기 갱신을 맡긴다.
 function paintLive(time){
  if(!stream||frozenMode){animationId=0;return;}
- if(time-lastPaint>=(previewCorrection.checked||settingsAdjusting?250:100)){updatePreview();lastPaint=time;}
+ if(!settingsAdjusting&&time-lastPaint>=(previewCorrection.checked?250:100)){updatePreview();lastPaint=time;}
  animationId=requestAnimationFrame(paintLive);
 }
 
@@ -23,7 +23,7 @@ function showDots(hits){
 async function checkLive(){
  clearTimeout(liveTimer);
  if(!stream||frozenMode)return;
- if(busy||starting||liveJob){liveTimer=setTimeout(checkLive,600);return;}
+ if(busy||starting||liveJob||settingsAdjusting){liveTimer=setTimeout(checkLive,600);return;}
  const epoch=liveEpoch;dots.replaceChildren();liveStatus.textContent='화면 코드 확인 중…';
  liveJob=(async()=>{
   if(!drawCorrected(liveFrame))return;
