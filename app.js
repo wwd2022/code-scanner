@@ -394,15 +394,28 @@ settingsFields.forEach(input=>{
 setLocationDirection(locationDirectionIndex,false);
 restoreSettings();
 
-// 슬라이더 조절 중 설정창 뒤에 보정 화면을 비춘다. (비긴 세팅스 프리뷰)
-// 원본 표시 설정은 유지하고 조절하는 동안만 보정 미리보기를 사용한다.
+// 조절하는 슬라이더와 제목만 하단에 표시한다.
+// 설정창은 투명하게 만들고 원본 표시 선택은 유지한다.
 const settingsDrawer=document.getElementById('settingsDrawer');
 let adjustmentPointer=null,adjustmentTimer=0,adjustmentFrame=0;
+let adjustmentSlider=null,adjustmentLabel=null;
 function beginSettingsPreview(event){
  if(!event.target.matches('input[type=range]')||busy||starting)return;
- if(event.type==='pointerdown')adjustmentPointer=event.pointerId;
+ if(event.type==='pointerdown'){
+  adjustmentPointer=event.pointerId;
+  event.target.setPointerCapture(event.pointerId);
+ }
  clearTimeout(adjustmentTimer);
+ if(adjustmentSlider!==event.target){
+  adjustmentSlider?.classList.remove('adjustment-slider');
+  adjustmentLabel?.classList.remove('adjustment-label');
+  adjustmentSlider=event.target;
+  adjustmentLabel=adjustmentSlider.closest('label')||settingsDrawer.querySelector('label[for="'+adjustmentSlider.id+'"]');
+  adjustmentSlider.classList.add('adjustment-slider');
+  adjustmentLabel?.classList.add('adjustment-label');
+ }
  settingsAdjusting=true;settingsDrawer.classList.add('adjusting');
+ settingsDrawer.closest('main').classList.add('adjusting-settings');
  if(!adjustmentFrame)adjustmentFrame=requestAnimationFrame(paintSettingsPreview);
  if(adjustmentPointer===null)adjustmentTimer=setTimeout(endSettingsPreview,700);
 }
@@ -415,13 +428,17 @@ function paintSettingsPreview(){
 }
 
 // 슬라이더 조절이 끝나면 원래 표시 설정으로 돌아간다. (엔드 세팅스 프리뷰)
-// 반투명 설정창을 복원하고 미리보기 ON/OFF 선택은 바꾸지 않는다.
+// 슬라이더·제목의 원래 배치와 미리보기 ON/OFF 선택을 복원한다.
 function endSettingsPreview(event){
  if(event?.pointerId!==undefined&&event.pointerId!==adjustmentPointer)return;
  clearTimeout(adjustmentTimer);adjustmentPointer=null;
  cancelAnimationFrame(adjustmentFrame);adjustmentFrame=0;
  if(!settingsAdjusting)return;
  settingsAdjusting=false;settingsDrawer.classList.remove('adjusting');
+ settingsDrawer.closest('main').classList.remove('adjusting-settings');
+ adjustmentSlider?.classList.remove('adjustment-slider');
+ adjustmentLabel?.classList.remove('adjustment-label');
+ adjustmentSlider=null;adjustmentLabel=null;
  updatePreview();
 }
 settingsDrawer.addEventListener('pointerdown',beginSettingsPreview);

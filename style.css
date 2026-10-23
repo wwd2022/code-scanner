@@ -77,7 +77,12 @@ button:disabled{opacity:.45;cursor:default}button:focus-visible,input:focus-visi
 .test-controls button{flex:1 1 85px;min-height:31px;padding:4px;font-size:12px}
 .test-controls .test-check{white-space:nowrap}
 
-#settingsDrawer.adjusting>.drawer-body{background:rgba(255,255,255,.22);box-shadow:none}
-#settingsDrawer.adjusting .drawer-body label,#settingsDrawer.adjusting .drawer-body h2,#settingsDrawer.adjusting .drawer-body h3{background:rgba(255,255,255,.78);border-radius:5px}
-#settingsDrawer.adjusting .drawer-body small{background:rgba(255,255,255,.72);border-radius:5px;color:#263547}
+#settingsDrawer.adjusting>.drawer-body{background:transparent;border-color:transparent;box-shadow:none;scrollbar-width:none}
+#settingsDrawer.adjusting>.drawer-body::-webkit-scrollbar{display:none}
+#settingsDrawer.adjusting .drawer-body *{visibility:hidden}
+#settingsDrawer.adjusting .drawer-body .adjustment-label,#settingsDrawer.adjusting .drawer-body .adjustment-label *,#settingsDrawer.adjusting .drawer-body .adjustment-slider{visibility:visible}
+#settingsDrawer.adjusting .drawer-body .adjustment-label{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 60px);transform:translateX(-50%);width:min(640px,calc(100% - 40px));margin:0;padding:0;display:block;background:transparent;color:#17263c;text-shadow:0 0 3px #fff,0 0 6px #fff;font-size:15px;font-weight:700;z-index:21}
+#settingsDrawer.adjusting .drawer-body input.adjustment-slider{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 16px);transform:translateX(-50%);width:min(640px,calc(100% - 40px));height:32px;margin:0;z-index:22}
+#settingsDrawer.adjusting .drawer-body .adjustment-label input.adjustment-slider{left:0;bottom:-44px;transform:none;width:100%}
+.adjusting-settings #readImage,.adjusting-settings .tool-drawer>summary{visibility:hidden}
 #settingsDrawer input[type=range]{touch-action:pan-y}
