@@ -185,6 +185,7 @@ function handleLocationStick(event){
   const index=Math.round((Math.atan2(dy,dx)+Math.PI/2)/(Math.PI*2)*16);
   if(dial===codeDial)setCodeDirection(index);
   else setLocationDirection(index);
+  saveSettings();
  }
 }
 locationDial.addEventListener('pointerdown',handleLocationStick);
@@ -337,3 +338,57 @@ function handleLiveTouch(event){
 }
 ['pointerdown','pointermove','pointerup','pointercancel'].forEach(type=>liveView.addEventListener(type,handleLiveTouch));
 liveView.addEventListener('dblclick',()=>{if(activeTab==='camera'&&!stream&&!starting)startCamera();});
+
+// 인식·박스·테스트 입력값을 기기에 저장한다. (세이브 세팅스)
+// 같은 주소와 브라우저에서 재접속하면 마지막 설정을 복원한다.
+const settingsKey='code-scanner.settings.v1';
+const settingsFields=[...document.querySelectorAll('#settingsDrawer input[id],#settingsDrawer select[id],#testControls input[id],#testControls select[id]')];
+function saveSettings(){
+ const values={};
+ for(const input of settingsFields)values[input.id]=input.type==='checkbox'?input.checked:input.value;
+ try{
+  localStorage.setItem(settingsKey,JSON.stringify({values,codeDirection:codeDirectionIndex,locationDirection:locationDirectionIndex}));
+ }catch(error){
+  status.textContent='설정을 저장하지 못했습니다. 브라우저 저장 공간 설정을 확인하세요.';
+ }
+}
+
+// 저장된 설정을 읽고 화면 표시에도 적용한다. (리스토어 세팅스)
+// 잘못된 값은 무시하며 사진·OCR 결과·카메라 상태는 복원하지 않는다.
+function restoreSettings(){
+ try{
+  const saved=JSON.parse(localStorage.getItem(settingsKey)||'null');
+  if(!saved||!saved.values||typeof saved.values!=='object')return;
+  for(const input of settingsFields){
+   const value=saved.values[input.id];
+   if(input.type==='checkbox'){
+    if(typeof value==='boolean')input.checked=value;
+   }else if(typeof value==='string'){
+    if(input.tagName==='SELECT'&&![...input.options].some(option=>option.value===value))continue;
+    if(input.id==='filterMode'&&!['print','contrast'].includes(value))continue;
+    if(input.type==='range'||input.type==='number'){
+     const number=Number(value);
+     if(!value.trim()||!Number.isFinite(number)||number<Number(input.min)||number>Number(input.max))continue;
+    }
+    if(input.type==='color'&&!/^#[0-9a-f]{6}$/i.test(value))continue;
+    input.value=value;
+   }
+  }
+  if(Number.isInteger(saved.codeDirection)&&saved.codeDirection>=0&&saved.codeDirection<16)setCodeDirection(saved.codeDirection);
+  if(Number.isInteger(saved.locationDirection)&&saved.locationDirection>=0&&saved.locationDirection<16)setLocationDirection(saved.locationDirection);
+  strengthValue.value=strength.value;
+  document.getElementById('brightnessValue').value=brightness.value;
+  document.getElementById('thresholdValue').value=threshold.value;
+  document.getElementById('testNoiseValue').value=document.getElementById('testNoise').value+'%';
+  correctionModeButtons.forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.filterMode===filterMode.value)));
+  updateBoxStyle();updatePreview();
+ }catch(error){
+  console.warn('저장된 설정을 복원하지 못했습니다.',error);
+ }
+}
+settingsFields.forEach(input=>{
+ input.addEventListener('input',saveSettings);
+ input.addEventListener('change',saveSettings);
+});
+correctionModeButtons.forEach(button=>button.addEventListener('click',saveSettings));
+restoreSettings();
