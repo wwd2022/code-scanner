@@ -128,18 +128,22 @@ function printFilter(image,offset=16,cleanLines=true){
  for(let i=0;i<n;i++){const v=mask[i]?0:255;data[i*4]=data[i*4+1]=data[i*4+2]=v;}
 }
 
-// 전체 사진과 겹치는 확대 구역을 준비한다. (크리에이트 스캔 패시스)
-// 구역 경계의 코드도 포함하고 한 번에 캔버스 한 장씩 처리한다.
+// 선택한 전체 검사와 확대 구역만 준비한다.
+// 구역 크기·겹침·인식 해상도는 기존 값을 유지한다.
 function createScanPasses(width,height,settings){
- const full={x:0,y:0,width,height};
- const passes=[{...full,name:'전체 원본',mode:'original',scale:Math.min(1,2400/Math.max(width,height))}];
- passes.push({...full,name:'전체 보정',mode:settings.mode,scale:Math.min(1,2400/Math.max(width,height))});
+ const full={x:0,y:0,width,height},enabled=new Set(settings.stages),passes=[];
+ if(enabled.has('original'))passes.push({...full,key:'original',name:'전체 원본',mode:'original',scale:Math.min(1,2400/Math.max(width,height))});
+ if(enabled.has('corrected'))passes.push({...full,key:'corrected',name:'전체 보정',mode:settings.mode,scale:Math.min(1,2400/Math.max(width,height))});
  if(settings.deep){
   const tw=Math.ceil(width*.5),th=Math.ceil(height*.65);
-  for(let row=0;row<2;row++)for(let col=0;col<3;col++)passes.push({
-   x:Math.round((width-tw)*col/2),y:(height-th)*row,width:tw,height:th,
-   name:'확대 '+(row*3+col+1),mode:settings.mode,scale:Math.min(2,2000/Math.max(tw,th))
-  });
+  for(let row=0;row<2;row++)for(let col=0;col<3;col++){
+   const number=row*3+col+1,key='zoom'+number;
+   if(!enabled.has(key))continue;
+   passes.push({
+    x:Math.round((width-tw)*col/2),y:(height-th)*row,width:tw,height:th,
+    key,name:'확대 '+number,mode:settings.mode,scale:Math.min(2,2000/Math.max(tw,th))
+   });
+  }
  }
  return passes;
 }

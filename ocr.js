@@ -154,9 +154,11 @@ async function scanCamera(){
  if(busy||starting||(activeTab==='camera'&&frozenMode))return;
  if(activeTab==='camera'&&(!stream||camera.readyState<2)){showScanCameraRequired();return;}
  if(activeTab!=='camera'&&!photoReady)return;
- busy=true;showScanStart();
+ const stages=scanStageInputs.filter(input=>input.checked&&(deepScan.checked||!input.dataset.scanStage.startsWith('zoom'))).map(input=>input.dataset.scanStage);
+ if(!stages.length){showScanStagesRequired();return;}
+ busy=true;showScanStart(stages);
  const started=performance.now();
- const settings={mode:filterMode.value,brightness:Number(brightness.value),threshold:Number(threshold.value),removeLines:removeLines.checked,deep:deepScan.checked,strength:Number(strength.value)};
+ const settings={mode:filterMode.value,brightness:Number(brightness.value),threshold:Number(threshold.value),removeLines:removeLines.checked,deep:deepScan.checked,strength:Number(strength.value),stages};
  try{
   if(activeTab==='camera'){
    if(!drawCorrected(originalFrame,0))throw new Error('영상이 아직 준비되지 않았습니다.');
@@ -178,7 +180,7 @@ async function scanCamera(){
   const passes=createScanPasses(scanSource.width,scanSource.height,settings);
   const groups=[],stats=[],errors=[];
   // 확대 검사도 같은 최대 2개 워커 풀을 사용한다.
-  const results=await runParallelPasses(passes,settings,scanSource);
+  const results=await runParallelPasses(passes,settings,scanSource,(i,result)=>showScanStageResult(passes[i],result));
   if(area)scanSource.width=scanSource.height=1;
   for(let i=0;i<results.length;i++){
    const pass=passes[i],result=results[i];

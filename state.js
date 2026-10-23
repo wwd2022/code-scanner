@@ -23,6 +23,7 @@ const threshold=document.getElementById('threshold'),removeLines=document.getEle
 const printCorrection=document.getElementById('printCorrection');
 let settingsAdjusting=false;
 const previewCorrection=document.getElementById('previewCorrection');
-const correctionInputs=[printCorrection,brightness,threshold,removeLines,deepScan,previewCorrection];
+const scanStageInputs=[...document.querySelectorAll('[data-scan-stage]')];
+const correctionInputs=[printCorrection,brightness,threshold,removeLines,deepScan,previewCorrection,...scanStageInputs];
 const boxOpacity=document.getElementById("boxOpacity"),boxOpacityValue=document.getElementById("boxOpacityValue");
 const imageViewport=document.getElementById('imageViewport'),zoomLevel=document.getElementById('zoomLevel'),zoomHint=document.getElementById('zoomHint');

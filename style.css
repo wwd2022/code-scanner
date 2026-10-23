@@ -86,3 +86,8 @@ button:disabled{opacity:.45;cursor:default}button:focus-visible,input:focus-visi
 #settingsDrawer.adjusting .drawer-body .adjustment-label input.adjustment-slider{left:0;bottom:-44px;transform:none;width:100%}
 .adjusting-settings #readImage,.adjusting-settings .tool-drawer>summary{visibility:hidden}
 #settingsDrawer input[type=range]{touch-action:pan-y}
+
+.scan-stages{border-top:1px solid #dce3ec;margin-top:12px;padding-top:10px}
+.scan-stages>summary{font-weight:600;cursor:pointer}
+.scan-stages output{margin-left:auto;white-space:nowrap;font-size:12px;color:#526275}
+.zoom-stages{padding-left:12px}

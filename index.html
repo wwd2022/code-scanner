@@ -76,7 +76,21 @@
 <label for="threshold">인쇄물 글자 농도 <output id="thresholdValue">16</output></label>
 <input id="threshold" type="range" min="4" max="32" step="2" value="16">
 <label class="inline-label"><input id="removeLines" type="checkbox" checked> 표 테두리 완화</label>
-<label class="inline-label"><input id="deepScan" type="checkbox" checked> 정밀 인식 · 6구역 확대 검사</label>
+<details class="scan-stages" open>
+<summary>정밀 인식 · 단계 선택</summary>
+<label class="inline-label"><input id="scanOriginal" data-scan-stage="original" type="checkbox" checked> 전체 원본<output data-stage-count="original">미검사</output></label>
+<label class="inline-label"><input id="scanCorrected" data-scan-stage="corrected" type="checkbox" checked> 전체 보정<output data-stage-count="corrected">미검사</output></label>
+<label class="inline-label"><input id="deepScan" type="checkbox" checked> 확대 검사 사용</label>
+<div class="zoom-stages">
+<label class="inline-label"><input id="scanZoom1" data-scan-stage="zoom1" type="checkbox" checked> 확대 1 · 상단 왼쪽<output data-stage-count="zoom1">미검사</output></label>
+<label class="inline-label"><input id="scanZoom2" data-scan-stage="zoom2" type="checkbox" checked> 확대 2 · 상단 중앙<output data-stage-count="zoom2">미검사</output></label>
+<label class="inline-label"><input id="scanZoom3" data-scan-stage="zoom3" type="checkbox" checked> 확대 3 · 상단 오른쪽<output data-stage-count="zoom3">미검사</output></label>
+<label class="inline-label"><input id="scanZoom4" data-scan-stage="zoom4" type="checkbox" checked> 확대 4 · 하단 왼쪽<output data-stage-count="zoom4">미검사</output></label>
+<label class="inline-label"><input id="scanZoom5" data-scan-stage="zoom5" type="checkbox" checked> 확대 5 · 하단 중앙<output data-stage-count="zoom5">미검사</output></label>
+<label class="inline-label"><input id="scanZoom6" data-scan-stage="zoom6" type="checkbox" checked> 확대 6 · 하단 오른쪽<output data-stage-count="zoom6">미검사</output></label>
+</div>
+<small>최근 코드 인식 기준 · 단계별 발견 개수이며 같은 코드가 여러 단계에서 중복될 수 있습니다. 최소 한 단계를 선택하세요.</small>
+</details>
 </div>
 <div class="box-style-settings">
 <h3>코드 박스</h3>
