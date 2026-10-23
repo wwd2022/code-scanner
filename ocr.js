@@ -165,12 +165,7 @@ async function scanCamera(){
    originalFrame.getContext('2d').drawImage(photoSource,0,0);
   }
   frame.width=originalFrame.width;frame.height=originalFrame.height;
-  const ctx=frame.getContext('2d',{willReadFrequently:true});ctx.drawImage(originalFrame,0,0);
-  // 정지 화면도 카메라 미리보기와 같은 대비 강도로 표시한다.
-  if(activeTab==='camera'&&Number(strength.value)){
-   const pixels=ctx.getImageData(0,0,frame.width,frame.height);
-   applyFilter(pixels.data,Number(strength.value));ctx.putImageData(pixels,0,0);
-  }
+  renderPreview(originalFrame,frame);
   if(activeTab==='camera')camera.pause();frozenMode=true;liveEpoch++;clearTimeout(liveTimer);cancelAnimationFrame(animationId);dots.replaceChildren();
   detectedHits=[];showScanFrame();
   if(liveJob)await liveJob.catch(()=>{});

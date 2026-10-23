@@ -63,6 +63,8 @@
 <summary>인식 설정</summary>
 <div class="drawer-body">
 <h2>이미지 보정 · 정밀 인식</h2>
+<label class="inline-label"><input id="previewCorrection" type="checkbox" role="switch" aria-describedby="previewCorrectionHint"> 보정 이미지 표시 <output id="previewCorrectionValue">OFF · 원본</output></label>
+<small id="previewCorrectionHint">ON: 현재 설정의 보정 이미지를 표시 · OFF: 원본 표시. OCR 설정은 유지됩니다.</small>
 <label for="strength">영상·대비 강도 <output id="strengthValue">50</output>%</label>
 <input id="strength" type="range" min="0" max="100" step="5" value="50">
 <div id="advanced">

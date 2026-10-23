@@ -1,10 +1,8 @@
-// 선택한 사진의 원본을 표시한다. (프리뷰 포토)
+// 선택한 사진을 표시 옵션에 따라 보여준다. (프리뷰 포토)
 // 이전 인식 박스를 지우며 원본 픽셀은 유지한다.
 function previewPhoto(){
  frame.width=photoSource.width;frame.height=photoSource.height;
- const ctx=frame.getContext('2d',{willReadFrequently:true});
- ctx.drawImage(photoSource,0,0);
- // 사진 원본 위에 인식 박스를 표시해 보정 결과와 비교한다.
+ renderPreview(photoSource,frame);
  detectedHits=[];boxes.replaceChildren();raw.textContent='';scanStats.textContent='';
  frozenMode=true;frozen.hidden=false;imageViewport.hidden=false;liveView.hidden=true;zoomLevel.hidden=false;zoomHint.hidden=false;
  readImage.disabled=false;strength.disabled=false;

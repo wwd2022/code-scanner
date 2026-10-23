@@ -1,8 +1,8 @@
-// 보정된 실시간 미리보기를 갱신한다. (페인트 라이브)
-// 초당 약 10프레임으로 표시하고 정지 화면에서는 갱신을 멈춘다.
+// 원본 또는 보정된 실시간 미리보기를 갱신한다. (페인트 라이브)
+// 보정은 긴 변 960픽셀·초당 최대 4회로 표시하고 OCR 해상도는 유지한다.
 function paintLive(time){
  if(!stream||frozenMode){animationId=0;return;}
- if(time-lastPaint>=100){drawCorrected(liveCanvas);lastPaint=time;}
+ if(time-lastPaint>=(previewCorrection.checked?250:100)){updatePreview();lastPaint=time;}
  animationId=requestAnimationFrame(paintLive);
 }
 

@@ -132,11 +132,12 @@ function updateBoxStyle(){
 }
 
 // 이미지 보정 방식을 변경한다. (스위치 코렉션 모드)
-// 선택한 설정을 다음 OCR 검사에 적용한다.
+// 선택한 설정을 미리보기와 다음 OCR 검사에 적용한다.
 function switchCorrectionMode(mode){
  if(busy||starting)return;
  filterMode.value=mode;
  correctionModeButtons.forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.filterMode===mode)));
+ updatePreview();
 }
 toolDrawers.forEach(drawer=>drawer.addEventListener('toggle',()=>{if(drawer.open)closeTools(drawer);}));
 imageViewport.addEventListener('pointerdown',handlePhotoPointer);
@@ -215,8 +216,10 @@ start.addEventListener('click',startCamera);
 stop.addEventListener('click',stopCamera);
 resume.addEventListener('click',resumeCamera);
 strength.addEventListener('input',changeFilter);
-brightness.addEventListener('input',()=>document.getElementById('brightnessValue').value=brightness.value);
-threshold.addEventListener('input',()=>document.getElementById('thresholdValue').value=threshold.value);
+brightness.addEventListener('input',()=>{document.getElementById('brightnessValue').value=brightness.value;updatePreview();});
+threshold.addEventListener('input',()=>{document.getElementById('thresholdValue').value=threshold.value;updatePreview();});
+removeLines.addEventListener('change',updatePreview);
+previewCorrection.addEventListener('change',updatePreview);
 tabButtons.forEach(button=>button.addEventListener('click',()=>switchTab(button.dataset.tab)));
 photoInput.addEventListener('change',loadPhoto);
 document.getElementById('testGenerate').addEventListener('click',makeTestImage);
@@ -290,7 +293,7 @@ function showScanFailure(error){
 // 다시 촬영 기능 및 사진 모드를 유지한다.
 function showScanEnd(){
  lockInputs(false);excel.disabled=false;sheet.disabled=false;liveCanvas.setAttribute('aria-busy','false');
- strength.disabled=activeTab==='camera'&&frozenMode;resume.disabled=!stream||!frozenMode;
+ strength.disabled=false;resume.disabled=!stream||!frozenMode;
  start.disabled=!!stream;readImage.textContent=activeTab==='camera'&&frozenMode?'다시 촬영':'코드 인식';
 }
 

@@ -14,7 +14,7 @@ function applyFilter(pixels,amount){
 
 // 카메라를 화면 비율로 잘라 캔버스에 그린다. (드로 코렉티드)
 // 미리보기·실시간 OCR·촬영에 같은 중앙 영역을 사용한다.
-function drawCorrected(target,amount=Number(strength.value)){
+function drawCorrected(target,amount=Number(strength.value),maxSize=2200){
  if(camera.readyState<2||!camera.videoWidth)return false;
  const viewWidth=liveView.clientWidth,viewHeight=liveView.clientHeight;
  if(!viewWidth||!viewHeight)return false;
@@ -25,7 +25,7 @@ function drawCorrected(target,amount=Number(strength.value)){
  const zoom=window.liveZoom||1;
  sourceWidth/=zoom;sourceHeight/=zoom;
  const sourceX=(camera.videoWidth-sourceWidth)/2,sourceY=(camera.videoHeight-sourceHeight)/2;
- const scale=Math.min(1,2200/Math.max(sourceWidth,sourceHeight));
+ const scale=Math.min(1,maxSize/Math.max(sourceWidth,sourceHeight));
  const width=Math.max(1,Math.round(sourceWidth*scale)),height=Math.max(1,Math.round(sourceHeight*scale));
  if(target.width!==width||target.height!==height){target.width=width;target.height=height;}
  const ctx=target.getContext('2d',{willReadFrequently:true});
@@ -36,12 +36,40 @@ function drawCorrected(target,amount=Number(strength.value)){
  return true;
 }
 
-// 보정 강도를 바꾸고 이전 점 표시를 지운다. (체인지 필터)
-// 다음 검사부터 새 보정 강도로 코드를 읽는다.
+// 원본 또는 현재 설정의 보정 이미지를 표시한다. (렌더 프리뷰)
+// OCR 보정 함수를 재사용하고 원본 픽셀과 결과 좌표를 유지한다.
+function renderPreview(source,target){
+ let rendered;
+ if(previewCorrection.checked){
+  const settings={mode:filterMode.value,brightness:Number(brightness.value),threshold:Number(threshold.value),removeLines:removeLines.checked,strength:Number(strength.value)};
+  rendered=renderScanPass(source,{x:0,y:0,width:source.width,height:source.height,scale:1,mode:settings.mode},settings);
+ }
+ const image=rendered?rendered.image:source;
+ if(target!==image){
+  if(target.width!==image.width)target.width=image.width;
+  if(target.height!==image.height)target.height=image.height;
+  target.getContext('2d').drawImage(image,0,0);
+ }
+ if(rendered)rendered.image.width=rendered.image.height=1;
+}
+
+// 표시 옵션과 보정 설정을 즉시 반영한다. (업데이트 프리뷰)
+// 확대·박스·인식 기록을 유지하며 화면 이미지만 다시 그린다.
+function updatePreview(){
+ document.getElementById('previewCorrectionValue').value=previewCorrection.checked?'ON · 보정':'OFF · 원본';
+ if(activeTab==='camera'&&!frozenMode){
+  if(stream&&drawCorrected(liveCanvas,0,previewCorrection.checked?960:2200))renderPreview(liveCanvas,liveCanvas);
+ }else if(frozenMode){
+  const source=activeTab==='camera'?originalFrame:photoSource;
+  if(source.width&&source.height)renderPreview(source,frame);
+ }
+}
+
+// 보정 강도와 미리보기를 변경한다. (체인지 필터)
+// 다음 OCR에 새 강도를 적용하고 기존 인식 박스는 유지한다.
 function changeFilter(){
  strengthValue.value=strength.value;liveEpoch++;dots.replaceChildren();
- if(stream&&!frozenMode){drawCorrected(liveCanvas);liveStatus.textContent='보정 변경 · 다음 코드 검사 중…';}
- if(activeTab!=='camera'&&photoReady)previewPhoto();
+ updatePreview();
 }
 
 // 그림자를 줄이고 인쇄 글자를 흑백으로 분리한다. (프린트 필터)
