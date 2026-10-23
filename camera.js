@@ -2,7 +2,7 @@
 // 보정은 긴 변 960픽셀·초당 최대 4회로 표시하고 OCR 해상도는 유지한다.
 function paintLive(time){
  if(!stream||frozenMode){animationId=0;return;}
- if(time-lastPaint>=(previewCorrection.checked?250:100)){updatePreview();lastPaint=time;}
+ if(time-lastPaint>=(previewCorrection.checked||settingsAdjusting?250:100)){updatePreview();lastPaint=time;}
  animationId=requestAnimationFrame(paintLive);
 }
 

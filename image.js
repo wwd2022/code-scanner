@@ -14,7 +14,7 @@ function applyFilter(pixels,amount){
 
 // 카메라를 화면 비율로 잘라 캔버스에 그린다. (드로 코렉티드)
 // 미리보기·실시간 OCR·촬영에 같은 중앙 영역을 사용한다.
-function drawCorrected(target,amount=Number(strength.value),maxSize=2200){
+function drawCorrected(target,amount=null,maxSize=2200){
  if(camera.readyState<2||!camera.videoWidth)return false;
  const viewWidth=liveView.clientWidth,viewHeight=liveView.clientHeight;
  if(!viewWidth||!viewHeight)return false;
@@ -30,8 +30,11 @@ function drawCorrected(target,amount=Number(strength.value),maxSize=2200){
  if(target.width!==width||target.height!==height){target.width=width;target.height=height;}
  const ctx=target.getContext('2d',{willReadFrequently:true});
  ctx.drawImage(camera,sourceX,sourceY,sourceWidth,sourceHeight,0,0,width,height);
- if(amount){
-  const image=ctx.getImageData(0,0,width,height);applyFilter(image.data,amount);ctx.putImageData(image,0,0);
+ if(amount===null||amount){
+  const image=ctx.getImageData(0,0,width,height);
+  if(amount===null)applyCorrection(image,{mode:filterMode.value,brightness:Number(brightness.value),strength:Number(strength.value),threshold:Number(threshold.value),removeLines:removeLines.checked});
+  else applyFilter(image.data,amount);
+  ctx.putImageData(image,0,0);
  }
  return true;
 }
@@ -40,7 +43,7 @@ function drawCorrected(target,amount=Number(strength.value),maxSize=2200){
 // OCR 보정 함수를 재사용하고 원본 픽셀과 결과 좌표를 유지한다.
 function renderPreview(source,target){
  let rendered;
- if(previewCorrection.checked){
+ if(previewCorrection.checked||settingsAdjusting){
   const settings={mode:filterMode.value,brightness:Number(brightness.value),threshold:Number(threshold.value),removeLines:removeLines.checked,strength:Number(strength.value)};
   rendered=renderScanPass(source,{x:0,y:0,width:source.width,height:source.height,scale:1,mode:settings.mode},settings);
  }
@@ -56,9 +59,9 @@ function renderPreview(source,target){
 // 표시 옵션과 보정 설정을 즉시 반영한다. (업데이트 프리뷰)
 // 확대·박스·인식 기록을 유지하며 화면 이미지만 다시 그린다.
 function updatePreview(){
- document.getElementById('previewCorrectionValue').value=previewCorrection.checked?'ON · 보정':'OFF · 원본';
+ document.getElementById('previewCorrectionValue').value=settingsAdjusting?'조절 중 · 보정':previewCorrection.checked?'ON · 보정':'OFF · 원본';
  if(activeTab==='camera'&&!frozenMode){
-  if(stream&&drawCorrected(liveCanvas,0,previewCorrection.checked?960:2200))renderPreview(liveCanvas,liveCanvas);
+  if(stream&&drawCorrected(liveCanvas,0,previewCorrection.checked||settingsAdjusting?960:2200))renderPreview(liveCanvas,liveCanvas);
  }else if(frozenMode){
   const source=activeTab==='camera'?originalFrame:photoSource;
   if(source.width&&source.height)renderPreview(source,frame);
@@ -133,7 +136,15 @@ function createScanPasses(width,height,settings){
  return passes;
 }
 
-// 인식할 구역에 밝기와 인쇄물 보정을 적용한다. (렌더 스캔 패스)
+// 밝기·흑백 대비·인쇄물 보정을 차례로 적용한다. (어플라이 코렉션)
+// 미리보기와 모든 OCR 입력에서 같은 필터를 사용한다.
+function applyCorrection(image,settings){
+ if(settings.brightness)for(let i=0;i<image.data.length;i+=4)for(let c=0;c<3;c++)image.data[i+c]+=settings.brightness;
+ applyFilter(image.data,settings.strength);
+ if(settings.mode==='print')printFilter(image,settings.threshold,settings.removeLines);
+}
+
+// 인식할 구역에 밝기·대비·인쇄물 보정을 적용한다. (렌더 스캔 패스)
 // 실제 확대 비율을 반환하여 박스를 원본 사진 좌표로 되돌린다.
 function renderScanPass(source,pass,settings){
  const crop=document.createElement('canvas');crop.width=pass.width;crop.height=pass.height;
@@ -141,9 +152,7 @@ function renderScanPass(source,pass,settings){
  ctx.drawImage(source,pass.x,pass.y,pass.width,pass.height,0,0,crop.width,crop.height);
  if(pass.mode!=='original'){
   const pixels=ctx.getImageData(0,0,crop.width,crop.height);
-  if(settings.brightness)for(let i=0;i<pixels.data.length;i+=4)for(let c=0;c<3;c++)pixels.data[i+c]+=settings.brightness;
-  if(pass.mode==='print')printFilter(pixels,settings.threshold,settings.removeLines);
-  else applyFilter(pixels.data,settings.strength);
+  applyCorrection(pixels,{...settings,mode:pass.mode});
   ctx.putImageData(pixels,0,0);
  }
  const output=document.createElement('canvas');output.width=Math.max(1,Math.round(crop.width*pass.scale));output.height=Math.max(1,Math.round(crop.height*pass.scale));

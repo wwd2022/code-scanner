@@ -131,12 +131,10 @@ function updateBoxStyle(){
  if(detectedHits.length)showBoxes(detectedHits);
 }
 
-// 이미지 보정 방식을 변경한다. (스위치 코렉션 모드)
-// 선택한 설정을 미리보기와 다음 OCR 검사에 적용한다.
-function switchCorrectionMode(mode){
- if(busy||starting)return;
- filterMode.value=mode;
- correctionModeButtons.forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.filterMode===mode)));
+// 인쇄물 보정을 대비 필터와 함께 켜거나 끈다. (체인지 프린트 코렉션)
+// 기존 모드 저장값과 OCR 설정을 동기화한다.
+function changePrintCorrection(){
+ filterMode.value=printCorrection.checked?'print':'contrast';
  updatePreview();
 }
 toolDrawers.forEach(drawer=>drawer.addEventListener('toggle',()=>{if(drawer.open)closeTools(drawer);}));
@@ -209,7 +207,7 @@ imageViewport.addEventListener('pointerup',event=>{
 });
 imageViewport.addEventListener('click',event=>{if(event.pointerType!=='touch')toggleBoxes();});
 document.querySelectorAll('.box-style-settings input,.box-style-settings select').forEach(input=>input.addEventListener('input',updateBoxStyle));
-correctionModeButtons.forEach(button=>button.addEventListener('click',()=>switchCorrectionMode(button.dataset.filterMode)));
+printCorrection.addEventListener('change',changePrintCorrection);
 updateBoxStyle();
 excel.addEventListener('change',loadExcel);
 sheet.addEventListener('change',changeSheet);
@@ -382,7 +380,8 @@ function restoreSettings(){
   document.getElementById('brightnessValue').value=brightness.value;
   document.getElementById('thresholdValue').value=threshold.value;
   document.getElementById('testNoiseValue').value=document.getElementById('testNoise').value+'%';
-  correctionModeButtons.forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.filterMode===filterMode.value)));
+  if(typeof values.printCorrection!=='boolean')printCorrection.checked=filterMode.value==='print';
+  filterMode.value=printCorrection.checked?'print':'contrast';
   updateBoxStyle();updatePreview();
  }catch(error){
   console.warn('저장된 설정을 복원하지 못했습니다.',error);
@@ -392,6 +391,34 @@ settingsFields.forEach(input=>{
  input.addEventListener('input',saveSettings);
  input.addEventListener('change',saveSettings);
 });
-correctionModeButtons.forEach(button=>button.addEventListener('click',saveSettings));
 setLocationDirection(locationDirectionIndex,false);
 restoreSettings();
+
+// 슬라이더 조절 중 설정창 뒤에 보정 화면을 비춘다. (비긴 세팅스 프리뷰)
+// 원본 표시 설정은 유지하고 조절하는 동안만 보정 미리보기를 사용한다.
+const settingsDrawer=document.getElementById('settingsDrawer');
+let adjustmentPointer=null,adjustmentTimer=0;
+function beginSettingsPreview(event){
+ if(!event.target.matches('input[type=range]')||busy||starting)return;
+ if(event.type==='pointerdown')adjustmentPointer=event.pointerId;
+ clearTimeout(adjustmentTimer);
+ settingsAdjusting=true;settingsDrawer.classList.add('adjusting');
+ updatePreview();
+ if(adjustmentPointer===null)adjustmentTimer=setTimeout(endSettingsPreview,700);
+}
+
+// 슬라이더 조절이 끝나면 원래 표시 설정으로 돌아간다. (엔드 세팅스 프리뷰)
+// 반투명 설정창을 복원하고 미리보기 ON/OFF 선택은 바꾸지 않는다.
+function endSettingsPreview(event){
+ if(event?.pointerId!==undefined&&event.pointerId!==adjustmentPointer)return;
+ clearTimeout(adjustmentTimer);adjustmentPointer=null;
+ if(!settingsAdjusting)return;
+ settingsAdjusting=false;settingsDrawer.classList.remove('adjusting');
+ updatePreview();
+}
+settingsDrawer.addEventListener('pointerdown',beginSettingsPreview);
+settingsDrawer.addEventListener('input',beginSettingsPreview);
+settingsDrawer.addEventListener('toggle',()=>{if(!settingsDrawer.open)endSettingsPreview();});
+window.addEventListener('pointerup',endSettingsPreview);
+window.addEventListener('pointercancel',endSettingsPreview);
+window.addEventListener('blur',endSettingsPreview);

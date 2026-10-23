@@ -76,3 +76,8 @@ button:disabled{opacity:.45;cursor:default}button:focus-visible,input:focus-visi
 .test-controls input[type=range]{width:64px}
 .test-controls button{flex:1 1 85px;min-height:31px;padding:4px;font-size:12px}
 .test-controls .test-check{white-space:nowrap}
+
+#settingsDrawer.adjusting>.drawer-body{background:rgba(255,255,255,.22);box-shadow:none}
+#settingsDrawer.adjusting .drawer-body label,#settingsDrawer.adjusting .drawer-body h2,#settingsDrawer.adjusting .drawer-body h3{background:rgba(255,255,255,.78);border-radius:5px}
+#settingsDrawer.adjusting .drawer-body small{background:rgba(255,255,255,.72);border-radius:5px;color:#263547}
+#settingsDrawer input[type=range]{touch-action:pan-y}

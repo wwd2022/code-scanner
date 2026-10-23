@@ -65,14 +65,12 @@
 <h2>이미지 보정 · 정밀 인식</h2>
 <label class="inline-label"><input id="previewCorrection" type="checkbox" role="switch" aria-describedby="previewCorrectionHint"> 보정 이미지 표시 <output id="previewCorrectionValue">OFF · 원본</output></label>
 <small id="previewCorrectionHint">ON: 현재 설정의 보정 이미지를 표시 · OFF: 원본 표시. OCR 설정은 유지됩니다.</small>
-<label for="strength">영상·대비 강도 <output id="strengthValue">50</output>%</label>
-<input id="strength" type="range" min="0" max="100" step="5" value="50">
 <div id="advanced">
-<nav class="tabs correction-tabs" aria-label="이미지 보정 방식">
-<button type="button" data-filter-mode="print" aria-pressed="true">인쇄물</button>
-<button type="button" data-filter-mode="contrast" aria-pressed="false">흑백 대비</button>
-</nav>
+<label class="inline-label"><input id="printCorrection" type="checkbox" checked> 인쇄물 보정</label>
 <input type="hidden" id="filterMode" value="print">
+<label for="strength">흑백 대비 강도 <output id="strengthValue">0</output>%</label>
+<input id="strength" type="range" min="0" max="100" step="5" value="0">
+<small>밝기·대비를 적용한 뒤 인쇄물의 그림자와 표 선을 보정합니다. 슬라이더 조절 중에는 뒤 화면에 보정 결과가 비칩니다.</small>
 <label for="brightness">밝기 <output id="brightnessValue">0</output></label>
 <input id="brightness" type="range" min="-60" max="60" step="5" value="0">
 <label for="threshold">인쇄물 글자 농도 <output id="thresholdValue">16</output></label>
@@ -102,7 +100,7 @@
 <label>위치 박스 방향 (16방향 · 드래그)</label>
 <div id="locationDial" class="location-dial" role="group" aria-label="위치 박스 표시 방향"></div>
 <small id="locationDirection">왼쪽</small>
-<small>인쇄물 모드는 그림자를 보정합니다. 설정은 세 가지 입력 모드에 공통 적용됩니다.</small>
+<small>인쇄물 보정과 흑백 대비를 함께 사용할 수 있습니다. 설정은 세 가지 입력 모드에 공통 적용됩니다.</small>
 </div>
 </details>
 <details class="tool-drawer" id="resultsDrawer">

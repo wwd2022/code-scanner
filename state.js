@@ -20,8 +20,9 @@ const tabButtons=[...document.querySelectorAll('[data-tab]')];
 
 const filterMode=document.getElementById('filterMode'),brightness=document.getElementById('brightness');
 const threshold=document.getElementById('threshold'),removeLines=document.getElementById('removeLines'),deepScan=document.getElementById('deepScan');
-const correctionModeButtons=[...document.querySelectorAll("[data-filter-mode]")];
+const printCorrection=document.getElementById('printCorrection');
+let settingsAdjusting=false;
 const previewCorrection=document.getElementById('previewCorrection');
-const correctionInputs=[...correctionModeButtons,brightness,threshold,removeLines,deepScan,previewCorrection];
+const correctionInputs=[printCorrection,brightness,threshold,removeLines,deepScan,previewCorrection];
 const boxOpacity=document.getElementById("boxOpacity"),boxOpacityValue=document.getElementById("boxOpacityValue");
 const imageViewport=document.getElementById('imageViewport'),zoomLevel=document.getElementById('zoomLevel'),zoomHint=document.getElementById('zoomHint');
