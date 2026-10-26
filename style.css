@@ -92,9 +92,9 @@ button:disabled{opacity:.45;cursor:default}button:focus-visible,input:focus-visi
 .zoom-stages{padding-left:12px}
 
 .code-box.needs-review{pointer-events:auto;cursor:pointer;touch-action:manipulation;z-index:2}
-.code-box.needs-review::before,.code-box.needs-review::after{content:'';position:absolute;top:50%;width:8px;height:8px;border:1px solid #8a6500;border-radius:50%;background:#ffdc00;transform:translateY(-50%)}
-.code-box.needs-review::before{right:calc(100% + 3px)}
-.code-box.needs-review::after{left:calc(100% + 3px)}
+.code-box.needs-review::before,.code-box.needs-review::after{content:'';position:absolute;top:0;bottom:0;width:4px;max-width:15%;background:rgba(220,50,50,.4);pointer-events:none}
+.code-box.needs-review::before{left:0}
+.code-box.needs-review::after{right:0}
 .code-box.needs-review:focus-visible{outline:2px solid #1673d0}
 #codeReview{width:min(420px,calc(100% - 24px));max-height:calc(100dvh - 24px);padding:18px;border:0;border-radius:16px;color:#20262e;background:#fff;overflow:auto;box-shadow:0 16px 60px #101c2b55}
 #codeReview::backdrop{background:#101c2baa}
