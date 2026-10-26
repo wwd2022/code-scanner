@@ -1,13 +1,13 @@
 // OCR 엔진을 한 번 준비해 공유한다. (겟 워커)
-// 실시간 검사와 터치 인식을 같은 엔진에서 순서대로 처리한다.
+// 코드용 허용 문자·사전 설정을 적용하고 모든 인식에서 공유한다.
 async function getWorker(){
  if(worker)return worker;
  if(!workerPromise)workerPromise=(async()=>{
   if(!window.Tesseract)throw new Error('OCR 라이브러리 로딩 실패. 인터넷 연결 후 새로고침하세요.');
   const created=await Tesseract.createWorker('eng',1,{logger:message=>{
    if(busy&&frozenMode&&message.status==='recognizing text')showScanProgress(message.progress);
-  }});
-  try{await created.setParameters({tessedit_pageseg_mode:'11'});}
+  }},{load_system_dawg:'0',load_freq_dawg:'0'});
+  try{await created.setParameters({tessedit_pageseg_mode:'11',tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-'});}
   catch(error){await created.terminate();throw error;}
   worker=created;return created;
  })();
@@ -155,13 +155,14 @@ function createOcrRegions(width,height,stages,maxEdge=3200){
 
 // 보정 이미지는 한 번 생성하고 전체·분리 검사에서 재사용한다.
 // 부분 재인식은 기본 한 번만 검사하며 모든 좌표를 원본에 맞춰 반환한다.
-async function recognizeCorrected(source,settings,area=null,scale=1,onPrepared=null,stages=null){
+async function recognizeCorrected(source,settings,area=null,scale=1,onPrepared=null,stages=null,psm='11'){
  const pass=area?{...area}:{x:0,y:0,width:source.width,height:source.height};
  const maxEdge=settings.ocrMaxEdge||3200;
  pass.scale=Math.min(scale,maxEdge/Math.max(pass.width,pass.height));
- let rendered;
+ let rendered,engine;
  try{
-  const engine=await getWorker();
+  engine=await getWorker();
+  if(psm!=='11')await engine.setParameters({tessedit_pageseg_mode:psm});
   rendered=renderScanPass(source,pass,settings);
   if(onPrepared)onPrepared(rendered.image,pass);
   const regions=createOcrRegions(rendered.image.width,rendered.image.height,stages,maxEdge);
@@ -188,7 +189,16 @@ async function recognizeCorrected(source,settings,area=null,scale=1,onPrepared=n
   }
   if(!groups.length)throw new Error(errors.join(' / ')||'검사할 영역이 없습니다.');
   return {hits:mergeHits(groups),text:texts.join('\n\n'),stats,errors,attempts:regions.length,resolution:rendered.image.width+'×'+rendered.image.height};
- }finally{if(rendered)rendered.image.width=rendered.image.height=1;}
+ }finally{
+  if(rendered)rendered.image.width=rendered.image.height=1;
+  if(engine&&psm!=='11'){
+   try{await engine.setParameters({tessedit_pageseg_mode:'11'});}
+   catch(error){
+    await engine.terminate().catch(()=>{});
+    if(worker===engine)worker=null;
+   }
+  }
+ }
 }
 
 // 불확실한 코드 주변을 여백과 함께 원본에서 잘라낸다.
@@ -204,12 +214,12 @@ function cropReviewRegion(hit){
  return {image,centerX:(b.x0+b.x1)/2-x,centerY:(b.y0+b.y1)/2-y};
 }
 
-// 잘라낸 영역도 보정 이미지 한 장만 확대해 한 번 읽는다.
+// 잘라낸 코드는 한 줄 모드로 읽은 뒤 전체 인식 모드를 복원한다.
 // 대상 중심에 가장 가까운 결과와 해당 후보만 반환한다.
 async function recognizeReviewRegion(crop){
  const width=crop.image.width,height=crop.image.height;
  const settings=getCorrectionSettings();
- const result=await recognizeCorrected(crop.image,settings,null,Math.min(4,settings.ocrMaxEdge/800,1800/Math.max(width,height)));
+ const result=await recognizeCorrected(crop.image,settings,null,Math.min(4,settings.ocrMaxEdge/800,1800/Math.max(width,height)),null,null,'7');
  const hits=result.hits;
  const distance=hit=>Math.hypot(((hit.bbox.x0+hit.bbox.x1)/2-crop.centerX)/width,((hit.bbox.y0+hit.bbox.y1)/2-crop.centerY)/height);
  hits.sort((a,b)=>distance(a)-distance(b));
