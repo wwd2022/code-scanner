@@ -230,11 +230,6 @@ for(const input of [speckArea,speckThreshold]){
  });
  input.addEventListener('change',updatePreview);
 }
-for(const input of [gaussianSize,gaussianX,gaussianY]){
- input.addEventListener('input',updateGaussianOutputs);
- input.addEventListener('change',updatePreview);
-}
-noiseMethod.addEventListener('change',()=>{updateGaussianOutputs();updatePreview();});
 removeLines.addEventListener('change',updatePreview);
 previewCorrection.addEventListener('change',updatePreview);
 tabButtons.forEach(button=>button.addEventListener('click',()=>switchTab(button.dataset.tab)));
@@ -400,7 +395,7 @@ function restoreSettings(){
   if(saved.locationDirection!=null&&Number.isInteger(locationDirection)&&locationDirection>=0&&locationDirection<16)setLocationDirection(locationDirection,false);
   strengthValue.value=strength.value;
   document.getElementById('screenNoiseValue').value=screenNoise.value;
-  updateGaussianOutputs();updateSpeckOutputs();
+  updateSpeckOutputs();
   document.getElementById('brightnessValue').value=brightness.value;
   document.getElementById('thresholdValue').value=threshold.value;
   document.getElementById('testNoiseValue').value=document.getElementById('testNoise').value+'%';
@@ -473,13 +468,6 @@ window.addEventListener('pointercancel',endSettingsPreview);
 window.addEventListener('blur',endSettingsPreview);
 
 
-// 가우시안 범위와 가로·세로 값을 설정창에 표시한다.
-// 저장값 복원 후에도 같은 표시 처리를 사용한다.
-function updateGaussianOutputs(){
- document.getElementById('gaussianSizeValue').value=gaussianSize.value+'×'+gaussianSize.value;
- document.getElementById('gaussianXValue').value=Number(gaussianX.value).toFixed(1);
- document.getElementById('gaussianYValue').value=Number(gaussianY.value).toFixed(1);
-}
 
 // 확대 검사 사용 여부와 처리 상태에 맞춰 단계 선택을 잠근다.
 // 선택값은 유지하며 기존 설정 저장·복원 방식을 사용한다.

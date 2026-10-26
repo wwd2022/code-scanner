@@ -131,10 +131,7 @@ function printFilter(image,offset=16,cleanLines=true){
 // 모니터 노이즈·밝기·대비·인쇄물 보정을 차례로 적용한다. (어플라이 코렉션)
 // 미리보기와 모든 OCR 입력에서 같은 필터를 사용한다.
 function applyCorrection(image,settings){
- if(settings.screenNoise){
-  if(settings.noiseMethod==='gaussian')applyGaussian(image,settings);
-  else reduceScreenNoise(image,settings.screenNoise);
- }
+ if(settings.screenNoise)reduceScreenNoise(image,settings.screenNoise);
  if(settings.brightness)for(let i=0;i<image.data.length;i+=4)for(let c=0;c<3;c++)image.data[i+c]+=settings.brightness;
  applyFilter(image.data,settings.strength);
  if(settings.mode==='print')printFilter(image,settings.threshold,settings.removeLines);
@@ -188,37 +185,7 @@ function reduceScreenNoise(image,amount){
 // 모든 입력 모드에서 현재 보정값을 같은 형식으로 읽는다.
 // 미리보기·전체 인식·부분 재인식의 설정 누락을 막는다.
 function getCorrectionSettings(){
- return {removeSpecks:removeSpecks.checked,speckArea:Number(speckArea.value),speckThreshold:Number(speckThreshold.value),noiseMethod:noiseMethod.value,gaussianSize:Number(gaussianSize.value),gaussianX:Number(gaussianX.value),gaussianY:Number(gaussianY.value),screenNoise:Number(screenNoise.value),mode:filterMode.value,brightness:Number(brightness.value),strength:Number(strength.value),threshold:Number(threshold.value),removeLines:removeLines.checked};
-}
-
-// 가우시안 가중치를 정규화해 가로·세로에 따로 사용한다.
-// 넓은 2차원 필터 대신 두 번의 1차원 계산으로 연산량을 줄인다.
-function gaussianKernel(size,sigma){
- const kernel=new Float32Array(size),radius=(size-1)/2;
- let sum=0;
- for(let i=0;i<size;i++){const x=i-radius;kernel[i]=Math.exp(-x*x/(2*sigma*sigma));sum+=kernel[i];}
- for(let i=0;i<size;i++)kernel[i]/=sum;
- return kernel;
-}
-
-// 밝기 영상에 가로·세로 가우시안을 적용하고 원본과 혼합한다.
-// 크기·좌표·투명도는 유지하며 강도 0은 공통 처리에서 생략한다.
-function applyGaussian(image,settings){
- const {width,height,data}=image,size=Math.max(3,Math.min(15,Math.round(settings.gaussianSize/2)*2-1)),radius=(size-1)/2;
- const kx=gaussianKernel(size,Math.max(.1,settings.gaussianX)),ky=gaussianKernel(size,Math.max(.1,settings.gaussianY));
- const gray=new Float32Array(width*height),horizontal=new Float32Array(width*height),mix=settings.screenNoise/100;
- for(let i=0;i<gray.length;i++)gray[i]=data[i*4]*.299+data[i*4+1]*.587+data[i*4+2]*.114;
- for(let y=0;y<height;y++)for(let x=0;x<width;x++){
-  let sum=0;
-  for(let k=0;k<size;k++)sum+=gray[y*width+Math.max(0,Math.min(width-1,x+k-radius))]*kx[k];
-  horizontal[y*width+x]=sum;
- }
- for(let y=0;y<height;y++)for(let x=0;x<width;x++){
-  let sum=0;
-  for(let k=0;k<size;k++)sum+=horizontal[Math.max(0,Math.min(height-1,y+k-radius))*width+x]*ky[k];
-  const offset=(y*width+x)*4;
-  for(let c=0;c<3;c++)data[offset+c]=Math.round(data[offset+c]*(1-mix)+sum*mix);
- }
+ return {removeSpecks:removeSpecks.checked,speckArea:Number(speckArea.value),speckThreshold:Number(speckThreshold.value),screenNoise:Number(screenNoise.value),mode:filterMode.value,brightness:Number(brightness.value),strength:Number(strength.value),threshold:Number(threshold.value),removeLines:removeLines.checked};
 }
 
 // 대각선을 포함해 연결된 검은 영역 중 지정 면적 이하만 지운다.
