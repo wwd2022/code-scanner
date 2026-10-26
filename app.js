@@ -136,6 +136,18 @@ function updateBoxStyle(){
   boxes.style.setProperty('--'+type+'-bg',bg);
   boxes.style.setProperty('--'+type+'-color',color);
   boxes.style.setProperty('--'+type+'-border',border);
+  const shape=document.getElementById(type+'Shape').value;
+  const padX=document.getElementById(type+'PadX').value,padY=document.getElementById(type+'PadY').value;
+  const effect=document.getElementById(type+'TextEffect').value,effectColor=document.getElementById(type+'EffectColor').value;
+  const radius={default:type==='code'?'2px':'5px',square:'0px',rounded:'8px',pill:'999px'}[shape];
+  const shadow=effect==='default'?(type==='code'?'0 0 2px #fff,0 0 3px #fff':'none'):effect==='shadow'||effect==='both'?'1px 1px 2px '+effectColor:'none';
+  boxes.style.setProperty('--'+type+'-radius',radius);
+  boxes.style.setProperty('--'+type+'-pad-x',padX/100+'em');
+  boxes.style.setProperty('--'+type+'-pad-y',padY/100+'em');
+  boxes.style.setProperty('--'+type+'-text-shadow',shadow);
+  boxes.style.setProperty('--'+type+'-text-stroke',effect==='outline'||effect==='both'?'0.6px '+effectColor:'0px transparent');
+  document.getElementById(type+'PadXValue').value=padX+'%';
+  document.getElementById(type+'PadYValue').value=padY+'%';
   document.getElementById(type+'SizeValue').value=size+'px';
   document.getElementById(type+'OpacityValue').value=opacity+'%';
  }
