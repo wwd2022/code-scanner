@@ -54,7 +54,7 @@ function renderPreview(source,target){
   const ctx=previewBuffer.getContext('2d',{willReadFrequently:true});
   ctx.drawImage(source,0,0,w,h);
   const pixels=ctx.getImageData(0,0,w,h);
-  applyCorrection(pixels,getCorrectionSettings());
+  applyCorrection(pixels,{...getCorrectionSettings(),pixelScale:Math.min(w/width,h/height)});
   ctx.putImageData(pixels,0,0);
   image=previewBuffer;
  }
@@ -138,6 +138,10 @@ function applyCorrection(image,settings){
  if(settings.brightness)for(let i=0;i<image.data.length;i+=4)for(let c=0;c<3;c++)image.data[i+c]+=settings.brightness;
  applyFilter(image.data,settings.strength);
  if(settings.mode==='print')printFilter(image,settings.threshold,settings.removeLines);
+ if(settings.removeSpecks){
+  const area=Math.floor(settings.speckArea*(settings.pixelScale??1)**2);
+  if(area>0)removeSmallDarkRegions(image,area,settings.speckThreshold);
+ }
 }
 
 // 선택 영역의 보정 이미지 한 장을 만든다.
@@ -184,7 +188,7 @@ function reduceScreenNoise(image,amount){
 // 모든 입력 모드에서 현재 보정값을 같은 형식으로 읽는다.
 // 미리보기·전체 인식·부분 재인식의 설정 누락을 막는다.
 function getCorrectionSettings(){
- return {noiseMethod:noiseMethod.value,gaussianSize:Number(gaussianSize.value),gaussianX:Number(gaussianX.value),gaussianY:Number(gaussianY.value),screenNoise:Number(screenNoise.value),mode:filterMode.value,brightness:Number(brightness.value),strength:Number(strength.value),threshold:Number(threshold.value),removeLines:removeLines.checked};
+ return {removeSpecks:removeSpecks.checked,speckArea:Number(speckArea.value),speckThreshold:Number(speckThreshold.value),noiseMethod:noiseMethod.value,gaussianSize:Number(gaussianSize.value),gaussianX:Number(gaussianX.value),gaussianY:Number(gaussianY.value),screenNoise:Number(screenNoise.value),mode:filterMode.value,brightness:Number(brightness.value),strength:Number(strength.value),threshold:Number(threshold.value),removeLines:removeLines.checked};
 }
 
 // 가우시안 가중치를 정규화해 가로·세로에 따로 사용한다.
@@ -214,5 +218,32 @@ function applyGaussian(image,settings){
   for(let k=0;k<size;k++)sum+=horizontal[Math.max(0,Math.min(height-1,y+k-radius))*width+x]*ky[k];
   const offset=(y*width+x)*4;
   for(let c=0;c<3;c++)data[offset+c]=Math.round(data[offset+c]*(1-mix)+sum*mix);
+ }
+}
+
+// 대각선을 포함해 연결된 검은 영역 중 지정 면적 이하만 지운다.
+// 원래 픽셀의 연결을 기준으로 판정하고 크기·좌표·투명도는 유지한다.
+function removeSmallDarkRegions(image,maxArea,threshold){
+ const {width,height,data}=image,length=width*height;
+ const mask=new Uint8Array(length),queue=new Int32Array(length);
+ for(let i=0;i<length;i++){
+  const p=i*4;
+  if(data[p+3]&&data[p]*.299+data[p+1]*.587+data[p+2]*.114<threshold)mask[i]=1;
+ }
+ for(let start=0;start<length;start++){
+  if(!mask[start])continue;
+  let head=0,tail=1;queue[0]=start;mask[start]=0;
+  while(head<tail){
+   const p=queue[head++],x=p%width,y=Math.floor(p/width);
+   for(let ny=Math.max(0,y-1);ny<=Math.min(height-1,y+1);ny++){
+    for(let nx=Math.max(0,x-1);nx<=Math.min(width-1,x+1);nx++){
+     const next=ny*width+nx;
+     if(mask[next]){mask[next]=0;queue[tail++]=next;}
+    }
+   }
+  }
+  if(tail<=maxArea)for(let i=0;i<tail;i++){
+   const p=queue[i]*4;data[p]=data[p+1]=data[p+2]=255;
+  }
  }
 }

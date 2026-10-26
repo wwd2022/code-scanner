@@ -223,6 +223,13 @@ screenNoise.addEventListener('input',()=>{
  liveEpoch++;dots.replaceChildren();
 });
 screenNoise.addEventListener('change',updatePreview);
+removeSpecks.addEventListener('change',()=>{liveEpoch++;dots.replaceChildren();updatePreview();});
+for(const input of [speckArea,speckThreshold]){
+ input.addEventListener('input',()=>{
+  updateSpeckOutputs();liveEpoch++;dots.replaceChildren();
+ });
+ input.addEventListener('change',updatePreview);
+}
 for(const input of [gaussianSize,gaussianX,gaussianY]){
  input.addEventListener('input',updateGaussianOutputs);
  input.addEventListener('change',updatePreview);
@@ -393,7 +400,7 @@ function restoreSettings(){
   if(saved.locationDirection!=null&&Number.isInteger(locationDirection)&&locationDirection>=0&&locationDirection<16)setLocationDirection(locationDirection,false);
   strengthValue.value=strength.value;
   document.getElementById('screenNoiseValue').value=screenNoise.value;
-  updateGaussianOutputs();
+  updateGaussianOutputs();updateSpeckOutputs();
   document.getElementById('brightnessValue').value=brightness.value;
   document.getElementById('thresholdValue').value=threshold.value;
   document.getElementById('testNoiseValue').value=document.getElementById('testNoise').value+'%';
@@ -488,3 +495,10 @@ function showScanStageResult(region,count,failed){
 }
 deepScan.addEventListener('change',()=>syncScanStageInputs());
 syncScanStageInputs();
+
+// 작은 영역 제거 설정의 현재 숫자를 표시한다.
+// 입력·저장값 복원 시 같은 표시 처리를 사용한다.
+function updateSpeckOutputs(){
+ document.getElementById('speckAreaValue').value=speckArea.value;
+ document.getElementById('speckThresholdValue').value=speckThreshold.value;
+}
