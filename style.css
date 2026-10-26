@@ -53,7 +53,6 @@ button:disabled{opacity:.45;cursor:default}button:focus-visible,input:focus-visi
 .code-box{position:absolute;display:flex;align-items:center;justify-content:center;border:1px solid #16833d;background:rgba(22,108,66,.16);color:#111;text-shadow:0 0 2px #fff,0 0 3px #fff;border-radius:2px;font:600 11px/1.1 monospace;letter-spacing:.1px;white-space:nowrap;min-height:12px;pointer-events:none}
 .code-box{font-family:var(--code-font,monospace);font-size:var(--code-size,11px);background:var(--code-bg,#d1eadc);opacity:var(--code-opacity,.65);color:var(--code-color,#111);border-style:var(--code-border,solid)}
 .code-box.missing-box{border-color:#b16b00}
-.code-box.needs-review{outline:1px dashed #c33;outline-offset:1px}
 .location-box{position:absolute;z-index:1;background:#202b3c;color:white;padding:4px 7px;border-radius:5px;font-size:12px;font-weight:700;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
 .location-box{font-family:var(--place-font,sans-serif);font-size:var(--place-size,12px);background:var(--place-bg,#202b3c);opacity:var(--place-opacity,1);color:var(--place-color,#fff);border:1px var(--place-border,none) #8899aa}
 .box-style-settings{border-top:1px solid #dce3ec;margin-top:12px;padding-top:6px}
@@ -92,7 +91,10 @@ button:disabled{opacity:.45;cursor:default}button:focus-visible,input:focus-visi
 .scan-stages output{margin-left:auto;white-space:nowrap;font-size:12px;color:#526275}
 .zoom-stages{padding-left:12px}
 
-.code-box.needs-review{pointer-events:auto;cursor:pointer;touch-action:manipulation;min-height:28px;padding:4px 6px;z-index:2}
+.code-box.needs-review{pointer-events:auto;cursor:pointer;touch-action:manipulation;z-index:2}
+.code-box.needs-review::before,.code-box.needs-review::after{content:'';position:absolute;top:50%;width:8px;height:8px;border:1px solid #8a6500;border-radius:50%;background:#ffdc00;transform:translateY(-50%)}
+.code-box.needs-review::before{right:calc(100% + 3px)}
+.code-box.needs-review::after{left:calc(100% + 3px)}
 .code-box.needs-review:focus-visible{outline:2px solid #1673d0}
 #codeReview{width:min(420px,calc(100% - 24px));max-height:calc(100dvh - 24px);padding:18px;border:0;border-radius:16px;color:#20262e;background:#fff;overflow:auto;box-shadow:0 16px 60px #101c2b55}
 #codeReview::backdrop{background:#101c2baa}
