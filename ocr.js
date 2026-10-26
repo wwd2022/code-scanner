@@ -1,17 +1,54 @@
-// OCR 엔진을 한 번 준비해 공유한다. (겟 워커)
-// 코드용 허용 문자·사전 설정을 적용하고 모든 인식에서 공유한다.
-async function getWorker(){
- if(worker)return worker;
- if(!workerPromise)workerPromise=(async()=>{
-  if(!window.Tesseract)throw new Error('OCR 라이브러리 로딩 실패. 인터넷 연결 후 새로고침하세요.');
-  const created=await Tesseract.createWorker('eng',1,{logger:message=>{
-   if(busy&&frozenMode&&message.status==='recognizing text')showScanProgress(message.progress);
-  }},{load_system_dawg:'0',load_freq_dawg:'0'});
-  try{await created.setParameters({tessedit_pageseg_mode:'11',tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-'});}
-  catch(error){await created.terminate();throw error;}
-  worker=created;return created;
- })();
- try{return await workerPromise;}finally{workerPromise=null;}
+// OCR 호출과 워커 개수 변경을 같은 대기열에서 처리한다.
+let ocrWorkers=[],ocrLane=Promise.resolve();
+function runOcrSession(task,isCurrent=()=>true){
+ const next=ocrLane.then(()=>{assertOcrCurrent(isCurrent);return task();});
+ ocrLane=next.catch(()=>{});
+ return next;
+}
+function assertOcrCurrent(isCurrent){
+ if(!isCurrent())throw new DOMException('이전 인식 결과 폐기','AbortError');
+}
+
+// 진행 중인 호출이 끝난 뒤에만 워커를 줄인다.
+async function trimOcrWorkers(limit){
+ while(ocrWorkers.length>limit){
+  const entry=ocrWorkers.pop();
+  await entry.engine.terminate().catch(()=>{});
+ }
+}
+
+// 각 워커에 같은 언어·사전·문자 설정을 적용해 재사용한다.
+async function prepareOcrWorkers(limit,jobs,isCurrent){
+ if(!window.Tesseract)throw new Error('OCR 라이브러리 로딩 실패. 인터넷 연결 후 새로고침하세요.');
+ await trimOcrWorkers(limit);
+ const needed=Math.min(limit,jobs);
+ let warning='';
+ while(ocrWorkers.length<needed){
+  assertOcrCurrent(isCurrent);
+  const entry={engine:null,psm:'11',progress:null,broken:false};
+  let created;
+  try{
+   created=await Tesseract.createWorker('eng',1,{logger:message=>entry.progress?.(message),errorHandler:()=>{}},{load_system_dawg:'0',load_freq_dawg:'0'});
+   await created.setParameters({tessedit_pageseg_mode:'11',tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-'});
+   entry.engine=created;ocrWorkers.push(entry);
+  }catch(error){
+   if(created)await created.terminate().catch(()=>{});
+   if(!ocrWorkers.length)throw error;
+   warning='추가 워커 준비 실패 · '+ocrWorkers.length+'개로 처리';break;
+  }
+ }
+ assertOcrCurrent(isCurrent);
+ return {entries:ocrWorkers.slice(0,needed),warning};
+}
+
+// 결과 폐기와 실제 작업 완료 대기를 구분한다.
+function cancelActiveScan(){
+ if(!activeScan||activeScan.cancelled)return;
+ activeScan.cancelled=true;scanEpoch++;
+ cancelScan.disabled=true;
+ document.getElementById('scanSingleCount').value='취소 요청 · 실행 중 결과 폐기';
+ document.querySelectorAll('[data-stage-count]').forEach(output=>{if(output.value==='대기')output.value='대기 취소';});
+ status.textContent='대기 작업 제거 · '+(activeScan.running?'실행 중 OCR '+activeScan.running+'개':activeScan.phase)+' 완료 대기 · 결과는 반영하지 않습니다.';
 }
 
 // 코드의 표기를 통일한다. (노멀라이즈 코드)
@@ -101,16 +138,18 @@ function mergeHits(groups){
  }).sort((a,b)=>a.bbox.y0-b.bbox.y0||a.bbox.x0-b.bbox.x0);
 }
 
-// 보정 이미지를 한 번 만들고 선택한 전체·분리 구역을 검사한다.
-// 확대 사진은 보이는 영역만 처리하고 결과 좌표는 원본에 맞춘다.
+// 촬영·사진·테스트는 같은 설정과 인식 경로를 사용한다.
 async function scanCamera(){
  if(busy||starting||(activeTab==='camera'&&frozenMode))return;
  if(activeTab==='camera'&&(!stream||camera.readyState<2)){showScanCameraRequired();return;}
  if(activeTab!=='camera'&&!photoReady)return;
  const stages=scanStageInputs.filter(input=>input.checked&&(deepScan.checked||input.dataset.scanStage==='corrected')).map(input=>input.dataset.scanStage);
  if(!stages.length){status.textContent='인식 설정에서 검사 단계를 하나 이상 선택하세요.';return;}
+ const run={epoch:++scanEpoch,cancelled:false,running:0,phase:'화면 준비'};activeScan=run;
+ const isCurrent=()=>activeScan===run&&!run.cancelled&&run.epoch===scanEpoch;
+ const started=performance.now(),settings=getCorrectionSettings(),preset=performancePreset.value;
  busy=true;showScanStart(stages);
- const started=performance.now(),settings=getCorrectionSettings();
+ liveEpoch++;clearTimeout(liveTimer);cancelAnimationFrame(animationId);dots.replaceChildren();
  try{
   if(activeTab==='camera'){
    if(!drawCorrected(originalFrame,0,settings.ocrMaxEdge))throw new Error('영상이 아직 준비되지 않았습니다.');
@@ -121,22 +160,29 @@ async function scanCamera(){
   frame.width=originalFrame.width;frame.height=originalFrame.height;
   frame.getContext('2d').drawImage(originalFrame,0,0);
   if(activeTab==='camera')camera.pause();
-  frozenMode=true;liveEpoch++;clearTimeout(liveTimer);cancelAnimationFrame(animationId);dots.replaceChildren();
-  detectedHits=[];showScanFrame();
-  if(liveJob)await liveJob.catch(()=>{});
+  frozenMode=true;detectedHits=[];showScanFrame();
+  const captureMs=performance.now()-started,waiting=performance.now();
+  if(liveJob){run.phase='실시간 OCR';status.textContent='진행 중 실시간 OCR 완료 대기 · 결과 폐기';await liveJob.catch(()=>{});}
+  const liveWaitMs=performance.now()-waiting;
+  assertOcrCurrent(isCurrent);
   const area=activeTab==='camera'?null:getVisiblePhotoRegion();
-  recognitionStage='보정 이미지';
   const result=await recognizeCorrected(originalFrame,settings,area,1,(image,pass)=>{
-   if(previewCorrection.checked)frame.getContext('2d').drawImage(image,pass.x,pass.y,pass.width,pass.height);
-  },stages);
+   if(isCurrent()&&previewCorrection.checked)frame.getContext('2d').drawImage(image,pass.x,pass.y,pass.width,pass.height);
+  },stages,'11',{isCurrent,run});
+  assertOcrCurrent(isCurrent);
   appendScanRaw('전체·분리 검사',result.text,false);
   detectedHits=result.hits;
-  document.getElementById('scanSingleCount').value=detectedHits.length+'개 · OCR '+result.attempts+'회'+(result.errors.length?' · 실패 '+result.errors.length+'회':'');
-  showScanResults(detectedHits,area,['OCR '+result.resolution,...result.stats],((performance.now()-started)/1000).toFixed(1),result.errors.length);
+  document.getElementById('scanSingleCount').value=detectedHits.length+'곳 · OCR '+result.attempts+'회'+(result.errors.length?' · 실패 '+result.errors.length+'회':'');
+  showScanResults(detectedHits,area,['보정 기준 '+result.resolution,...result.stats],((performance.now()-started)/1000).toFixed(1),result.errors.length);
+  showPerformanceResult({...result,captureMs,liveWaitMs,totalMs:performance.now()-started,preset,source:activeTab,imageRevision,area});
  }catch(error){
-  showScanFailure(error);
-  if(worker){await worker.terminate().catch(()=>{});worker=null;}
- }finally{recognitionStage='';busy=false;showScanEnd();}
+  if(error.name==='AbortError'||!isCurrent()){
+   document.getElementById('scanSingleCount').value='취소 · 실행 중 결과 폐기 완료';
+   status.textContent='인식 취소 · 실행 중 작업 완료, 결과 폐기';
+  }else showScanFailure({message:error.message||String(error)});
+ }finally{
+  if(activeScan===run){activeScan=null;busy=false;showScanEnd();}
+ }
 }
 
 // 전체와 겹치는 여섯 구역의 좌표를 보정 이미지 기준으로 만든다.
@@ -154,52 +200,127 @@ function createOcrRegions(width,height,stages,maxEdge=3200){
  return regions;
 }
 
-// 보정 이미지는 한 번 생성하고 전체·분리 검사에서 재사용한다.
-// 부분 재인식은 기본 한 번만 검사하며 모든 좌표를 원본에 맞춰 반환한다.
-async function recognizeCorrected(source,settings,area=null,scale=1,onPrepared=null,stages=null,psm='11'){
- const pass=area?{...area}:{x:0,y:0,width:source.width,height:source.height};
- const maxEdge=settings.ocrMaxEdge||3200;
- pass.scale=Math.min(scale,maxEdge/Math.max(pass.width,pass.height));
- let rendered,engine;
- try{
-  engine=await getWorker();
-  if(psm!=='11')await engine.setParameters({tessedit_pageseg_mode:psm});
-  rendered=renderScanPass(source,pass,settings);
-  if(onPrepared)onPrepared(rendered.image,pass);
-  const regions=createOcrRegions(rendered.image.width,rendered.image.height,stages,maxEdge);
-  const groups=[],texts=[],stats=[],errors=[];
-  for(let i=0;i<regions.length;i++){
-   const region=regions[i];
-   recognitionStage=region.name+' ('+(i+1)+'/'+regions.length+')';
-   let image=rendered.image;
-   try{
-    if(region.key!=='corrected'){
-     image=document.createElement('canvas');
-     image.width=Math.max(1,Math.round(region.width*region.scale));image.height=Math.max(1,Math.round(region.height*region.scale));
-     image.getContext('2d').drawImage(rendered.image,region.x,region.y,region.width,region.height,0,0,image.width,image.height);
+// 보정은 한 번만 수행하고 독립 영역을 워커별 큐로 분배한다.
+// 활성 호출은 완료를 기다리고 취소된 대기 영역은 실행하지 않는다.
+async function recognizeCorrected(source,settings,area=null,scale=1,onPrepared=null,stages=null,psm='11',context={}){
+ const epoch=scanEpoch,isCurrent=context.isCurrent||(()=>epoch===scanEpoch),queued=performance.now();
+ return runOcrSession(async()=>{
+  const queueMs=performance.now()-queued;
+  const pass=area?{...area}:{x:0,y:0,width:source.width,height:source.height};
+  const maxEdge=settings.ocrMaxEdge||3200;
+  pass.scale=Math.min(scale,maxEdge/Math.max(pass.width,pass.height));
+  let rendered,entries=[];
+  try{
+   if(context.run)context.run.phase='이미지 보정';
+   if(stages)status.textContent='OCR 입력 보정 중…';
+   const prepareStart=performance.now();
+   rendered=await renderScanPass(source,pass,settings);
+   const prepMs=performance.now()-prepareStart;
+   assertOcrCurrent(isCurrent);
+   if(onPrepared)onPrepared(rendered.image,pass);
+   const regions=createOcrRegions(rendered.image.width,rendered.image.height,stages,maxEdge);
+   const resolution=rendered.image.width+'×'+rendered.image.height;
+   if(stages)document.getElementById('ocrInputSize').value='이번 보정 기준: '+resolution+'px · 실제 OCR 입력은 단계별로 표시';
+   if(stages)status.textContent='OCR 워커 준비 중…';
+   if(context.run)context.run.phase='OCR 워커 준비';
+   const workerStart=performance.now();
+   const pool=await prepareOcrWorkers(settings.ocrWorkers||1,regions.length,isCurrent);entries=pool.entries;
+   for(const entry of entries){
+    assertOcrCurrent(isCurrent);
+    if(entry.psm!==psm){
+     try{await entry.engine.setParameters({tessedit_pageseg_mode:psm});entry.psm=psm;}
+     catch(error){entry.broken=true;throw error;}
     }
-    const {data}=await engine.recognize(image,{}, {text:true,blocks:true});
-    const hits=mapScanHits(mapScanHits(collectHits(data),region,image.width/region.width,image.height/region.height),pass,rendered.scaleX,rendered.scaleY);
-    groups.push(hits);texts.push('['+region.name+']\n'+data.text);
-    stats.push(region.name+' '+image.width+'×'+image.height+' · '+hits.length+'곳');
-    if(stages)showScanStageResult(region,hits.length,false);
-   }catch(error){
-    errors.push(region.name+': '+error.message);texts.push('['+region.name+' 실패] '+error.message);
-    if(stages)showScanStageResult(region,0,true);
-   }finally{if(image!==rendered.image)image.width=image.height=1;}
-  }
-  if(!groups.length)throw new Error(errors.join(' / ')||'검사할 영역이 없습니다.');
-  return {hits:mergeHits(groups),text:texts.join('\n\n'),stats,errors,attempts:regions.length,resolution:rendered.image.width+'×'+rendered.image.height};
- }finally{
-  if(rendered)rendered.image.width=rendered.image.height=1;
-  if(engine&&psm!=='11'){
-   try{await engine.setParameters({tessedit_pageseg_mode:'11'});}
-   catch(error){
-    await engine.terminate().catch(()=>{});
-    if(worker===engine)worker=null;
+   }
+   const workersMs=performance.now()-workerStart;
+   const groups=Array(regions.length),texts=Array(regions.length),stageStats=Array(regions.length),errors=[];
+   let cursor=0,attempts=0,lastProgress=0;
+   const states=regions.map(()=>({state:'waiting',progress:0}));
+   const report=(force=false)=>{
+    if(!stages||!isCurrent()||(!force&&performance.now()-lastProgress<100))return;
+    lastProgress=performance.now();
+    const done=states.filter(item=>['done','failed'].includes(item.state)).length;
+    const running=states.flatMap((item,i)=>item.state==='running'?[regions[i].name+' '+Math.round(item.progress*100)+'%']:[]);
+    status.textContent='완료 '+done+'/'+regions.length+' · '+running.join(' / ')+' · 대기 '+states.filter(item=>item.state==='waiting').length;
+   };
+   const ocrStart=performance.now();
+   if(context.run)context.run.phase='영역 OCR';
+   const consume=async entry=>{
+    while(cursor<regions.length&&isCurrent()){
+     const index=cursor++,region=regions[index];
+     let image=rendered.image;
+     const stageStart=performance.now();
+     try{
+      if(region.key!=='corrected'){
+       image=document.createElement('canvas');
+       image.width=Math.max(1,Math.round(region.width*region.scale));image.height=Math.max(1,Math.round(region.height*region.scale));
+       image.getContext('2d').drawImage(rendered.image,region.x,region.y,region.width,region.height,0,0,image.width,image.height);
+      }
+      assertOcrCurrent(isCurrent);
+      attempts++;states[index].state='running';
+      if(context.run)context.run.running++;
+      if(stages)showScanStageResult(region,0,false,'처리 중');
+      entry.progress=message=>{
+       if(message.status==='recognizing text'){
+        states[index].progress=Math.max(0,Math.min(1,Number(message.progress)||0));report();
+       }
+      };
+      report(true);
+      const {data}=await entry.engine.recognize(image,{}, {text:true,blocks:true});
+      assertOcrCurrent(isCurrent);
+      const hits=mapScanHits(mapScanHits(collectHits(data),region,image.width/region.width,image.height/region.height),pass,rendered.scaleX,rendered.scaleY);
+      groups[index]=hits;texts[index]='['+region.name+']\n'+data.text;
+      states[index]={state:'done',progress:1};
+      stageStats[index]={...region,width:image.width,height:image.height,count:hits.length,ms:performance.now()-stageStart};
+      if(stages)showScanStageResult(region,hits.length,false);
+     }catch(error){
+      if(!isCurrent()){
+       states[index].state='cancelled';
+       if(stages)showScanStageResult(region,0,false,'결과 폐기');
+      }else{
+       states[index].state='failed';entry.broken=true;
+       errors.push(region.name+': '+(error.message||String(error)));
+       texts[index]='['+region.name+' 실패] '+(error.message||String(error));
+       stageStats[index]={...region,width:image.width,height:image.height,count:0,ms:performance.now()-stageStart,failed:true};
+       if(stages)showScanStageResult(region,0,true);
+      }
+     }finally{
+      entry.progress=null;
+      if(context.run&&states[index].state!=='waiting')context.run.running=Math.max(0,context.run.running-1);
+      if(image!==rendered.image)image.width=image.height=1;
+      report(true);
+     }
+     if(entry.broken)break;
+    }
+   };
+   const outcomes=await Promise.allSettled(entries.map(consume));
+   const ocrMs=performance.now()-ocrStart;
+   assertOcrCurrent(isCurrent);
+   const rejected=outcomes.find(item=>item.status==='rejected');
+   if(rejected)throw rejected.reason;
+   for(let i=0;i<regions.length;i++)if(states[i].state==='waiting'){
+    errors.push(regions[i].name+': 사용 가능한 워커 없음');
+    if(stages)showScanStageResult(regions[i],0,false,'미실행 · 워커 실패');
+   }
+   if(!groups.some(Boolean))throw new Error(errors.join(' / ')||'검사할 영역이 없습니다.');
+   const mergeStart=performance.now(),hits=mergeHits(groups.filter(Boolean)),mergeMs=performance.now()-mergeStart;
+   const completed=stageStats.filter(Boolean);
+   return {hits,text:texts.filter(Boolean).join('\n\n'),stats:completed.map(item=>item.name+' '+item.width+'×'+item.height+' · '+item.count+'곳'),errors,attempts,resolution,stageStats:completed,queueMs,prepMs,workersMs,ocrMs,mergeMs,usedWorkers:entries.length,warning:pool.warning,correctionPath:rendered.correctionPath};
+  }finally{
+   if(rendered)rendered.image.width=rendered.image.height=1;
+   for(const entry of entries){
+    entry.progress=null;
+    if(!entry.broken&&entry.psm!=='11'){
+     try{await entry.engine.setParameters({tessedit_pageseg_mode:'11'});entry.psm='11';}
+     catch(error){entry.broken=true;}
+    }
+    if(entry.broken){
+     ocrWorkers=ocrWorkers.filter(item=>item!==entry);
+     await entry.engine.terminate().catch(()=>{});
+    }
    }
   }
- }
+ },isCurrent);
 }
 
 // 불확실한 코드 주변을 여백과 함께 원본에서 잘라낸다.

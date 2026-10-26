@@ -3,6 +3,9 @@
 function lockInputs(locked){
  tabButtons.forEach(button=>button.disabled=locked);
  correctionInputs.forEach(input=>input.disabled=locked);
+ syncPerformanceInputs(locked);
+ presetButtons.forEach(button=>button.disabled=locked);
+ document.querySelectorAll('#testControls input,#testControls select,#testControls button').forEach(input=>input.disabled=locked);
  syncScanStageInputs(locked);
  photoInput.disabled=locked;
  readImage.disabled=locked||(activeTab==='camera'?!stream:!photoReady);
@@ -20,13 +23,14 @@ function closeTools(except=null){
 // 이전 인식 결과와 사진 확대 상태를 초기화한다.
 function switchTab(tab){
  if(busy||starting||activeTab===tab)return;
- stopCamera();activeTab=tab;photoReady=false;frozenMode=false;
+ stopCamera();scanEpoch++;activeTab=tab;photoReady=false;frozenMode=false;
  setPhotoZoom(1);imageViewport.classList.remove('camera-shot');imageViewport.scrollLeft=0;imageViewport.scrollTop=0;closeTools();zoomLevel.hidden=true;zoomHint.hidden=true;
  detectedHits=[];boxes.hidden=false;document.getElementById('boxVisibility').hidden=true;boxes.replaceChildren();raw.textContent='';scanStats.textContent='';
  tabButtons.forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.tab===tab)));
  document.getElementById('cameraControls').hidden=tab!=='camera';
  document.getElementById('photoControls').hidden=tab!=='photo';
  document.getElementById('testControls').hidden=tab!=='test';
+ document.getElementById('testPerformance').hidden=tab!=='test';
  readImage.disabled=true;
  liveView.hidden=tab!=='camera';liveStatus.hidden=tab!=='camera';
  imageViewport.hidden=true;frozen.hidden=true;
@@ -49,6 +53,7 @@ function setPhotoZoom(value,centerX=imageViewport.clientWidth/2,centerY=imageVie
  if(detectedHits.length)showBoxes(detectedHits);
  imageViewport.scrollLeft=left;imageViewport.scrollTop=top;
  zoomLevel.textContent=Math.round(next*100)+'%';
+ updateOcrInputSize();
 }
 
 // 확대 상태에서 현재 보이는 원본 사진 영역을 구한다. (겟 비저블 포토 리전)
@@ -272,12 +277,6 @@ readImage.addEventListener('click',handleScanButton);
 window.addEventListener('pagehide',stopCamera);
 restoreExcel();
 
-// OCR 진행 상태를 화면에 표시한다. (쇼 스캔 프로그레스)
-// 인식 엔진 데이터는 변경하지 않는다.
-function showScanProgress(progress){
- status.textContent=recognitionStage+' 코드 인식 중… '+Math.round(progress*100)+'%';
-}
-
 // 카메라 준비 안내를 표시한다. (쇼 스캔 카메라 리콰이어드)
 // 촬영 상태는 변경하지 않는다.
 function showScanCameraRequired(){
@@ -289,6 +288,7 @@ function showScanCameraRequired(){
 function showScanStart(stages){
  lockInputs(true);excel.disabled=true;sheet.disabled=true;resume.disabled=true;strength.disabled=true;
  liveCanvas.setAttribute('aria-busy','true');
+ cancelScan.hidden=false;cancelScan.disabled=false;
  document.getElementById('scanSingleCount').value='검사 중…';
  document.querySelectorAll('[data-stage-count]').forEach(output=>output.value=stages.includes(output.dataset.stageCount)?'대기':'미실행');
  raw.textContent='';scanStats.textContent='';status.textContent='보정 이미지 준비 · 선택한 '+stages.length+'단계 검사';
@@ -332,6 +332,7 @@ function showScanFailure(error){
 // 인식 완료 후 입력과 버튼 상태를 복원한다. (쇼 스캔 엔드)
 // 다시 촬영 기능 및 사진 모드를 유지한다.
 function showScanEnd(){
+ cancelScan.hidden=true;cancelScan.disabled=false;
  lockInputs(false);excel.disabled=false;sheet.disabled=false;liveCanvas.setAttribute('aria-busy','false');
  strength.disabled=false;resume.disabled=!stream||!frozenMode;
  start.disabled=!!stream;readImage.textContent=activeTab==='camera'&&frozenMode?'다시 촬영':'코드 인식';
@@ -359,7 +360,10 @@ function handleLiveTouch(event){
   point.x=event.clientX;point.y=event.clientY;
   if(liveTouches.size===2&&stream){
    const [a,b]=[...liveTouches.values()],distance=Math.hypot(a.x-b.x,a.y-b.y);
-   if(livePinch)window.liveZoom=Math.max(1,Math.min(6,window.liveZoom*distance/livePinch));
+   if(livePinch){
+    window.liveZoom=Math.max(1,Math.min(6,window.liveZoom*distance/livePinch));
+    liveEpoch++;dots.replaceChildren();
+   }
    livePinch=distance;
    liveStatus.textContent='카메라 확대 '+window.liveZoom.toFixed(1)+'배';
   }
@@ -408,6 +412,7 @@ function restoreSettings(){
   const saved=JSON.parse(localStorage.getItem(settingsKey)||'null');
   if(!saved||typeof saved!=='object')return;
   const values=saved.values&&typeof saved.values==='object'?saved.values:{};
+  if(values.performancePreset===undefined)performancePreset.value='custom';
   for(const input of settingsFields){
    const value=values[input.id];
    if(input.type==='checkbox'){
@@ -465,7 +470,7 @@ settingsPanelButtons.forEach(button=>button.addEventListener('click',()=>{
  settingsDrawer.querySelector('.drawer-body').scrollTop=0;
  updateDesignPreview();
 }));
-const previewInputs=new Set([strength,previewQuality,ocrSize,removeSpecks,speckArea,speckThreshold,screenNoise,printCorrection,brightness,threshold,removeLines,previewCorrection]);
+const previewInputs=new Set([strength,previewQuality,removeSpecks,speckArea,speckThreshold,screenNoise,printCorrection,brightness,threshold,removeLines,previewCorrection]);
 let adjustmentPointer=null,adjustmentTimer=0,adjustmentFrame=0;
 let adjustmentSlider=null,adjustmentLabel=null;
 function beginSettingsPreview(event){
@@ -492,11 +497,11 @@ function beginSettingsPreview(event){
 // 여러 입력 이벤트를 한 화면 갱신으로 모은다.
 // 가장 최근 설정값만 사용하고 중간 값의 중복 보정은 생략한다.
 function queueSettingsPreview(){
- if(!adjustmentFrame)adjustmentFrame=requestAnimationFrame(paintSettingsPreview);
+ if(!adjustmentFrame)adjustmentFrame=setTimeout(paintSettingsPreview,100);
 }
 function paintSettingsPreview(){
  adjustmentFrame=0;
- updatePreview();
+ if(!busy&&!starting)updatePreview();
 }
 
 // 보정 입력의 표시·무효화·미리보기 갱신을 한 경로로 모은다.
@@ -517,7 +522,7 @@ function endSettingsPreview(event){
  if(event?.pointerId!==undefined&&event.pointerId!==adjustmentPointer)return;
  if(!settingsAdjusting)return;
  clearTimeout(adjustmentTimer);adjustmentPointer=null;
- cancelAnimationFrame(adjustmentFrame);adjustmentFrame=0;
+ clearTimeout(adjustmentFrame);adjustmentFrame=0;
  settingsAdjusting=false;settingsDrawer.classList.remove('adjusting');
  settingsDrawer.closest('main').classList.remove('adjusting-settings');
  adjustmentSlider?.classList.remove('adjustment-slider');
@@ -548,9 +553,9 @@ function syncScanStageInputs(locked=busy||starting){
 
 // 각 단계의 최신 발견 수 또는 실패 상태를 표시한다.
 // 최종 결과는 별도로 중복 통합하므로 단계별 수에는 중복이 포함된다.
-function showScanStageResult(region,count,failed){
+function showScanStageResult(region,count,failed,state=''){
  const output=document.querySelector('[data-stage-count="'+region.key+'"]');
- if(output)output.value=failed?'실패':count+'개';
+ if(output)output.value=state||(failed?'실패':count+'개');
 }
 deepScan.addEventListener('change',()=>syncScanStageInputs());
 syncScanStageInputs();
@@ -564,3 +569,116 @@ function updateSpeckOutputs(){
 
 
 window.addEventListener('resize',updateDesignPreview);
+
+// 프리셋은 해상도·검사 단계를 유지하고 자원 배분을 바꾼다.
+const performanceProfiles={
+ power:{ocrSize:'3200',liveOcr:false,liveInterval:'2000',liveSize:'960',workerCount:'1',deepScan:true,previewQuality:'low'},
+ balanced:{ocrSize:'3200',liveOcr:true,liveInterval:'600',liveSize:'2200',workerCount:'1',deepScan:true,previewQuality:'low'},
+ fast:{ocrSize:'3200',liveOcr:true,liveInterval:'1200',liveSize:'1280',workerCount:'2',deepScan:true,previewQuality:'low'}
+};
+const performanceLabels={power:'절전',balanced:'균형',fast:'고성능',custom:'사용자 설정'};
+const performanceDescriptions={
+ power:'촬영 후 해상도·전체·6구역 검사 유지 · 실시간 OCR 끄기 · 워커 1개',
+ balanced:'기존 해상도·전체·6구역 검사 유지 · 실시간 600ms · 워커 1개',
+ fast:'촬영 후 해상도·전체·6구역 검사 유지 · 워커 2개 · 촬영 전 검사는 1280px·1200ms',
+ custom:'직접 선택한 값 적용 · 촬영 후 검사와 실시간 검사는 자원을 나눠 사용합니다.'
+};
+function syncPerformanceInputs(locked=busy||starting){
+ liveInterval.disabled=locked||!liveOcr.checked;liveSize.disabled=locked||!liveOcr.checked;
+}
+function refreshPerformanceSettings(){
+ if(!Object.prototype.hasOwnProperty.call(performanceLabels,performancePreset.value))performancePreset.value='custom';
+ const profile=performanceProfiles[performancePreset.value];
+ if(profile&&(!Object.entries(profile).every(([id,value])=>{
+  const input=document.getElementById(id);return input.type==='checkbox'?input.checked===value:input.value===value;
+ })||scanStageInputs.some(input=>!input.checked)))performancePreset.value='custom';
+ for(const button of presetButtons)button.setAttribute('aria-pressed',String(button.dataset.performancePreset===performancePreset.value));
+ document.getElementById('performanceHint').textContent=performanceLabels[performancePreset.value]+' · '+performanceDescriptions[performancePreset.value];
+ syncPerformanceInputs();syncScanStageInputs();updateOcrInputSize();
+}
+
+// 설정 변경은 실행 중 호출을 건드리지 않고 다음 작업에 반영한다.
+function performanceSettingsChanged(){
+ liveEpoch++;dots.replaceChildren();clearTimeout(liveTimer);
+ refreshPerformanceSettings();queueSettingsSave();
+ runOcrSession(()=>trimOcrWorkers(Number(workerCount.value))).catch(()=>{});
+ if(stream&&!frozenMode){
+  if(liveOcr.checked)liveTimer=setTimeout(checkLive,Number(liveInterval.value));
+  else liveStatus.textContent='실시간 OCR 꺼짐 · 인식 버튼으로 촬영';
+ }
+}
+for(const button of presetButtons)button.addEventListener('click',()=>{
+ if(busy||starting)return;
+ const preset=button.dataset.performancePreset,profile=performanceProfiles[preset];
+ if(profile){
+  for(const [id,value] of Object.entries(profile)){
+   const input=document.getElementById(id);
+   if(input.type==='checkbox')input.checked=value;else input.value=value;
+  }
+  scanStageInputs.forEach(input=>input.checked=true);
+ }
+ performancePreset.value=preset;performanceSettingsChanged();queueSettingsPreview();
+});
+settingsDrawer.addEventListener('change',event=>{
+ if(!performanceInputs.includes(event.target))return;
+ performancePreset.value='custom';performanceSettingsChanged();
+});
+
+// 다음 입력 예상 크기와 최근 인식의 실제 입력 크기를 구분한다.
+function updateOcrInputSize(){
+ let width=0,height=0;
+ if(activeTab==='camera'){
+  if(frozenMode){width=originalFrame.width;height=originalFrame.height;}
+  else if(stream&&camera.videoWidth){
+   const ratio=liveView.clientWidth/Math.max(1,liveView.clientHeight);
+   width=camera.videoWidth;height=camera.videoHeight;
+   if(width/height>ratio)width=height*ratio;else height=width/ratio;
+   width/=(window.liveZoom||1);height/=(window.liveZoom||1);
+  }
+ }else if(photoReady){
+  const area=getVisiblePhotoRegion();width=area?.width||photoSource.width;height=area?.height||photoSource.height;
+ }
+ const output=document.getElementById('ocrInputSize');
+ if(!width||!height){output.value='이미지를 준비하면 입력 크기를 표시합니다.';return;}
+ const scale=Math.min(1,Number(ocrSize.value)/Math.max(width,height));
+ output.value='다음 입력 예상: '+Math.max(1,Math.round(width*scale))+'×'+Math.max(1,Math.round(height*scale))+'px · 추가 확대 최대 2배·2000px 기준, 이미 큰 구역은 원래 픽셀 유지';
+}
+
+// 벽시계 경과와 병렬 영역 시간을 나누고 같은 이미지의 최근 두 회만 보관한다.
+let recentPerformance=[];
+function showPerformanceResult(result){
+ const seconds=ms=>(ms/1000).toFixed(2)+'초';
+ const unique=new Set(result.hits.map(hit=>hit.code)).size;
+ const inputSizes=[...new Set(result.stageStats.map(stage=>stage.width+'×'+stage.height))].join(' / ');
+ const summary=seconds(result.totalMs)+' · 입력 '+inputSizes+' · OCR 워커 '+result.usedWorkers+'개 · 중복 제거 '+result.hits.length+'곳 / '+unique+'종';
+ const brief=document.getElementById('recognitionSummary');brief.hidden=false;brief.value='최근: '+summary;
+ document.getElementById('ocrInputSize').value='최근 실제 OCR 입력: '+inputSizes+'px';
+ document.getElementById('scanSummary').hidden=false;
+ document.getElementById('performanceReport').hidden=false;
+ document.getElementById('performanceTotal').textContent=performanceLabels[result.preset]+' · '+summary+(result.warning?' · '+result.warning:'');
+ document.getElementById('performanceTiming').textContent='화면 준비 '+seconds(result.captureMs)+' · 실시간/큐 대기 '+seconds(result.liveWaitMs+result.queueMs)+' · 보정 '+seconds(result.prepMs)+' ('+result.correctionPath+') · 워커 준비 '+seconds(result.workersMs)+' · 영역 처리 경과 '+seconds(result.ocrMs)+' · 결과 통합 '+seconds(result.mergeMs);
+ const rows=document.createDocumentFragment();
+ for(const stage of result.stageStats){
+  const row=document.createElement('tr');
+  for(const value of [stage.name,stage.width+'×'+stage.height,stage.failed?'실패':stage.count+'곳',seconds(stage.ms)]){
+   const cell=document.createElement('td');cell.textContent=value;row.append(cell);
+  }
+  rows.append(row);
+ }
+ document.getElementById('performanceSteps').replaceChildren(rows);
+ if(result.source==='test'){
+  const areaKey=JSON.stringify(result.area);
+  recentPerformance=recentPerformance.filter(item=>item.revision===result.imageRevision&&item.areaKey===areaKey).slice(-1);
+  recentPerformance.push({revision:result.imageRevision,areaKey,text:performanceLabels[result.preset]+' · '+summary});
+  document.getElementById('testPerformance').value=recentPerformance.map((item,index)=>(recentPerformance.length===2&&index===0?'이전: ':'최근: ')+item.text).join('\n');
+ }
+}
+cancelScan.addEventListener('click',cancelActiveScan);
+document.getElementById('testRescan').addEventListener('click',()=>{
+ if(activeTab==='test'&&photoReady){closeTools();scanCamera();}
+});
+window.addEventListener('pagehide',()=>{
+ cancelActiveScan();
+ runOcrSession(async()=>{await trimOcrWorkers(0);releaseCorrectionWorker();}).catch(()=>{});
+});
+refreshPerformanceSettings();

@@ -1,11 +1,14 @@
 // 선택한 사진을 표시 옵션에 따라 보여준다. (프리뷰 포토)
 // 이전 인식 박스를 지우며 원본 픽셀은 유지한다.
 function previewPhoto(){
+ scanEpoch++;imageRevision++;
+ if(activeTab==='test')document.getElementById('testPerformance').value='현재 이미지를 유지하고 성능 설정을 바꿔 같은 이미지 재인식을 누르세요.';
  frame.width=photoSource.width;frame.height=photoSource.height;
  renderPreview(photoSource,frame);
  detectedHits=[];boxes.replaceChildren();raw.textContent='';scanStats.textContent='';
  frozenMode=true;frozen.hidden=false;imageViewport.hidden=false;liveView.hidden=true;zoomLevel.hidden=false;zoomHint.hidden=false;
  readImage.disabled=false;strength.disabled=false;
+ updateOcrInputSize();
  status.textContent='두 손가락 확대·이동 / 두 번 터치 또는 인식 버튼으로 검사';
 }
 

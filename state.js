@@ -8,9 +8,8 @@ const liveView=document.getElementById('liveView'),liveCanvas=document.getElemen
 const strength=document.getElementById('strength'),strengthValue=document.getElementById('strengthValue'),liveStatus=document.getElementById('liveStatus');
 const liveFrame=document.createElement('canvas'),originalFrame=document.createElement('canvas');
 const scanStats=document.getElementById('scanStats');
-let recognitionStage='';
-let animationId=0,liveTimer=0,liveJob=null,workerPromise=null,liveEpoch=0,lastPaint=0;
-let workbook=null,locations=new Map(),stream=null,worker=null,busy=false,starting=false;
+let animationId=0,liveTimer=0,liveJob=null,liveEpoch=0,lastPaint=0;
+let workbook=null,locations=new Map(),stream=null,busy=false,starting=false;
 let database=null,recordCount=0,frozenMode=false,detectedHits=[];
 
 let activeTab='camera',photoReady=false;
@@ -28,7 +27,13 @@ const previewCorrection=document.getElementById('previewCorrection');
 const previewQuality=document.getElementById('previewQuality');
 const ocrSize=document.getElementById('ocrSize');
 const deepScan=document.getElementById('deepScan');
+const liveOcr=document.getElementById('liveOcr'),liveInterval=document.getElementById('liveInterval'),liveSize=document.getElementById('liveSize');
+const workerCount=document.getElementById('workerCount'),performancePreset=document.getElementById('performancePreset');
+const presetButtons=[...document.querySelectorAll('[data-performance-preset]')];
+const cancelScan=document.getElementById('cancelScan');
 const scanStageInputs=[...document.querySelectorAll('[data-scan-stage]')];
-const correctionInputs=[previewQuality,ocrSize,removeSpecks,speckArea,speckThreshold,deepScan,...scanStageInputs,screenNoise,printCorrection,brightness,threshold,removeLines,previewCorrection];
+const performanceInputs=[ocrSize,liveOcr,liveInterval,liveSize,workerCount,deepScan,...scanStageInputs,previewQuality];
+const correctionInputs=[...performanceInputs,removeSpecks,speckArea,speckThreshold,screenNoise,printCorrection,brightness,threshold,removeLines,previewCorrection];
+let scanEpoch=0,activeScan=null,imageRevision=0;
 const boxOpacity=document.getElementById("boxOpacity"),boxOpacityValue=document.getElementById("boxOpacityValue");
 const imageViewport=document.getElementById('imageViewport'),zoomLevel=document.getElementById('zoomLevel'),zoomHint=document.getElementById('zoomHint');

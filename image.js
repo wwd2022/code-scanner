@@ -41,7 +41,7 @@ function drawCorrected(target,amount=null,maxSize=2200){
 
 // 조절 중에는 작은 이미지에 보정하고 표시 크기는 유지한다.
 // 원본·OCR 좌표는 보존하며 미리보기용 캔버스를 재사용한다.
-const previewBuffer=document.createElement('canvas');
+const previewBuffer=typeof document==='undefined'?null:document.createElement('canvas');
 function renderPreview(source,target){
  const width=source.width,height=source.height;
  const corrected=previewCorrection.checked||settingsAdjusting;
@@ -139,23 +139,23 @@ function applyCorrection(image,settings){
 
 // 낮은 해상도는 먼저 축소한 뒤 보정해 픽셀 연산도 줄인다.
 // 확대 시에는 보정을 한 번 적용한 결과만 확대하고 실제 좌표 배율을 반환한다.
-function renderScanPass(source,pass,settings){
+async function renderScanPass(source,pass,settings){
  const workingScale=Math.min(1,pass.scale);
  const image=document.createElement('canvas');
  image.width=Math.max(1,Math.round(pass.width*workingScale));image.height=Math.max(1,Math.round(pass.height*workingScale));
  const ctx=image.getContext('2d',{willReadFrequently:true});
  ctx.drawImage(source,pass.x,pass.y,pass.width,pass.height,0,0,image.width,image.height);
- const pixels=ctx.getImageData(0,0,image.width,image.height);
  // 잘라낸 영역도 전체 이미지의 기준 배율을 유지한다.
  const pixelScale=(settings.referenceEdge||Math.max(source.width,source.height))/correctionReferenceEdge*Math.min(image.width/pass.width,image.height/pass.height);
- applyCorrection(pixels,{...settings,pixelScale});
- ctx.putImageData(pixels,0,0);
- if(pass.scale<=1)return {image,scaleX:image.width/pass.width,scaleY:image.height/pass.height};
+ let correctionPath;
+ try{correctionPath=await correctCanvas(image,{...settings,pixelScale});}
+ catch(error){image.width=image.height=1;throw error;}
+ if(pass.scale<=1)return {image,scaleX:image.width/pass.width,scaleY:image.height/pass.height,correctionPath};
  const output=document.createElement('canvas');
  output.width=Math.max(1,Math.round(pass.width*pass.scale));output.height=Math.max(1,Math.round(pass.height*pass.scale));
  output.getContext('2d').drawImage(image,0,0,output.width,output.height);
  image.width=image.height=1;
- return {image:output,scaleX:output.width/pass.width,scaleY:output.height/pass.height};
+ return {image:output,scaleX:output.width/pass.width,scaleY:output.height/pass.height,correctionPath};
 }
 
 // 확대 구역의 박스를 원본 사진 위치로 변환한다. (맵 스캔 히츠)
@@ -187,7 +187,7 @@ function reduceScreenNoise(image,amount){
 // 모든 입력 모드에서 현재 보정값을 같은 형식으로 읽는다.
 // 미리보기·전체 인식·부분 재인식의 설정 누락을 막는다.
 function getCorrectionSettings(referenceEdge=0){
- return {referenceEdge,ocrMaxEdge:Number(ocrSize.value),removeSpecks:removeSpecks.checked,speckArea:Number(speckArea.value),speckThreshold:Number(speckThreshold.value),screenNoise:Number(screenNoise.value),mode:filterMode.value,brightness:Number(brightness.value),strength:Number(strength.value),threshold:Number(threshold.value),removeLines:removeLines.checked};
+ return {referenceEdge,ocrMaxEdge:Number(ocrSize.value),ocrWorkers:Number(workerCount.value),removeSpecks:removeSpecks.checked,speckArea:Number(speckArea.value),speckThreshold:Number(speckThreshold.value),screenNoise:Number(screenNoise.value),mode:filterMode.value,brightness:Number(brightness.value),strength:Number(strength.value),threshold:Number(threshold.value),removeLines:removeLines.checked};
 }
 
 // 대각선을 포함해 연결된 검은 영역 중 지정 면적 이하만 지운다.
@@ -217,10 +217,61 @@ function removeSmallDarkRegions(image,maxArea,threshold){
  }
 }
 
-// 슬라이더의 저해상도 미리보기도 선택한 OCR 해상도를 넘지 않는다.
-// 실제 OCR 설정은 바꾸지 않고 조절 종료 후 기본 해상도로 돌아간다.
+// 표시용 보정 픽셀 수는 OCR 해상도와 별도로 제한한다.
 function getPreviewMaxSize(){
- const maxEdge=Number(ocrSize.value);
- return settingsAdjusting&&previewQuality.value==='low'?Math.min(640,maxEdge):maxEdge;
+ return previewQuality.value==='low'?640:960;
+}
+
+// 큰 OCR 입력의 픽셀 연산만 옮기고 필터 구현은 공유한다.
+let correctionWorker=null,correctionWorkerFailed=false,correctionRequestId=0;
+const correctionRequests=new Map();
+function releaseCorrectionWorker(){
+ if(correctionWorker)correctionWorker.terminate();
+ correctionWorker=null;
+ for(const request of correctionRequests.values())request.reject(new Error('보정 워커 종료'));
+ correctionRequests.clear();
+}
+function getCorrectionWorker(){
+ if(correctionWorkerFailed||typeof Worker==='undefined')return null;
+ if(correctionWorker)return correctionWorker;
+ try{
+  const created=new Worker('correction-worker.js');correctionWorker=created;
+  created.onmessage=event=>{
+   const message=event.data,request=correctionRequests.get(message.id);
+   if(!request)return;
+   correctionRequests.delete(message.id);
+   if(message.error)request.reject(new Error(message.error));
+   else request.resolve(message.buffer);
+  };
+  const fail=event=>{event.preventDefault?.();correctionWorkerFailed=true;releaseCorrectionWorker();};
+  created.onerror=fail;created.onmessageerror=fail;
+  return created;
+ }catch(error){correctionWorkerFailed=true;return null;}
+}
+
+// 전송 실패 시 원본 픽셀을 다시 읽어 같은 필터로 처리한다.
+async function correctCanvas(canvas,settings){
+ if(!settings.screenNoise&&!settings.brightness&&!settings.strength&&settings.mode!=='print'&&!settings.removeSpecks)return '원본';
+ const ctx=canvas.getContext('2d',{willReadFrequently:true});
+ const width=canvas.width,height=canvas.height;
+ let pixels=ctx.getImageData(0,0,width,height);
+ const target=getCorrectionWorker();
+ if(target){
+  const id=++correctionRequestId;
+  try{
+   const buffer=await new Promise((resolve,reject)=>{
+    correctionRequests.set(id,{resolve,reject});
+    try{target.postMessage({id,width,height,buffer:pixels.data.buffer,settings},[pixels.data.buffer]);}
+    catch(error){correctionRequests.delete(id);reject(error);}
+   });
+   ctx.putImageData(new ImageData(new Uint8ClampedArray(buffer),width,height),0,0);
+   return '보정 워커';
+  }catch(error){
+   correctionWorkerFailed=true;releaseCorrectionWorker();
+   pixels=ctx.getImageData(0,0,width,height);
+  }
+ }
+ applyCorrection(pixels,settings);ctx.putImageData(pixels,0,0);
+ return '화면 스레드 · 대체 처리';
 }
 

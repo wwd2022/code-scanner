@@ -129,3 +129,18 @@ button:disabled{opacity:.45;cursor:default}button:focus-visible,input:focus-visi
 .design-choices{display:flex;flex-wrap:wrap;gap:5px;margin:4px 0 12px}
 .design-choices button{min-height:34px;padding:5px 9px;font-size:12px}
 .design-choices button[aria-pressed=true]{background:#273950;color:#fff;border-color:#273950}
+
+.performance-presets{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+.performance-presets button{min-height:40px;padding:6px 2px;font-size:12px}
+.performance-presets button[aria-pressed=true]{background:#273950;color:#fff;border-color:#273950}
+.performance-advanced>summary,.correction-settings>summary{cursor:pointer;font-weight:600;padding:10px 0}
+.correction-settings{border-top:1px solid #dce3ec;margin-top:12px}
+.performance-note{display:block;font-size:11px;line-height:1.45;color:#526275;overflow-wrap:anywhere}
+.test-performance{max-height:46px;overflow:auto;flex-shrink:0;white-space:pre-line}
+.scan-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.scan-actions output{flex:1;min-width:0}
+#cancelScan{position:absolute;right:8px;top:42px;z-index:7;min-height:34px;white-space:nowrap;font-size:12px}
+.performance-table{overflow-x:auto}
+.performance-table table{width:100%;border-collapse:collapse;font-size:11px;text-align:left}
+.performance-table th,.performance-table td{padding:6px 3px;border-bottom:1px solid #e3e8ef;white-space:nowrap}
+#performanceTotal{font-size:13px;font-weight:600}

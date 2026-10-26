@@ -18,45 +18,53 @@ function showDots(hits){
  }
 }
 
-// 터치 전에 화면 전체를 반복 검사한다. (체크 라이브)
-// 기록을 추가하지 않고 최신 검사 결과의 코드 위치에 점만 표시한다.
+// 실시간 OCR도 촬영 후 인식과 같은 보정·워커 경로를 사용한다.
 async function checkLive(){
  clearTimeout(liveTimer);
- if(!stream||frozenMode)return;
- if(busy||starting||liveJob||settingsAdjusting){liveTimer=setTimeout(checkLive,600);return;}
- const epoch=liveEpoch;dots.replaceChildren();liveStatus.textContent='화면 코드 확인 중…';
- liveJob=(async()=>{
-  if(!drawCorrected(liveFrame,null,Math.min(2200,Number(ocrSize.value))))return;
-  const engine=await getWorker();
-  if(epoch!==liveEpoch||frozenMode||!stream)return;
-  const {data}=await engine.recognize(liveFrame,{}, {text:true,blocks:true});
-  if(epoch!==liveEpoch||frozenMode||!stream)return;
-  const hits=collectHits(data);showDots(hits);
-  liveStatus.textContent=hits.length?hits.length+'곳 감지 · 빨간 점 위치의 코드를 확인하세요.':'정규식에 맞는 코드가 아직 보이지 않습니다.';
+ if(!stream||frozenMode||activeTab!=='camera'||!liveOcr.checked)return;
+ const delay=Number(liveInterval.value);
+ if(busy||starting||liveJob||settingsAdjusting||document.hidden){liveTimer=setTimeout(checkLive,delay);return;}
+ const epoch=liveEpoch;
+ const isCurrent=()=>epoch===liveEpoch&&!frozenMode&&!!stream&&liveOcr.checked&&!busy;
+ dots.replaceChildren();liveStatus.textContent='화면 코드 확인 중…';
+ const job=(async()=>{
+  const settings={...getCorrectionSettings(),ocrMaxEdge:Number(liveSize.value)};
+  if(!drawCorrected(liveFrame,0,settings.ocrMaxEdge))return;
+  const result=await recognizeCorrected(liveFrame,settings,null,1,null,null,'11',{isCurrent});
+  if(!isCurrent())return;
+  showDots(result.hits);
+  liveStatus.textContent=result.hits.length?result.hits.length+'곳 감지 · 빨간 점 위치의 코드를 확인하세요.':'정규식에 맞는 코드가 아직 보이지 않습니다.';
  })();
- try{await liveJob;}
- catch(error){if(epoch===liveEpoch&&!frozenMode)liveStatus.textContent='실시간 확인 실패: '+error.message;}
- finally{liveJob=null;if(stream&&!frozenMode)liveTimer=setTimeout(checkLive,600);}
+ liveJob=job;
+ try{await job;}
+ catch(error){if(isCurrent()&&error.name!=='AbortError')liveStatus.textContent='실시간 확인 실패: '+(error.message||String(error));}
+ finally{
+  if(liveJob===job)liveJob=null;
+  if(stream&&!frozenMode&&liveOcr.checked)liveTimer=setTimeout(checkLive,Number(liveInterval.value));
+ }
 }
 
 // 미리보기와 주기적 OCR 검사를 시작한다. (비긴 라이브)
 // 이전 표시를 지우고 새 화면의 코드 위치를 검사한다.
 function beginLive(){
  liveEpoch++;dots.replaceChildren();clearTimeout(liveTimer);cancelAnimationFrame(animationId);
- lastPaint=0;animationId=requestAnimationFrame(paintLive);liveTimer=setTimeout(checkLive,600);
+ updateOcrInputSize();
+ lastPaint=0;animationId=requestAnimationFrame(paintLive);
+ if(liveOcr.checked)liveTimer=setTimeout(checkLive,Number(liveInterval.value));
+ else liveStatus.textContent='실시간 OCR 꺼짐 · 인식 버튼으로 촬영';
 }
 
 // 다시 촬영 시 카메라 미리보기만 재개한다. (리줌 카메라)
-// 반복 OCR을 멈추고 새 촬영 버튼 입력을 기다린다.
+// 실시간 검사 설정을 적용하고 새 촬영 버튼 입력을 기다린다.
 async function resumeCamera(){
  if(busy||starting)return;
  if(!stream){await startCamera();return;}
  try{
-  liveEpoch++;clearTimeout(liveTimer);cancelAnimationFrame(animationId);
+  scanEpoch++;liveEpoch++;clearTimeout(liveTimer);cancelAnimationFrame(animationId);
   await camera.play();frozenMode=false;detectedHits=[];boxes.replaceChildren();dots.replaceChildren();
   frozen.hidden=true;imageViewport.hidden=true;zoomLevel.hidden=true;zoomHint.hidden=true;liveView.hidden=false;resume.disabled=true;strength.disabled=false;readImage.disabled=false;readImage.textContent='코드 인식';
-  lastPaint=0;animationId=requestAnimationFrame(paintLive);
-  liveStatus.textContent='촬영 준비 완료';
+  beginLive();
+  liveStatus.textContent=liveOcr.checked?'촬영 준비 완료':'실시간 OCR 꺼짐 · 인식 버튼으로 촬영';
   status.textContent='코드 인식 버튼을 누르면 새 화면을 촬영합니다.';
  }catch(error){status.textContent='영상 재생 실패: '+error.message;}
 }
@@ -80,6 +88,7 @@ async function startCamera(){
 // 사용 중인 카메라를 끈다. (스톱 카메라)
 // 모든 영상 트랙을 종료하고 다시 켜기 버튼을 활성화한다.
 function stopCamera(){
+ if(activeScan&&activeTab==='camera')cancelActiveScan();
  if(stream)stream.getTracks().forEach(track=>track.stop());
  liveEpoch++;clearTimeout(liveTimer);cancelAnimationFrame(animationId);dots.replaceChildren();liveStatus.textContent='카메라 꺼짐';
  stream=null;camera.srcObject=null;stop.disabled=true;resume.disabled=true;readImage.disabled=true;start.disabled=busy;
