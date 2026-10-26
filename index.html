@@ -35,6 +35,7 @@
 <button id="testExport" type="button">엑셀에서 추출</button>
 <button id="testRescan" type="button">같은 이미지 재인식</button>
 <button id="testReview" type="button">코드 확인 UI</button>
+<button id="testBatchReview" type="button">불확실 일괄 재인식</button>
 <button id="testOptimize" type="button">자동 최적화</button>
 </div>
 <output id="testPerformance" class="performance-note test-performance" hidden>같은 이미지를 유지하고 성능 설정을 바꿔 재인식하세요.</output>
@@ -138,6 +139,9 @@
 <summary>전체 · 확대 분리 검사</summary>
 <label class="inline-label"><input id="scanCorrected" data-scan-stage="corrected" type="checkbox" checked> 전체 보정 이미지<output data-stage-count="corrected">미검사</output></label>
 <label class="inline-label"><input id="deepScan" type="checkbox" checked> 확대 · 6구역 분리 검사 사용</label>
+<label for="extraScanMode">추가 검사 방식</label>
+<select id="extraScanMode"><option value="full" selected>선택 구역 모두 검사</option><option value="smart">필요 구역 자동 선택</option></select>
+<small>자동은 전체 인식 후 불확실 코드·코드 일부가 읽힌 위치를 검사합니다. 코드를 찾지 못하면 선택 구역을 모두 검사합니다. 문자 후보조차 놓친 부분은 생략될 수 있으므로 누락이 의심되면 전체 구역 검사를 사용하세요.</small>
 <div class="zoom-stages">
 <label class="inline-label"><input id="scanZoom1" data-scan-stage="zoom1" type="checkbox" checked> 확대 1 · 상단 왼쪽<output data-stage-count="zoom1">미검사</output></label>
 <label class="inline-label"><input id="scanZoom2" data-scan-stage="zoom2" type="checkbox" checked> 확대 2 · 상단 중앙<output data-stage-count="zoom2">미검사</output></label>
@@ -240,6 +244,11 @@
 <summary>결과 <span id="count">0</span></summary>
 <div class="drawer-body">
 <h2>조회 기록</h2>
+<div id="reviewActions" class="review-toolbar" hidden>
+<span id="reviewPendingCount"></span>
+<button id="openUncertain" type="button">순차 확인</button>
+<button id="batchReview" type="button">일괄 재인식</button>
+</div>
 <div id="empty" class="empty">인식 완료 시 코드별 조회 기록이 추가됩니다.</div>
 <div id="records"></div>
 <div id="scanStats" class="empty"></div>
@@ -252,6 +261,7 @@
 <dialog id="codeReview" aria-labelledby="reviewTitle" aria-describedby="reviewMessage">
 <form id="reviewForm" novalidate>
 <h2 id="reviewTitle">코드 확인</h2>
+<nav class="review-navigation" aria-label="코드 순차 확인"><button id="reviewPrevious" type="button">이전</button><output id="reviewPosition"></output><button id="reviewNext" type="button">다음</button></nav>
 <canvas id="reviewImage" role="img" aria-label="전체 OCR 입력에서 자른 이미지"></canvas>
 <small id="reviewPreviewLabel">전체 OCR 입력에서 자른 이미지</small>
 <div class="review-settings">
@@ -260,6 +270,7 @@
 </div>
 <small>전체 인식의 보정 이미지에서 잘라 배율만 조절하며 추가 보정은 하지 않습니다. 배율은 0.1~16배, 빈칸은 자동(최대 4배)입니다. OCR 최대 긴 변(128~3200px)이 배율보다 우선합니다.</small>
 <p id="reviewMessage" role="status" aria-live="polite"></p>
+<button id="reviewStop" type="button" hidden>대기 재인식 중단</button>
 <label for="reviewInput">품목코드 직접 입력</label>
 <input id="reviewInput" type="text" placeholder="AB12-A00345" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="done" autofocus>
 <div id="reviewCandidates" aria-label="다른 인식 후보"></div>

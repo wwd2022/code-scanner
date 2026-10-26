@@ -12,6 +12,7 @@ function placeLabel(element,anchor,angle,width,height){
 // 인식 글자는 그대로 두고 코드·위치 라벨을 주변에 표시한다. (쇼 박시스)
 // 기존 색상·조이스틱 설정을 유지하며 OCR 박스 위 덮개를 제거한다.
 function showBoxes(hits){
+ updateReviewActions();
  const indicator=document.getElementById('boxVisibility');
  indicator.hidden=false;indicator.textContent=boxes.hidden?'박스 숨김':'박스 표시';
  // 숨김 중에는 보존하고 다시 표시할 때 최신 좌표로 만든다.
@@ -27,15 +28,17 @@ function showBoxes(hits){
   const code=document.createElement('div'),place=document.createElement('div');
   code.className='code-box';
   if(!found?.length)code.classList.add('missing-box');
-  if(hit.review){
-   code.classList.add('needs-review');code.setAttribute('role','button');code.tabIndex=0;
-   code.setAttribute('aria-label',hit.code+' 확인 및 수정');
-   for(const type of ['pointerdown','pointermove','pointerup','pointercancel','dblclick'])code.addEventListener(type,event=>event.stopPropagation());
-   code.addEventListener('click',event=>{event.stopPropagation();openCodeReview(hit);});
-   code.addEventListener('keydown',event=>{
-    if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();openCodeReview(hit);}
-   });
-  }
+  if(hit.review)code.classList.add('needs-review');
+  code.scanHit=hit;code.setAttribute('role','button');code.tabIndex=0;
+  code.setAttribute('aria-label',hit.code+' 확인 및 수정');
+  code.addEventListener('click',event=>{
+   event.stopPropagation();
+   if(event.pointerType==='touch'||event.sourceCapabilities?.firesTouchEvents)return;
+   openCodeReview(hit);
+  });
+  code.addEventListener('keydown',event=>{
+   if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();openCodeReview(hit);}
+  });
   const codeText=document.createElement('span');codeText.className='box-text';codeText.textContent=hit.code;code.append(codeText);
   code.title=hit.review?'확인 필요: '+hit.code:hit.code;
   place.className='location-box';
@@ -72,85 +75,152 @@ function refreshRecords(){
  document.getElementById('count').textContent=String(recordCount);
 }
 
-// 코드 확인 팝업의 입력과 버튼을 한 번 연결한다.
-// 적용 전에는 원래 인식 결과를 변경하지 않는다.
+// 확인 초안과 재인식 후보는 적용하기 전까지 실제 코드를 바꾸지 않는다.
 const codeReview=document.getElementById('codeReview'),reviewInput=document.getElementById('reviewInput');
 const reviewImage=document.getElementById('reviewImage'),reviewMessage=document.getElementById('reviewMessage');
-const reviewCandidates=document.getElementById('reviewCandidates');
-let reviewHit=null,reviewCrop=null,reviewRunning=false;
+const reviewCandidates=document.getElementById('reviewCandidates'),reviewSuggestions=new Map();
+let reviewHit=null,reviewCrop=null,reviewRunning=false,reviewQueue=[],reviewIndex=-1,reviewStopRequested=false;
 
-// 전체 인식의 보정 영상에서 자른 코드를 확인 창에 표시한다.
-function openCodeReview(hit){
- if(busy||starting||codeReview.open)return;
- const crop=cropReviewRegion(hit);
- if(!crop){status.textContent='전체 인식을 다시 실행한 뒤 코드를 선택하세요.';return;}
- reviewHit=hit;reviewCrop=crop;
- reviewImage.width=reviewCrop.image.width;reviewImage.height=reviewCrop.image.height;
- reviewImage.getContext('2d').drawImage(reviewCrop.image,0,0);
- reviewImage.setAttribute('aria-label','전체 OCR 보정 영상에서 자른 코드 · 흰 여백 포함');
- document.getElementById('reviewPreviewLabel').textContent='전체 OCR 입력에서 자른 이미지';
- reviewInput.value=hit.code;showReviewCandidates(hit.alternatives||[]);
- reviewMessage.textContent='사진과 비교해 직접 입력하거나 재인식하세요.';
- closeTools();codeReview.showModal();
+function updateReviewActions(){
+ const pending=detectedHits.filter(hit=>hit.review).length;
+ document.getElementById('reviewActions').hidden=!detectedHits.length;
+ document.getElementById('reviewPendingCount').textContent='확인 필요 '+pending+'개 · 모든 코드 박스를 눌러 수정 가능';
+ for(const id of ['openUncertain','batchReview'])document.getElementById(id).disabled=busy||starting||!pending;
+ document.getElementById('batchReview').textContent='일괄 재인식 ('+pending+')';
+}
+function resetReviewSession(){
+ reviewSuggestions.clear();
+ if(!codeReview.open){reviewQueue=[];reviewIndex=-1;}
+ document.getElementById('reviewActions').hidden=true;
+}
+function rememberReviewDraft(){
+ if(!reviewHit)return;
+ const previous=reviewSuggestions.get(reviewHit)||{};
+ reviewSuggestions.set(reviewHit,{...previous,draft:reviewInput.value,dirty:normalizeCode(reviewInput.value)!==reviewHit.code});
+}
+function syncReviewNavigation(){
+ document.getElementById('reviewPrevious').disabled=reviewRunning||reviewIndex<=0;
+ document.getElementById('reviewNext').disabled=reviewRunning||reviewIndex>=reviewQueue.length-1;
+ document.getElementById('reviewPosition').value=(reviewIndex+1)+' / '+reviewQueue.length+' · 미확인 '+reviewQueue.filter(hit=>hit.review).length;
+ document.getElementById('reviewApply').textContent=reviewIndex<reviewQueue.length-1?'적용 · 다음':'적용';
 }
 
-// 인식 후보를 누르면 입력창에 복사한다.
-// 후보 선택만으로 코드나 조회 위치를 확정하지 않는다.
+// 이전·다음 이동 시 입력 초안을 보존하고 보정 영상의 같은 좌표를 쓴다.
+function selectReviewItem(index){
+ if(reviewRunning||index<0||index>=reviewQueue.length)return;
+ const hit=reviewQueue[index];
+ if(!detectedHits.includes(hit))return;
+ const crop=cropReviewRegion(hit);
+ if(!crop){reviewMessage.textContent='전체 인식을 다시 실행한 뒤 코드를 선택하세요.';return;}
+ rememberReviewDraft();
+ if(reviewCrop)reviewCrop.image.width=reviewCrop.image.height=1;
+ reviewIndex=index;reviewHit=hit;reviewCrop=crop;
+ reviewImage.width=crop.image.width;reviewImage.height=crop.image.height;
+ reviewImage.getContext('2d').drawImage(crop.image,0,0);
+ reviewImage.setAttribute('aria-label','전체 OCR 보정 영상에서 자른 코드 · 흰 여백 포함');
+ document.getElementById('reviewPreviewLabel').textContent='전체 OCR 입력에서 자른 이미지';
+ const suggestion=reviewSuggestions.get(hit);
+ reviewInput.value=suggestion?.draft??hit.code;
+ showReviewCandidates(suggestion?.candidates||hit.alternatives||[]);
+ reviewMessage.textContent=suggestion?.message||'사진과 비교해 직접 입력하거나 재인식하세요. 다음으로 이동해도 입력 초안은 유지됩니다.';
+ syncReviewNavigation();
+}
+function openCodeReview(hit,queue=null){
+ if(busy||starting||codeReview.open)return;
+ if(!cropReviewAvailable()){status.textContent='전체 인식을 다시 실행한 뒤 코드를 선택하세요.';return;}
+ reviewQueue=queue||detectedHits.filter(item=>!hit.review||item.review);
+ if(!reviewQueue.includes(hit))reviewQueue=[hit];
+ selectReviewItem(reviewQueue.indexOf(hit));
+ if(!reviewCrop)return;
+ closeTools();codeReview.showModal();
+}
+function cropReviewAvailable(){return !!reviewSourceArea&&reviewSourceEpoch===scanEpoch;}
 function showReviewCandidates(codes){
  reviewCandidates.replaceChildren();
  for(const value of [...new Set(codes)]){
   const button=document.createElement('button');button.type='button';button.textContent=value;
-  button.addEventListener('click',()=>{reviewInput.value=value;});
+  button.addEventListener('click',()=>{reviewInput.value=value;rememberReviewDraft();});
   reviewCandidates.append(button);
  }
 }
 
-// 선택한 영역만 기존 OCR·보정 경로로 다시 검사한다.
-// 실패하면 입력값을 유지하며 적용은 사용자에게 맡긴다.
-async function retryCodeReview(){
- if(reviewRunning||busy||!reviewCrop)return;
- reviewRunning=true;busy=true;
- const controls=[...codeReview.querySelectorAll('button,input,select')],target=reviewHit;
+// 일괄 재인식은 기존 단일 코드 경로를 순서대로 호출하고 후보만 보관한다.
+async function runReviewJobs(targets){
+ if(reviewRunning||busy||!targets.length)return;
+ rememberReviewDraft();reviewRunning=true;reviewStopRequested=false;busy=true;
+ lockInputs(true);excel.disabled=true;sheet.disabled=true;updateReviewActions();
+ const controls=[...codeReview.querySelectorAll('button,input,select')];
  controls.forEach(control=>control.disabled=true);
- codeReview.setAttribute('aria-busy','true');reviewMessage.textContent='선택 영역 재인식 중…';
+ const stopButton=document.getElementById('reviewStop');stopButton.hidden=false;stopButton.disabled=false;
+ codeReview.setAttribute('aria-busy','true');syncReviewNavigation();
+ const epoch=scanEpoch;
+ const previewFor=reviewHit,preparedPreview=document.createElement('canvas');preparedPreview.width=preparedPreview.height=1;
+ let completed=0,failures=0,notFound=0,previewDescription='';
  try{
-  const result=await recognizeReviewRegion(reviewCrop,image=>{
-   if(reviewHit!==target||!codeReview.open)return;
-   reviewImage.width=image.width;reviewImage.height=image.height;
-   reviewImage.getContext('2d').drawImage(image,0,0);
-   const description='실제 OCR 입력 · 기존 보정 유지 · '+image.width+'×'+image.height+'px';
-   reviewImage.setAttribute('aria-label',description);document.getElementById('reviewPreviewLabel').textContent=description;
-  });
-  if(reviewHit!==target||!codeReview.open)return;
-  const {candidates}=result;
-  if(candidates.length){
-   reviewInput.value=candidates[0];showReviewCandidates(candidates);
-   reviewMessage.textContent='재인식 완료 · '+result.correctionPath+' · 사진과 비교한 뒤 적용하세요.';
-  }else reviewMessage.textContent='코드를 찾지 못했습니다. 확대 배율을 바꾸거나 직접 입력하세요. · '+result.correctionPath;
- }catch(error){reviewMessage.textContent='재인식 실패: '+error.message+' · 직접 입력할 수 있습니다.';}
- finally{
+  for(const hit of targets){
+   if(reviewStopRequested||epoch!==scanEpoch)break;
+   if(!detectedHits.includes(hit))continue;
+   const crop=cropReviewRegion(hit);
+   if(!crop)break;
+   reviewMessage.textContent='재인식 '+(completed+1)+' / '+targets.length+' · 코드는 자동 확정하지 않습니다.';
+   try{
+    const result=await recognizeReviewRegion(crop,image=>{
+     if(reviewStopRequested||epoch!==scanEpoch||hit!==reviewHit||!codeReview.open)return;
+     reviewImage.width=image.width;reviewImage.height=image.height;reviewImage.getContext('2d').drawImage(image,0,0);
+     const description='실제 OCR 입력 · 기존 보정 유지 · '+image.width+'×'+image.height+'px';
+     preparedPreview.width=image.width;preparedPreview.height=image.height;preparedPreview.getContext('2d').drawImage(image,0,0);previewDescription=description;
+     reviewImage.setAttribute('aria-label',description);document.getElementById('reviewPreviewLabel').textContent=description;
+    });
+    if(reviewStopRequested||epoch!==scanEpoch)break;
+    const previous=reviewSuggestions.get(hit)||{};
+    if(!result.candidates.length)notFound++;
+    const candidates=[...new Set([...result.candidates,...(hit.alternatives||[])])];
+    reviewSuggestions.set(hit,{...previous,candidates,draft:previous.dirty?previous.draft:(result.candidates[0]||hit.code),message:result.candidates.length?'재인식 후보입니다. 사진과 비교한 뒤 적용하세요.':'재인식에서 코드를 찾지 못했습니다. 직접 수정할 수 있습니다.'});
+   }catch(error){
+    if(reviewStopRequested||epoch!==scanEpoch)break;
+    failures++;
+    const previous=reviewSuggestions.get(hit)||{};
+    reviewSuggestions.set(hit,{...previous,draft:previous.draft??hit.code,message:'재인식 실패: '+(error.message||String(error))});
+   }finally{crop.image.width=crop.image.height=1;}
+   completed++;
+  }
+ }finally{
   reviewRunning=false;busy=false;codeReview.setAttribute('aria-busy','false');
-  controls.forEach(control=>control.disabled=false);
+  controls.forEach(control=>control.disabled=false);stopButton.hidden=true;
+  lockInputs(false);excel.disabled=false;sheet.disabled=false;updateReviewActions();
+  // 현재 입력을 다시 저장해 새 후보를 덮지 않도록 선택을 비운다.
+  reviewHit=null;
+  if(epoch===scanEpoch&&codeReview.open)selectReviewItem(reviewIndex);
+  if(epoch===scanEpoch&&reviewHit===previewFor&&preparedPreview.width>1){
+   reviewImage.width=preparedPreview.width;reviewImage.height=preparedPreview.height;reviewImage.getContext('2d').drawImage(preparedPreview,0,0);
+   reviewImage.setAttribute('aria-label',previewDescription);document.getElementById('reviewPreviewLabel').textContent=previewDescription;
+  }
+  preparedPreview.width=preparedPreview.height=1;
+  const summary=(reviewStopRequested?'중단 · 실행 중 결과 폐기 · ':'완료 · ')+completed+'/'+targets.length+'개 처리'+(failures?' · 실패 '+failures:'')+(notFound?' · 미검출 '+notFound:'')+' · 후보를 확인해 적용하세요.';
+  reviewMessage.textContent=summary;status.textContent='코드 재인식 '+summary;
+  syncReviewNavigation();
  }
 }
-
-// 규격에 맞는 입력만 현재 코드와 조회 위치에 반영한다.
-// 취소와 재인식은 기존 결과를 바꾸지 않는다.
+function retryCodeReview(){if(reviewHit)runReviewJobs([reviewHit]);}
+function openUncertainReview(runBatch=false){
+ if(busy||starting||codeReview.open)return;
+ const targets=detectedHits.filter(hit=>hit.review);
+ if(!targets.length){status.textContent='확인할 불확실 코드가 없습니다.';return;}
+ openCodeReview(targets[0],targets);
+ if(runBatch&&codeReview.open)runReviewJobs(targets);
+}
 function applyCodeReview(event){
  event.preventDefault();
  if(reviewRunning||!reviewHit||!detectedHits.includes(reviewHit))return;
  const value=normalizeCode(reviewInput.value);
  if(!/^[A-Z0-9]{4}-[A-Z0-9]{6}$/.test(value)){
-  reviewMessage.textContent='영문·숫자 4자리-6자리로 입력하세요. 예: AB12-A00345';
-  reviewInput.focus();return;
+  reviewMessage.textContent='영문·숫자 4자리-6자리로 입력하세요. 예: AB12-A00345';reviewInput.focus();return;
  }
- reviewHit.code=value;reviewHit.review=false;reviewHit.alternatives=[];
+ reviewHit.code=value;reviewHit.review=false;reviewHit.alternatives=[];reviewSuggestions.delete(reviewHit);
  refreshRecords();showBoxes(detectedHits);status.textContent=value+' 확인 완료 · 위치 갱신';
- codeReview.close();
+ if(reviewIndex<reviewQueue.length-1){reviewHit=null;selectReviewItem(reviewIndex+1);}
+ else codeReview.close();
 }
-
-// 테스트 탭에서 실제 인식 결과로 같은 확인 창을 연다.
-// 불확실한 코드를 우선하며 없으면 첫 번째 코드를 보여준다.
 function openReviewTest(){
  if(busy||starting)return;
  const hit=detectedHits.find(item=>item.review)||detectedHits[0];
@@ -159,12 +229,21 @@ function openReviewTest(){
 }
 document.getElementById('reviewForm').addEventListener('submit',applyCodeReview);
 document.getElementById('reviewRetry').addEventListener('click',retryCodeReview);
+document.getElementById('reviewPrevious').addEventListener('click',()=>selectReviewItem(reviewIndex-1));
+document.getElementById('reviewNext').addEventListener('click',()=>selectReviewItem(reviewIndex+1));
+document.getElementById('reviewInput').addEventListener('input',rememberReviewDraft);
 document.getElementById('reviewCancel').addEventListener('click',()=>{if(!reviewRunning)codeReview.close();});
+document.getElementById('reviewStop').addEventListener('click',()=>{
+ reviewStopRequested=true;document.getElementById('reviewStop').disabled=true;
+ reviewMessage.textContent='대기 작업 제거 · 실행 중 재인식 완료 대기 · 해당 결과는 폐기합니다.';
+});
 codeReview.addEventListener('cancel',event=>{if(reviewRunning)event.preventDefault();});
 codeReview.addEventListener('close',()=>{
- reviewHit=null;
+ rememberReviewDraft();reviewHit=null;reviewQueue=[];reviewIndex=-1;
  if(reviewCrop)reviewCrop.image.width=reviewCrop.image.height=1;
  reviewCrop=null;reviewImage.width=reviewImage.height=1;
 });
 document.getElementById('testReview').addEventListener('click',openReviewTest);
-
+document.getElementById('openUncertain').addEventListener('click',()=>openUncertainReview());
+document.getElementById('batchReview').addEventListener('click',()=>openUncertainReview(true));
+document.getElementById('testBatchReview').addEventListener('click',()=>openUncertainReview(true));

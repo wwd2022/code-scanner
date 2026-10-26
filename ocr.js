@@ -4,6 +4,7 @@ const reviewSource=document.createElement('canvas');
 let reviewSourceArea=null,reviewSourceEpoch=-1;
 function clearReviewSource(){
  reviewSource.width=reviewSource.height=1;reviewSourceArea=null;reviewSourceEpoch=-1;
+ if(typeof resetReviewSession==='function')resetReviewSession();
 }
 function runOcrSession(task,isCurrent=()=>true){
  const next=ocrLane.then(()=>{assertOcrCurrent(isCurrent);return task();});
@@ -235,13 +236,15 @@ async function recognizeCorrected(source,settings,area=null,scale=1,onPrepared=n
    const prepMs=performance.now()-prepareStart;
    assertOcrCurrent(isCurrent);
    if(onPrepared)onPrepared(rendered.image,pass);
-   const regions=createOcrRegions(rendered.image.width,rendered.image.height,stages,maxEdge);
+   const smart=settings.extraScanMode==='smart'&&psm==='11'&&stages?.some(key=>key.startsWith('zoom'));
+   const enabled=smart?[...new Set(['corrected',...stages])]:stages;
+   const regions=createOcrRegions(rendered.image.width,rendered.image.height,enabled,maxEdge);
    const resolution=rendered.image.width+'×'+rendered.image.height;
    if(stages)document.getElementById('ocrInputSize').value='보정 '+rendered.correctionResolution+'px → OCR 기준 '+resolution+'px';
    if(stages){status.textContent='OCR 워커 준비 중…';document.getElementById('accelerationStatus').value='최근 경로: '+rendered.correctionPath;}
    if(context.run)context.run.phase='OCR 워커 준비';
    const workerStart=performance.now();
-   const pool=await prepareOcrWorkers(settings.ocrWorkers||1,regions.length,isCurrent);entries=pool.entries;
+   const pool=await prepareOcrWorkers(settings.ocrWorkers||1,smart?1:regions.length,isCurrent);entries=pool.entries;
    for(const entry of entries){
     assertOcrCurrent(isCurrent);
     if(entry.psm!==psm){
@@ -249,23 +252,25 @@ async function recognizeCorrected(source,settings,area=null,scale=1,onPrepared=n
      catch(error){entry.broken=true;throw error;}
     }
    }
-   const workersMs=performance.now()-workerStart;
+   let workersMs=performance.now()-workerStart;
    const groups=Array(regions.length),texts=Array(regions.length),stageStats=Array(regions.length),errors=[];
-   let cursor=0,attempts=0,lastProgress=0;
+   let cursor=0,attempts=0,lastProgress=0,activeJobs=0,peakJobs=0,extraWorkersMs=0,selectionPending=smart;
+   let tasks=smart?[0]:regions.map((_,index)=>index),fullData=null,fullHits=[],selectionSummary='';
    const states=regions.map(()=>({state:'waiting',progress:0}));
    const report=(force=false)=>{
     if(!stages||!isCurrent()||(!force&&performance.now()-lastProgress<100))return;
     lastProgress=performance.now();
     const done=states.filter(item=>['done','failed'].includes(item.state)).length;
     const running=states.flatMap((item,i)=>item.state==='running'?[regions[i].name+' '+Math.round(item.progress*100)+'%']:[]);
-    status.textContent='완료 '+done+'/'+regions.length+' · '+running.join(' / ')+' · 대기 '+states.filter(item=>item.state==='waiting').length;
+    const skipped=states.filter(item=>item.state==='skipped').length;
+    status.textContent='완료 '+done+'/'+(selectionPending?1:regions.length-skipped)+' · '+running.join(' / ')+' · 대기 '+(selectionPending?Math.max(0,1-cursor):states.filter(item=>item.state==='waiting').length)+(selectionPending?' · 추가 구역 선택 대기':skipped?' · 생략 '+skipped:'');
    };
    const ocrStart=performance.now();
    if(context.run)context.run.phase='영역 OCR';
    const consume=async entry=>{
-    while(cursor<regions.length&&isCurrent()){
-     const index=cursor++,region=regions[index];
-     let image=rendered.image;
+    while(cursor<tasks.length&&!entry.broken&&isCurrent()){
+     const index=tasks[cursor++],region=regions[index];
+     let image=rendered.image,launched=false;
      const stageStart=performance.now();
      try{
       if(region.key!=='corrected'){
@@ -274,7 +279,7 @@ async function recognizeCorrected(source,settings,area=null,scale=1,onPrepared=n
        image.getContext('2d').drawImage(rendered.image,region.x,region.y,region.width,region.height,0,0,image.width,image.height);
       }
       assertOcrCurrent(isCurrent);
-      attempts++;states[index].state='running';
+      attempts++;states[index].state='running';launched=true;activeJobs++;peakJobs=Math.max(peakJobs,activeJobs);
       if(context.run)context.run.running++;
       if(stages)showScanStageResult(region,0,false,'처리 중');
       entry.progress=message=>{
@@ -285,7 +290,9 @@ async function recognizeCorrected(source,settings,area=null,scale=1,onPrepared=n
       report(true);
       const {data}=await entry.engine.recognize(image,{}, {text:true,blocks:true});
       assertOcrCurrent(isCurrent);
-      const hits=mapScanHits(mapScanHits(collectHits(data),region,image.width/region.width,image.height/region.height),pass,rendered.scaleX,rendered.scaleY);
+      const localHits=collectHits(data);
+      if(smart&&region.key==='corrected'){fullData=data;fullHits=localHits;}
+      const hits=mapScanHits(mapScanHits(localHits,region,image.width/region.width,image.height/region.height),pass,rendered.scaleX,rendered.scaleY);
       groups[index]=hits;texts[index]='['+region.name+']\n'+data.text;
       states[index]={state:'done',progress:1};
       stageStats[index]={...region,width:image.width,height:image.height,count:hits.length,ms:performance.now()-stageStart};
@@ -303,7 +310,7 @@ async function recognizeCorrected(source,settings,area=null,scale=1,onPrepared=n
       }
      }finally{
       entry.progress=null;
-      if(context.run&&states[index].state!=='waiting')context.run.running=Math.max(0,context.run.running-1);
+      if(launched){activeJobs--;if(context.run)context.run.running=Math.max(0,context.run.running-1);}
       if(image!==rendered.image)image.width=image.height=1;
       report(true);
      }
@@ -311,7 +318,37 @@ async function recognizeCorrected(source,settings,area=null,scale=1,onPrepared=n
     }
    };
    const outcomes=await Promise.allSettled(entries.map(consume));
-   const ocrMs=performance.now()-ocrStart;
+   if(smart&&isCurrent()){
+    if(context.run)context.run.phase='추가 구역 선택';
+    const selection=chooseExtraRegions(fullData,fullHits,regions.slice(1),rendered.image.width,rendered.image.height);
+    tasks=[];cursor=0;
+    for(let i=1;i<regions.length;i++){
+     const region=regions[i];region.reason=selection.reasons.get(region.key)||'전체 인식에서 추가 검사 후보 없음';
+     if(selection.selected.has(region.key))tasks.push(i);
+     else{
+      states[i].state='skipped';stageStats[i]={...region,skipped:true,width:0,height:0,count:0,ms:0};
+      if(stages)showScanStageResult(region,0,false,'자동 생략');
+     }
+    }
+    selectionSummary='추가 검사 자동 선택 '+tasks.length+'/'+(regions.length-1)+'구역 · '+selection.reason;
+    selectionPending=false;
+    fullData=null;fullHits=[];
+    if(tasks.length){
+     if(context.run)context.run.phase='추가 OCR 워커 준비';
+     const extraStart=performance.now();
+     for(const entry of entries)if(entry.broken){
+      ocrWorkers=ocrWorkers.filter(item=>item!==entry);await entry.engine.terminate().catch(()=>{});
+     }
+     const extra=await prepareOcrWorkers(settings.ocrWorkers||1,tasks.length,isCurrent);
+     entries=[...new Set([...entries,...extra.entries])];
+     const extraMs=performance.now()-extraStart;workersMs+=extraMs;extraWorkersMs+=extraMs;
+     if(extra.warning)pool.warning=extra.warning;
+     if(context.run)context.run.phase='추가 영역 OCR';
+     outcomes.push(...await Promise.allSettled(extra.entries.map(consume)));
+    }
+    report(true);
+   }
+   const ocrMs=performance.now()-ocrStart-extraWorkersMs;
    assertOcrCurrent(isCurrent);
    const rejected=outcomes.find(item=>item.status==='rejected');
    if(rejected)throw rejected.reason;
@@ -322,7 +359,7 @@ async function recognizeCorrected(source,settings,area=null,scale=1,onPrepared=n
    if(!groups.some(Boolean))throw new Error(errors.join(' / ')||'검사할 영역이 없습니다.');
    const mergeStart=performance.now(),sized=selectGlyphSizes(mergeHits(groups.filter(Boolean)),settings),hits=sized.hits,mergeMs=performance.now()-mergeStart;
    const completed=stageStats.filter(Boolean);
-   return {hits,glyphSummary:sized.summary,text:texts.filter(Boolean).join('\n\n'),stats:completed.map(item=>item.name+' '+item.width+'×'+item.height+' · '+item.count+'곳'),errors,attempts,resolution,stageStats:completed,queueMs,prepMs,workersMs,ocrMs,mergeMs,usedWorkers:entries.length,warning:pool.warning,correctionPath:rendered.correctionPath,correctionResolution:rendered.correctionResolution};
+   return {hits,glyphSummary:sized.summary,text:texts.filter(Boolean).join('\n\n'),stats:completed.map(item=>item.skipped?item.name+' 자동 생략':item.name+' '+item.width+'×'+item.height+' · '+item.count+'곳').concat(selectionSummary?[selectionSummary]:[]),errors,attempts,resolution,stageStats:completed,queueMs,prepMs,workersMs,ocrMs,mergeMs,usedWorkers:peakJobs,warning:pool.warning,correctionPath:rendered.correctionPath,correctionResolution:rendered.correctionResolution};
   }finally{
    if(rendered)rendered.image.width=rendered.image.height=1;
    for(const entry of entries){
@@ -536,4 +573,43 @@ function selectGlyphSizes(hits,settings){
  }
  const selected=hits.filter(hit=>height(hit)>=low&&height(hit)<=high);
  return {hits:selected,summary:'글자 높이 '+(manual?'수동':'자동')+' '+Math.round(low)+'~'+Math.round(high)+'px · 범위 밖 '+(hits.length-selected.length)+'곳 제외'};
+}
+
+// 부분 문자열과 불확실 코드의 좌표로 필요한 확대 구역을 고른다.
+function chooseExtraRegions(data,hits,regions,width,height){
+ const selected=new Set(),reasons=new Map();
+ const all=reason=>{
+  for(const region of regions){selected.add(region.key);reasons.set(region.key,reason);}
+  return {selected,reasons,reason};
+ };
+ if(!data||!hits.length)return all('전체 인식에서 코드 없음 · 선택 구역 전체 검사');
+ const merged=mergeHits([hits]);
+ const targets=merged.filter(hit=>hit.review).map(hit=>({...hit.bbox,reason:'불확실 코드'}));
+ const patterns=[/(?:^|[^A-Z0-9])([A-Z0-9]{3,5}[ \t]*-[ \t]*[A-Z0-9]{5,8})(?![A-Z0-9])/g,/(?:^|[^A-Z0-9])([A-Z0-9]{4}[ \t]+[A-Z0-9]{6})(?![A-Z0-9])/g];
+ for(const block of data.blocks||[])for(const paragraph of block.paragraphs||[])for(const line of paragraph.lines||[]){
+  let text='';const spans=[];
+  for(const word of line.words||[]){
+   if(text)text+=' ';const start=text.length;text+=word.text;spans.push({start,end:text.length,bbox:word.bbox});
+  }
+  text=text.toUpperCase().replace(/[‐‑‒–—−﹣－~]/g,'-');
+  for(const pattern of patterns)for(const match of text.matchAll(pattern)){
+   if(merged.some(hit=>hit.code===normalizeCode(match[1])))continue;
+   const start=match.index+match[0].length-match[1].length,end=start+match[1].length;
+   const boxes=spans.filter(span=>span.end>start&&span.start<end&&span.bbox).map(span=>span.bbox);
+   if(boxes.length)targets.push({x0:Math.min(...boxes.map(b=>b.x0)),y0:Math.min(...boxes.map(b=>b.y0)),x1:Math.max(...boxes.map(b=>b.x1)),y1:Math.max(...boxes.map(b=>b.y1)),reason:'코드 일부 인식'});
+  }
+ }
+ for(const target of targets){
+  const padding=Math.max(8,(target.y1-target.y0)*.5);
+  const b={x0:Math.max(0,target.x0-padding),y0:Math.max(0,target.y0-padding),x1:Math.min(width,target.x1+padding),y1:Math.min(height,target.y1+padding)};
+  const area=(b.x1-b.x0)*(b.y1-b.y0);if(area<=0)continue;
+  const ranked=regions.map(region=>{
+   const overlap=Math.max(0,Math.min(b.x1,region.x+region.width)-Math.max(b.x0,region.x))*Math.max(0,Math.min(b.y1,region.y+region.height)-Math.max(b.y0,region.y));
+   const distance=Math.hypot((b.x0+b.x1)/2-region.x-region.width/2,(b.y0+b.y1)/2-region.y-region.height/2);
+   return {region,coverage:overlap/area,distance};
+  }).sort((a,b)=>b.coverage-a.coverage||a.distance-b.distance);
+  const choices=ranked[0]?.coverage>=.95?[ranked[0]]:ranked.filter(item=>item.coverage>0);
+  for(const {region} of choices){selected.add(region.key);reasons.set(region.key,target.reason);}
+ }
+ return {selected,reasons,reason:targets.length?targets.length+'개 후보 영역':'추가 검사 후보 없음'};
 }

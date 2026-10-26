@@ -79,7 +79,7 @@ function handlePhotoPointer(event){
  if(imageViewport.hidden||busy||!frozenMode||event.pointerType!=='touch')return;
  if(event.type==='pointerdown'){
   imageViewport.setPointerCapture(event.pointerId);
-  photoPointers.set(event.pointerId,{x:event.clientX,y:event.clientY,startX:event.clientX,startY:event.clientY,moved:false});
+  photoPointers.set(event.pointerId,{x:event.clientX,y:event.clientY,startX:event.clientX,startY:event.clientY,moved:false,hit:event.target.closest('.code-box')?.scanHit||null});
   if(photoPointers.size===2){
    const [a,b]=[...photoPointers.values()];
    pinchDistance=Math.hypot(a.x-b.x,a.y-b.y);
@@ -109,6 +109,11 @@ function handlePhotoPointer(event){
  }
  photoPointers.delete(event.pointerId);
  if(event.type==='pointerup'&&!multiTouch&&!prev.moved){
+  if(prev.hit&&detectedHits.includes(prev.hit)){
+   lastTap=0;openCodeReview(prev.hit);
+   if(!photoPointers.size){pinchDistance=0;multiTouch=false;}
+   return;
+  }
   const now=performance.now();
   if(now-lastTap<330&&Math.hypot(event.clientX-lastTapX,event.clientY-lastTapY)<35){
    lastTap=0;if(activeTab!=='camera'){closeTools();scanCamera();}
@@ -243,12 +248,15 @@ function toggleBoxes(){
  indicator.hidden=false;indicator.textContent=boxes.hidden?'박스 숨김':'박스 표시';
 }
 let tapStart=null;
-imageViewport.addEventListener('pointerdown',event=>{if(event.isPrimary)tapStart={x:event.clientX,y:event.clientY};});
+imageViewport.addEventListener('pointerdown',event=>{
+ if(event.isPrimary)tapStart={x:event.clientX,y:event.clientY,onCode:!!event.target.closest('.code-box'),multiple:false};
+ else if(tapStart)tapStart.multiple=true;
+});
 imageViewport.addEventListener('pointerup',event=>{
- if(event.pointerType==='touch'&&event.isPrimary&&tapStart&&Math.hypot(event.clientX-tapStart.x,event.clientY-tapStart.y)<10&&!multiTouch)toggleBoxes();
+ if(event.pointerType==='touch'&&event.isPrimary&&tapStart&&!tapStart.onCode&&!tapStart.multiple&&Math.hypot(event.clientX-tapStart.x,event.clientY-tapStart.y)<10&&!multiTouch)toggleBoxes();
  tapStart=null;
 });
-imageViewport.addEventListener('click',event=>{if(event.pointerType!=='touch')toggleBoxes();});
+imageViewport.addEventListener('click',event=>{if(!codeReview.open&&event.pointerType!=='touch')toggleBoxes();});
 document.querySelectorAll('.box-style-settings input,.box-style-settings select').forEach(input=>input.addEventListener('input',updateBoxStyle));
 document.querySelectorAll('.design-choices button').forEach(button=>button.addEventListener('click',()=>{
  const input=document.getElementById(button.parentElement.dataset.choiceFor);
@@ -294,6 +302,7 @@ function showScanStart(stages){
  document.getElementById('scanSingleCount').value='검사 중…';
  document.querySelectorAll('[data-stage-count]').forEach(output=>output.value=stages.includes(output.dataset.stageCount)?'대기':'미실행');
  raw.textContent='';scanStats.textContent='';status.textContent='보정 이미지 준비 · 선택한 '+stages.length+'단계 검사';
+ updateReviewActions();
 }
 
 // 촬영한 이미지를 결과 화면에 표시한다. (쇼 스캔 프레임)
@@ -338,6 +347,7 @@ function showScanEnd(){
  lockInputs(false);excel.disabled=false;sheet.disabled=false;liveCanvas.setAttribute('aria-busy','false');
  strength.disabled=false;resume.disabled=!stream||!frozenMode;
  start.disabled=!!stream;readImage.textContent=activeTab==='camera'&&frozenMode?'다시 촬영':'코드 인식';
+ updateReviewActions();
 }
 
 // 꺼진 카메라는 더블탭으로 켜고, 실행 중에는 두 손가락으로 확대한다. (핸들 라이브 터치)
@@ -550,7 +560,10 @@ if(typeof ResizeObserver!=='undefined'){
 // 확대 검사 사용 여부와 처리 상태에 맞춰 단계 선택을 잠근다.
 // 선택값은 유지하며 기존 설정 저장·복원 방식을 사용한다.
 function syncScanStageInputs(locked=busy||starting){
- for(const input of scanStageInputs)input.disabled=locked||(!deepScan.checked&&input.dataset.scanStage.startsWith('zoom'));
+ const smart=extraScanMode.value==='smart'&&deepScan.checked;
+ if(smart)document.getElementById('scanCorrected').checked=true;
+ for(const input of scanStageInputs)input.disabled=locked||(!deepScan.checked&&input.dataset.scanStage.startsWith('zoom'))||(smart&&input.dataset.scanStage==='corrected');
+ extraScanMode.disabled=locked||!deepScan.checked;
 }
 
 // 각 단계의 최신 발견 수 또는 실패 상태를 표시한다.
@@ -558,6 +571,7 @@ function syncScanStageInputs(locked=busy||starting){
 function showScanStageResult(region,count,failed,state=''){
  const output=document.querySelector('[data-stage-count="'+region.key+'"]');
  if(output)output.value=state||(failed?'실패':count+'개');
+ if(output)output.title=region.reason||'';
 }
 deepScan.addEventListener('change',()=>syncScanStageInputs());
 syncScanStageInputs();
@@ -654,7 +668,7 @@ let recentPerformance=[];
 function showPerformanceResult(result){
  const seconds=ms=>(ms/1000).toFixed(2)+'초';
  const unique=new Set(result.hits.map(hit=>hit.code)).size;
- const inputSizes=[...new Set(result.stageStats.map(stage=>stage.width+'×'+stage.height))].join(' / ');
+ const inputSizes=[...new Set(result.stageStats.filter(stage=>!stage.skipped).map(stage=>stage.width+'×'+stage.height))].join(' / ');
  const summary=seconds(result.totalMs)+' · 보정 '+result.correctionResolution+' → 입력 '+inputSizes+' · OCR 워커 '+result.usedWorkers+'개 · 중복 제거 '+result.hits.length+'곳 / '+unique+'종';
  const brief=document.getElementById('recognitionSummary');brief.hidden=false;brief.value='최근: '+summary;
  document.getElementById('ocrInputSize').value='최근 보정 '+result.correctionResolution+'px → OCR '+inputSizes+'px';
@@ -667,7 +681,7 @@ function showPerformanceResult(result){
  const rows=document.createDocumentFragment();
  for(const stage of result.stageStats){
   const row=document.createElement('tr');
-  for(const value of [stage.name,stage.width+'×'+stage.height,stage.failed?'실패':stage.count+'곳',seconds(stage.ms)]){
+  for(const value of [stage.name,stage.skipped?'—':stage.width+'×'+stage.height,stage.skipped?'자동 생략':stage.failed?'실패':stage.count+'곳',stage.skipped?'—':seconds(stage.ms)]){
    const cell=document.createElement('td');cell.textContent=value;row.append(cell);
   }
   rows.append(row);

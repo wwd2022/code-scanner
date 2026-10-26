@@ -197,7 +197,7 @@ function reduceScreenNoise(image,amount){
 // 모든 입력 모드에서 현재 보정값을 같은 형식으로 읽는다.
 // 미리보기·전체 인식·부분 재인식의 설정 누락을 막는다.
 function getCorrectionSettings(referenceEdge=0){
- return {referenceEdge,glyphMode:glyphMode.value,glyphMin:Math.min(readNumericSetting(glyphMin,4),readNumericSetting(glyphMax,120)),glyphMax:Math.max(readNumericSetting(glyphMin,4),readNumericSetting(glyphMax,120)),ocrMaxEdge:Math.round(readNumericSetting(ocrSize,1280)),correctionMaxEdge:Number(correctionSize.value),acceleration:preprocessAcceleration.value,ocrWorkers:Number(workerCount.value),removeSpecks:removeSpecks.checked,speckArea:Number(speckArea.value),speckThreshold:Number(speckThreshold.value),screenNoise:Number(screenNoise.value),mode:filterMode.value,brightness:Number(brightness.value),strength:Number(strength.value),threshold:Number(threshold.value),removeLines:removeLines.checked};
+ return {referenceEdge,extraScanMode:extraScanMode.value,glyphMode:glyphMode.value,glyphMin:Math.min(readNumericSetting(glyphMin,4),readNumericSetting(glyphMax,120)),glyphMax:Math.max(readNumericSetting(glyphMin,4),readNumericSetting(glyphMax,120)),ocrMaxEdge:Math.round(readNumericSetting(ocrSize,1280)),correctionMaxEdge:Number(correctionSize.value),acceleration:preprocessAcceleration.value,ocrWorkers:Number(workerCount.value),removeSpecks:removeSpecks.checked,speckArea:Number(speckArea.value),speckThreshold:Number(speckThreshold.value),screenNoise:Number(screenNoise.value),mode:filterMode.value,brightness:Number(brightness.value),strength:Number(strength.value),threshold:Number(threshold.value),removeLines:removeLines.checked};
 }
 
 // 대각선을 포함해 연결된 검은 영역 중 지정 면적 이하만 지운다.
