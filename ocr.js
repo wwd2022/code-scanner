@@ -14,53 +14,6 @@ async function getWorker(){
  try{return await workerPromise;}finally{workerPromise=null;}
 }
 
-// 확대 OCR에 사용할 보조 워커를 최대 두 개 준비한다. (겟 패러렐 워커스)
-// 기존 실시간 워커는 유지하며 보조 워커 생성 실패 시 순차 인식으로 돌아간다.
-let parallelWorkers=[],parallelPromise=null;
-async function getParallelWorkers(){
- if(parallelWorkers.length)return parallelWorkers;
- if(!parallelPromise)parallelPromise=(async()=>{
-  const created=[];
-  try{
-   for(let i=0;i<2;i++){
-    const engine=await Tesseract.createWorker('eng',1);
-    await engine.setParameters({tessedit_pageseg_mode:'11'});
-    created.push(engine);
-   }
-   parallelWorkers=created;return created;
-  }catch(error){
-   await Promise.all(created.map(engine=>engine.terminate().catch(()=>{})));
-   return [];
-  }
- })();
- try{return await parallelPromise;}finally{parallelPromise=null;}
-}
-
-// 원본과 보정본을 독립 워커에서 병렬 검사한다. (런 패러렐 패시스)
-// 검사별 결과를 원래 순서로 반환하고 캔버스를 사용 후 해제한다.
-async function runParallelPasses(passes,settings,source,onResult){
- const engines=await getParallelWorkers();
- const results=new Array(passes.length),count=engines.length||1;
- let next=0;
- async function consume(index){
-  const engine=engines[index]||await getWorker();
-  while(next<passes.length){
-   const i=next++,pass=passes[i];
-   let rendered;
-   try{
-    rendered=renderScanPass(source,pass,settings);
-    const {data}=await engine.recognize(rendered.image,{}, {text:true,blocks:true});
-    const hits=mapScanHits(collectHits(data),pass,rendered.scaleX,rendered.scaleY);
-    results[i]={hits,text:data.text};
-   }catch(error){results[i]={hits:[],error:error.message};}
-   finally{if(rendered)rendered.image.width=rendered.image.height=1;}
-   if(onResult)onResult(i,results[i]);
-  }
- }
- await Promise.all(Array.from({length:Math.min(count,passes.length)},(_,i)=>consume(i)));
- return results;
-}
-
 // 코드의 표기를 통일한다. (노멀라이즈 코드)
 // 공백과 하이픈을 정리해 엑셀 조회에 사용한다.
 function normalizeCode(value){
@@ -148,17 +101,14 @@ function mergeHits(groups){
  }).sort((a,b)=>a.bbox.y0-b.bbox.y0||a.bbox.x0-b.bbox.x0);
 }
 
-// 카메라 또는 선택한 이미지의 원본과 보정본을 읽는다. (스캔 카메라)
-// 확대 사진에서는 보이는 부분만 검사하고 박스는 원본 위치에 표시한다.
+// 현재 입력을 보정 이미지 한 장으로 만들어 한 번만 인식한다.
+// 확대 사진은 보이는 영역만 처리하고 결과 좌표는 원본에 맞춘다.
 async function scanCamera(){
  if(busy||starting||(activeTab==='camera'&&frozenMode))return;
  if(activeTab==='camera'&&(!stream||camera.readyState<2)){showScanCameraRequired();return;}
  if(activeTab!=='camera'&&!photoReady)return;
- const stages=scanStageInputs.filter(input=>input.checked&&(deepScan.checked||!input.dataset.scanStage.startsWith('zoom'))).map(input=>input.dataset.scanStage);
- if(!stages.length){showScanStagesRequired();return;}
- busy=true;showScanStart(stages);
- const started=performance.now();
- const settings={screenNoise:Number(screenNoise.value),mode:filterMode.value,brightness:Number(brightness.value),threshold:Number(threshold.value),removeLines:removeLines.checked,deep:deepScan.checked,strength:Number(strength.value),stages};
+ busy=true;showScanStart();
+ const started=performance.now(),settings=getCorrectionSettings();
  try{
   if(activeTab==='camera'){
    if(!drawCorrected(originalFrame,0))throw new Error('영상이 아직 준비되지 않았습니다.');
@@ -167,34 +117,38 @@ async function scanCamera(){
    originalFrame.getContext('2d').drawImage(photoSource,0,0);
   }
   frame.width=originalFrame.width;frame.height=originalFrame.height;
-  renderPreview(originalFrame,frame);
-  if(activeTab==='camera')camera.pause();frozenMode=true;liveEpoch++;clearTimeout(liveTimer);cancelAnimationFrame(animationId);dots.replaceChildren();
+  frame.getContext('2d').drawImage(originalFrame,0,0);
+  if(activeTab==='camera')camera.pause();
+  frozenMode=true;liveEpoch++;clearTimeout(liveTimer);cancelAnimationFrame(animationId);dots.replaceChildren();
   detectedHits=[];showScanFrame();
   if(liveJob)await liveJob.catch(()=>{});
   const area=activeTab==='camera'?null:getVisiblePhotoRegion();
-  let scanSource=originalFrame;
-  if(area){
-   scanSource=document.createElement('canvas');scanSource.width=area.width;scanSource.height=area.height;
-   scanSource.getContext('2d').drawImage(originalFrame,area.x,area.y,area.width,area.height,0,0,area.width,area.height);
-  }
-  const passes=createScanPasses(scanSource.width,scanSource.height,settings);
-  const groups=[],stats=[],errors=[];
-  // 확대 검사도 같은 최대 2개 워커 풀을 사용한다.
-  const results=await runParallelPasses(passes,settings,scanSource,(i,result)=>showScanStageResult(passes[i],result));
-  if(area)scanSource.width=scanSource.height=1;
-  for(let i=0;i<results.length;i++){
-   const pass=passes[i],result=results[i];
-   if(result.error){errors.push(pass.name+': '+result.error);appendScanRaw(pass.name,result.error,true);continue;}
-   groups.push(area?result.hits.map(hit=>({...hit,bbox:{x0:hit.bbox.x0+area.x,y0:hit.bbox.y0+area.y,x1:hit.bbox.x1+area.x,y1:hit.bbox.y1+area.y}})):result.hits);
-   stats.push(pass.name+' '+result.hits.length+'곳');
-   appendScanRaw(pass.name,result.text,false);
-  }
-  if(!groups.length)throw new Error(errors.join(' / '));
-  detectedHits=mergeHits(groups);
-  const seconds=((performance.now()-started)/1000).toFixed(1);
-  showScanResults(detectedHits,area,stats,seconds,errors.length);
- }catch(error){showScanFailure(error);if(worker){await worker.terminate().catch(()=>{});worker=null;}}
- finally{recognitionStage='';busy=false;showScanEnd();}
+  recognitionStage='보정 이미지';
+  const result=await recognizeCorrected(originalFrame,settings,area,1,(image,pass)=>{
+   if(previewCorrection.checked)frame.getContext('2d').drawImage(image,pass.x,pass.y,pass.width,pass.height);
+  });
+  appendScanRaw('보정 이미지 1회',result.text,false);
+  detectedHits=mergeHits([result.hits]);
+  document.getElementById('scanSingleCount').value=detectedHits.length+'개 · OCR 1회';
+  showScanResults(detectedHits,area,['보정 이미지 1장 · OCR 1회'],((performance.now()-started)/1000).toFixed(1),0);
+ }catch(error){
+  showScanFailure(error);
+  if(worker){await worker.terminate().catch(()=>{});worker=null;}
+ }finally{recognitionStage='';busy=false;showScanEnd();}
+}
+
+// 전체 인식과 부분 재인식에 같은 단일 이미지 OCR을 사용한다.
+// 보정은 한 번만 수행하고 임시 이미지는 성공·실패 모두 해제한다.
+async function recognizeCorrected(source,settings,area=null,scale=1,onPrepared=null){
+ const pass=area?{...area,scale}:{x:0,y:0,width:source.width,height:source.height,scale};
+ let rendered;
+ try{
+  const engine=await getWorker();
+  rendered=renderScanPass(source,pass,settings);
+  if(onPrepared)onPrepared(rendered.image,pass);
+  const {data}=await engine.recognize(rendered.image,{}, {text:true,blocks:true});
+  return {hits:mapScanHits(collectHits(data),pass,rendered.scaleX,rendered.scaleY),text:data.text};
+ }finally{if(rendered)rendered.image.width=rendered.image.height=1;}
 }
 
 // 불확실한 코드 주변을 여백과 함께 원본에서 잘라낸다.
@@ -210,15 +164,12 @@ function cropReviewRegion(hit){
  return {image,centerX:(b.x0+b.x1)/2-x,centerY:(b.y0+b.y1)/2-y};
 }
 
-// 잘라낸 원본과 보정본을 확대해 공통 OCR로 다시 읽는다.
+// 잘라낸 영역도 보정 이미지 한 장만 확대해 한 번 읽는다.
 // 대상 중심에 가장 가까운 결과와 해당 후보만 반환한다.
 async function recognizeReviewRegion(crop){
- const settings={screenNoise:Number(screenNoise.value),mode:filterMode.value,brightness:Number(brightness.value),threshold:Number(threshold.value),removeLines:removeLines.checked,strength:Number(strength.value)};
- const width=crop.image.width,height=crop.image.height,scale=Math.min(4,1800/Math.max(width,height));
- const passes=['original',settings.mode].map(mode=>({x:0,y:0,width,height,scale,mode}));
- const results=await runParallelPasses(passes,settings,crop.image);
- if(results.every(result=>result.error))throw new Error(results.map(result=>result.error).join(' / '));
- const hits=mergeHits(results.map(result=>result.hits));
+ const width=crop.image.width,height=crop.image.height;
+ const result=await recognizeCorrected(crop.image,getCorrectionSettings(),null,Math.min(4,1800/Math.max(width,height)));
+ const hits=mergeHits([result.hits]);
  const distance=hit=>Math.hypot(((hit.bbox.x0+hit.bbox.x1)/2-crop.centerX)/width,((hit.bbox.y0+hit.bbox.y1)/2-crop.centerY)/height);
  hits.sort((a,b)=>distance(a)-distance(b));
  const best=hits[0];

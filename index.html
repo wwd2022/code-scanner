@@ -67,6 +67,14 @@
 <label class="inline-label"><input id="previewCorrection" type="checkbox" role="switch" aria-describedby="previewCorrectionHint"> 보정 이미지 표시 <output id="previewCorrectionValue">OFF · 원본</output></label>
 <small id="previewCorrectionHint">ON: 현재 설정의 보정 이미지를 표시 · OFF: 원본 표시. OCR 설정은 유지됩니다.</small>
 <div id="advanced">
+<label for="noiseMethod">모니터 필터 방식</label>
+<select id="noiseMethod"><option value="gaussian">가우시안 · 줄무늬 완화</option><option value="median">중간값 · 점 잡음 완화</option></select>
+<label for="gaussianSize">가우시안 범위 <output id="gaussianSizeValue">3×3</output></label>
+<input id="gaussianSize" type="range" min="3" max="15" step="2" value="3">
+<label for="gaussianX">가로 흐림 σX <output id="gaussianXValue">0.8</output></label>
+<input id="gaussianX" type="range" min="0.1" max="3" step="0.1" value="0.8">
+<label for="gaussianY">세로 흐림 σY <output id="gaussianYValue">0.6</output></label>
+<input id="gaussianY" type="range" min="0.1" max="3" step="0.1" value="0.6">
 <label for="screenNoise">모니터 노이즈 완화 <output id="screenNoiseValue">0</output>%</label>
 <input id="screenNoise" type="range" min="0" max="100" step="10" value="0" aria-describedby="screenNoiseHint">
 <small id="screenNoiseHint">0% 끄기 · 색 점과 잔무늬를 줄입니다. 높이면 얇은 글자가 흐려질 수 있으며 굵은 줄무늬는 남을 수 있습니다.</small>
@@ -80,21 +88,7 @@
 <label for="threshold">인쇄물 글자 농도 <output id="thresholdValue">16</output></label>
 <input id="threshold" type="range" min="4" max="32" step="2" value="16">
 <label class="inline-label"><input id="removeLines" type="checkbox" checked> 표 테두리 완화</label>
-<details class="scan-stages" open>
-<summary>정밀 인식 · 단계 선택</summary>
-<label class="inline-label"><input id="scanOriginal" data-scan-stage="original" type="checkbox" checked> 전체 원본<output data-stage-count="original">미검사</output></label>
-<label class="inline-label"><input id="scanCorrected" data-scan-stage="corrected" type="checkbox" checked> 전체 보정<output data-stage-count="corrected">미검사</output></label>
-<label class="inline-label"><input id="deepScan" type="checkbox" checked> 확대 검사 사용</label>
-<div class="zoom-stages">
-<label class="inline-label"><input id="scanZoom1" data-scan-stage="zoom1" type="checkbox" checked> 확대 1 · 상단 왼쪽<output data-stage-count="zoom1">미검사</output></label>
-<label class="inline-label"><input id="scanZoom2" data-scan-stage="zoom2" type="checkbox" checked> 확대 2 · 상단 중앙<output data-stage-count="zoom2">미검사</output></label>
-<label class="inline-label"><input id="scanZoom3" data-scan-stage="zoom3" type="checkbox" checked> 확대 3 · 상단 오른쪽<output data-stage-count="zoom3">미검사</output></label>
-<label class="inline-label"><input id="scanZoom4" data-scan-stage="zoom4" type="checkbox" checked> 확대 4 · 하단 왼쪽<output data-stage-count="zoom4">미검사</output></label>
-<label class="inline-label"><input id="scanZoom5" data-scan-stage="zoom5" type="checkbox" checked> 확대 5 · 하단 중앙<output data-stage-count="zoom5">미검사</output></label>
-<label class="inline-label"><input id="scanZoom6" data-scan-stage="zoom6" type="checkbox" checked> 확대 6 · 하단 오른쪽<output data-stage-count="zoom6">미검사</output></label>
-</div>
-<small>최근 코드 인식 기준 · 단계별 발견 개수이며 같은 코드가 여러 단계에서 중복될 수 있습니다. 최소 한 단계를 선택하세요.</small>
-</details>
+<div class="scan-stages"><strong>보정 이미지 한 번 인식</strong><small>현재 설정으로 만든 이미지 1장을 검사합니다. 사진을 확대하면 보이는 영역만 인식합니다.</small><output id="scanSingleCount">미검사</output></div>
 </div>
 <div class="box-style-settings">
 <h3>코드 박스</h3>

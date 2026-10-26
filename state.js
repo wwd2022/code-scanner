@@ -19,12 +19,13 @@ const photoInput=document.getElementById('photoInput'),readImage=document.getEle
 const tabButtons=[...document.querySelectorAll('[data-tab]')];
 
 const filterMode=document.getElementById('filterMode'),brightness=document.getElementById('brightness');
-const threshold=document.getElementById('threshold'),removeLines=document.getElementById('removeLines'),deepScan=document.getElementById('deepScan');
+const threshold=document.getElementById('threshold'),removeLines=document.getElementById('removeLines');
+const noiseMethod=document.getElementById('noiseMethod'),gaussianSize=document.getElementById('gaussianSize');
+const gaussianX=document.getElementById('gaussianX'),gaussianY=document.getElementById('gaussianY');
 const screenNoise=document.getElementById('screenNoise');
 const printCorrection=document.getElementById('printCorrection');
 let settingsAdjusting=false;
 const previewCorrection=document.getElementById('previewCorrection');
-const scanStageInputs=[...document.querySelectorAll('[data-scan-stage]')];
-const correctionInputs=[screenNoise,printCorrection,brightness,threshold,removeLines,deepScan,previewCorrection,...scanStageInputs];
+const correctionInputs=[noiseMethod,gaussianSize,gaussianX,gaussianY,screenNoise,printCorrection,brightness,threshold,removeLines,previewCorrection];
 const boxOpacity=document.getElementById("boxOpacity"),boxOpacityValue=document.getElementById("boxOpacityValue");
 const imageViewport=document.getElementById('imageViewport'),zoomLevel=document.getElementById('zoomLevel'),zoomHint=document.getElementById('zoomHint');
