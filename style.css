@@ -110,3 +110,9 @@ button:disabled{opacity:.45;cursor:default}button:focus-visible,input:focus-visi
 .review-actions{display:flex;gap:8px}
 .review-actions button{flex:1;min-height:44px}
 #reviewApply{background:#273950;border-color:#273950;color:#fff}
+
+.settings-tabs{margin-bottom:14px}
+.direction-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;text-align:center}
+.direction-row>div{min-width:0}
+.direction-row .location-dial{width:120px;height:120px}
+.direction-row .location-dial:after{width:40px;height:40px;transform:translate(calc(-50% + var(--stick-x,0px)*.65),calc(-50% + var(--stick-y,0px)*.65))}

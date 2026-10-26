@@ -409,6 +409,16 @@ restoreSettings();
 // 조절하는 슬라이더와 제목만 하단에 표시한다.
 // 설정창은 투명하게 만들고 원본 표시 선택은 유지한다.
 const settingsDrawer=document.getElementById('settingsDrawer');
+const settingsPanelButtons=[...settingsDrawer.querySelectorAll('[data-settings-panel]')];
+settingsPanelButtons.forEach(button=>button.addEventListener('click',()=>{
+ endSettingsPreview();
+ for(const tab of settingsPanelButtons){
+  const selected=tab===button;
+  tab.setAttribute('aria-pressed',String(selected));
+  document.getElementById(tab.dataset.settingsPanel).hidden=!selected;
+ }
+ settingsDrawer.querySelector('.drawer-body').scrollTop=0;
+}));
 const previewInputs=new Set([strength,previewQuality,ocrSize,removeSpecks,speckArea,speckThreshold,screenNoise,printCorrection,brightness,threshold,removeLines,previewCorrection]);
 let adjustmentPointer=null,adjustmentTimer=0,adjustmentFrame=0;
 let adjustmentSlider=null,adjustmentLabel=null;

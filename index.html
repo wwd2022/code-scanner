@@ -63,7 +63,12 @@
 <details class="tool-drawer" id="settingsDrawer">
 <summary>인식 설정</summary>
 <div class="drawer-body">
-<h2>이미지 보정 · 정밀 인식</h2>
+<h2>인식 설정</h2>
+<div class="tabs settings-tabs" role="group" aria-label="설정 종류">
+<button type="button" data-settings-panel="performanceSettings" aria-controls="performanceSettings" aria-pressed="true">성능 조정</button>
+<button type="button" data-settings-panel="designSettings" aria-controls="designSettings" aria-pressed="false">디자인 조정</button>
+</div>
+<section id="performanceSettings" aria-label="성능 조정">
 <label class="inline-label"><input id="previewCorrection" type="checkbox" role="switch" aria-describedby="previewCorrectionHint"> 보정 이미지 표시 <output id="previewCorrectionValue">OFF · 원본</output></label>
 <small id="previewCorrectionHint">ON: 현재 설정의 보정 이미지를 표시 · OFF: 원본 표시. OCR 설정은 유지됩니다.</small>
 <div id="advanced">
@@ -116,6 +121,18 @@
 <output id="scanSingleCount">미검사</output>
 </details>
 </div>
+<small>설정은 카메라·사진·테스트에 공통 적용됩니다.</small>
+</section>
+<section id="designSettings" aria-label="디자인 조정" hidden>
+<h3>박스 방향 · 16방향 드래그</h3>
+<div class="direction-row">
+<div><label>코드 박스</label>
+<div id="codeDial" class="location-dial" role="group" aria-label="코드 박스 표시 방향"></div>
+<small id="codeDirection">원본 위치</small></div>
+<div><label>위치 박스</label>
+<div id="locationDial" class="location-dial" role="group" aria-label="위치 박스 표시 방향"></div>
+<small id="locationDirection">왼쪽</small></div>
+</div>
 <div class="box-style-settings">
 <h3>코드 박스</h3>
 <label>글꼴 <select id="codeFont"><option value="monospace">고정폭</option><option value="sans-serif">기본</option><option value="serif">명조</option></select></label>
@@ -132,13 +149,7 @@
 <label>글자 색상 <input id="placeColor" type="color" value="#ffffff"></label>
 <label>테두리 <select id="placeBorder"><option value="none">없음</option><option value="solid">실선</option><option value="dashed">점선</option><option value="dotted">점점선</option><option value="double">이중선</option></select></label>
 </div>
-<label>코드 박스 방향 (16방향 · 드래그)</label>
-<div id="codeDial" class="location-dial" role="group" aria-label="코드 박스 표시 방향"></div>
-<small id="codeDirection">원본 위치</small>
-<label>위치 박스 방향 (16방향 · 드래그)</label>
-<div id="locationDial" class="location-dial" role="group" aria-label="위치 박스 표시 방향"></div>
-<small id="locationDirection">왼쪽</small>
-<small>인쇄물 보정과 흑백 대비를 함께 사용할 수 있습니다. 설정은 세 가지 입력 모드에 공통 적용됩니다.</small>
+</section>
 </div>
 </details>
 <details class="tool-drawer" id="resultsDrawer">
