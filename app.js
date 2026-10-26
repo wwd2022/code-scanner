@@ -223,6 +223,7 @@ screenNoise.addEventListener('input',()=>{
  liveEpoch++;dots.replaceChildren();
 });
 screenNoise.addEventListener('change',updatePreview);
+ocrSize.addEventListener('change',()=>{liveEpoch++;dots.replaceChildren();});
 removeSpecks.addEventListener('change',()=>{liveEpoch++;dots.replaceChildren();updatePreview();});
 for(const input of [speckArea,speckThreshold]){
  input.addEventListener('input',()=>{

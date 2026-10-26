@@ -132,7 +132,7 @@ async function scanCamera(){
   appendScanRaw('전체·분리 검사',result.text,false);
   detectedHits=result.hits;
   document.getElementById('scanSingleCount').value=detectedHits.length+'개 · OCR '+result.attempts+'회'+(result.errors.length?' · 실패 '+result.errors.length+'회':'');
-  showScanResults(detectedHits,area,result.stats,((performance.now()-started)/1000).toFixed(1),result.errors.length);
+  showScanResults(detectedHits,area,['OCR '+result.resolution,...result.stats],((performance.now()-started)/1000).toFixed(1),result.errors.length);
  }catch(error){
   showScanFailure(error);
   if(worker){await worker.terminate().catch(()=>{});worker=null;}
@@ -141,14 +141,14 @@ async function scanCamera(){
 
 // 전체와 겹치는 여섯 구역의 좌표를 보정 이미지 기준으로 만든다.
 // 선택된 단계만 반환하며 구역 간 여백을 겹쳐 경계의 글자 잘림을 줄인다.
-function createOcrRegions(width,height,stages){
+function createOcrRegions(width,height,stages,maxEdge=3200){
  const enabled=new Set(stages||['corrected']),regions=[];
  if(enabled.has('corrected'))regions.push({key:'corrected',name:'전체 보정',x:0,y:0,width,height,scale:1});
  const tw=Math.ceil(width*.5),th=Math.ceil(height*.65);
  for(let row=0;row<2;row++)for(let col=0;col<3;col++){
   const number=row*3+col+1,key='zoom'+number;
   if(!enabled.has(key))continue;
-  regions.push({key,name:'확대 '+number,x:Math.round((width-tw)*col/2),y:(height-th)*row,width:tw,height:th,scale:Math.min(2,2000/Math.max(tw,th))});
+  regions.push({key,name:'확대 '+number,x:Math.round((width-tw)*col/2),y:(height-th)*row,width:tw,height:th,scale:Math.min(2,Math.min(2000,maxEdge)/Math.max(tw,th))});
  }
  return regions;
 }
@@ -156,13 +156,15 @@ function createOcrRegions(width,height,stages){
 // 보정 이미지는 한 번 생성하고 전체·분리 검사에서 재사용한다.
 // 부분 재인식은 기본 한 번만 검사하며 모든 좌표를 원본에 맞춰 반환한다.
 async function recognizeCorrected(source,settings,area=null,scale=1,onPrepared=null,stages=null){
- const pass=area?{...area,scale}:{x:0,y:0,width:source.width,height:source.height,scale};
+ const pass=area?{...area}:{x:0,y:0,width:source.width,height:source.height};
+ const maxEdge=settings.ocrMaxEdge||3200;
+ pass.scale=Math.min(scale,maxEdge/Math.max(pass.width,pass.height));
  let rendered;
  try{
   const engine=await getWorker();
   rendered=renderScanPass(source,pass,settings);
   if(onPrepared)onPrepared(rendered.image,pass);
-  const regions=createOcrRegions(rendered.image.width,rendered.image.height,stages);
+  const regions=createOcrRegions(rendered.image.width,rendered.image.height,stages,maxEdge);
   const groups=[],texts=[],stats=[],errors=[];
   for(let i=0;i<regions.length;i++){
    const region=regions[i];
@@ -177,7 +179,7 @@ async function recognizeCorrected(source,settings,area=null,scale=1,onPrepared=n
     const {data}=await engine.recognize(image,{}, {text:true,blocks:true});
     const hits=mapScanHits(mapScanHits(collectHits(data),region,image.width/region.width,image.height/region.height),pass,rendered.scaleX,rendered.scaleY);
     groups.push(hits);texts.push('['+region.name+']\n'+data.text);
-    stats.push(region.name+' '+hits.length+'곳');
+    stats.push(region.name+' '+image.width+'×'+image.height+' · '+hits.length+'곳');
     if(stages)showScanStageResult(region,hits.length,false);
    }catch(error){
     errors.push(region.name+': '+error.message);texts.push('['+region.name+' 실패] '+error.message);
@@ -185,7 +187,7 @@ async function recognizeCorrected(source,settings,area=null,scale=1,onPrepared=n
    }finally{if(image!==rendered.image)image.width=image.height=1;}
   }
   if(!groups.length)throw new Error(errors.join(' / ')||'검사할 영역이 없습니다.');
-  return {hits:mergeHits(groups),text:texts.join('\n\n'),stats,errors,attempts:regions.length};
+  return {hits:mergeHits(groups),text:texts.join('\n\n'),stats,errors,attempts:regions.length,resolution:rendered.image.width+'×'+rendered.image.height};
  }finally{if(rendered)rendered.image.width=rendered.image.height=1;}
 }
 
@@ -206,7 +208,8 @@ function cropReviewRegion(hit){
 // 대상 중심에 가장 가까운 결과와 해당 후보만 반환한다.
 async function recognizeReviewRegion(crop){
  const width=crop.image.width,height=crop.image.height;
- const result=await recognizeCorrected(crop.image,getCorrectionSettings(),null,Math.min(4,1800/Math.max(width,height)));
+ const settings=getCorrectionSettings();
+ const result=await recognizeCorrected(crop.image,settings,null,Math.min(4,settings.ocrMaxEdge/800,1800/Math.max(width,height)));
  const hits=result.hits;
  const distance=hit=>Math.hypot(((hit.bbox.x0+hit.bbox.x1)/2-crop.centerX)/width,((hit.bbox.y0+hit.bbox.y1)/2-crop.centerY)/height);
  hits.sort((a,b)=>distance(a)-distance(b));

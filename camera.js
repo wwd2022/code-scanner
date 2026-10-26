@@ -26,7 +26,7 @@ async function checkLive(){
  if(busy||starting||liveJob||settingsAdjusting){liveTimer=setTimeout(checkLive,600);return;}
  const epoch=liveEpoch;dots.replaceChildren();liveStatus.textContent='화면 코드 확인 중…';
  liveJob=(async()=>{
-  if(!drawCorrected(liveFrame))return;
+  if(!drawCorrected(liveFrame,null,Math.min(2200,Number(ocrSize.value))))return;
   const engine=await getWorker();
   if(epoch!==liveEpoch||frozenMode||!stream)return;
   const {data}=await engine.recognize(liveFrame,{}, {text:true,blocks:true});

@@ -86,6 +86,13 @@
 <input id="speckThreshold" type="range" min="1" max="254" step="1" value="128">
 <small>대각선까지 연결된 검은 영역이 설정 면적 이하면 흰색으로 지웁니다. 밝기 기준을 높이면 회색도 검정에 포함합니다. 작은 값부터 조절하세요. 하이픈·작은 글자 획도 지워질 수 있습니다.</small>
 <label class="inline-label"><input id="removeLines" type="checkbox" checked> 표 테두리 완화</label>
+<label for="ocrSize">인식 이미지 해상도</label>
+<select id="ocrSize">
+<option value="1280">빠르게 · 긴 변 최대 1280px</option>
+<option value="1920">균형 · 긴 변 최대 1920px</option>
+<option value="3200" selected>정밀 · 긴 변 최대 3200px</option>
+</select>
+<small>낮추면 보정·인식할 픽셀이 줄어듭니다. 작은 글자는 누락될 수 있습니다. 사진 표시 크기는 유지하며 결과 탭에 실제 인식 해상도를 표시합니다.</small>
 <details class="scan-stages" open>
 <summary>전체 · 확대 분리 검사</summary>
 <label class="inline-label"><input id="scanCorrected" data-scan-stage="corrected" type="checkbox" checked> 전체 보정 이미지<output data-stage-count="corrected">미검사</output></label>

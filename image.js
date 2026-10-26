@@ -141,16 +141,20 @@ function applyCorrection(image,settings){
  }
 }
 
-// 선택 영역의 보정 이미지 한 장을 만든다.
-// 배율 1에서는 추가 캔버스 복사 없이 OCR에 바로 전달한다.
+// 낮은 해상도는 먼저 축소한 뒤 보정해 픽셀 연산도 줄인다.
+// 확대 시에는 보정을 한 번 적용한 결과만 확대하고 실제 좌표 배율을 반환한다.
 function renderScanPass(source,pass,settings){
- const image=document.createElement('canvas');image.width=pass.width;image.height=pass.height;
+ const workingScale=Math.min(1,pass.scale);
+ const image=document.createElement('canvas');
+ image.width=Math.max(1,Math.round(pass.width*workingScale));image.height=Math.max(1,Math.round(pass.height*workingScale));
  const ctx=image.getContext('2d',{willReadFrequently:true});
  ctx.drawImage(source,pass.x,pass.y,pass.width,pass.height,0,0,image.width,image.height);
  const pixels=ctx.getImageData(0,0,image.width,image.height);
- applyCorrection(pixels,settings);ctx.putImageData(pixels,0,0);
- if(pass.scale===1)return {image,scaleX:1,scaleY:1};
- const output=document.createElement('canvas');output.width=Math.max(1,Math.round(image.width*pass.scale));output.height=Math.max(1,Math.round(image.height*pass.scale));
+ applyCorrection(pixels,{...settings,pixelScale:Math.min(image.width/pass.width,image.height/pass.height)});
+ ctx.putImageData(pixels,0,0);
+ if(pass.scale<=1)return {image,scaleX:image.width/pass.width,scaleY:image.height/pass.height};
+ const output=document.createElement('canvas');
+ output.width=Math.max(1,Math.round(pass.width*pass.scale));output.height=Math.max(1,Math.round(pass.height*pass.scale));
  output.getContext('2d').drawImage(image,0,0,output.width,output.height);
  image.width=image.height=1;
  return {image:output,scaleX:output.width/pass.width,scaleY:output.height/pass.height};
@@ -185,7 +189,7 @@ function reduceScreenNoise(image,amount){
 // 모든 입력 모드에서 현재 보정값을 같은 형식으로 읽는다.
 // 미리보기·전체 인식·부분 재인식의 설정 누락을 막는다.
 function getCorrectionSettings(){
- return {removeSpecks:removeSpecks.checked,speckArea:Number(speckArea.value),speckThreshold:Number(speckThreshold.value),screenNoise:Number(screenNoise.value),mode:filterMode.value,brightness:Number(brightness.value),strength:Number(strength.value),threshold:Number(threshold.value),removeLines:removeLines.checked};
+ return {ocrMaxEdge:Number(ocrSize.value),removeSpecks:removeSpecks.checked,speckArea:Number(speckArea.value),speckThreshold:Number(speckThreshold.value),screenNoise:Number(screenNoise.value),mode:filterMode.value,brightness:Number(brightness.value),strength:Number(strength.value),threshold:Number(threshold.value),removeLines:removeLines.checked};
 }
 
 // 대각선을 포함해 연결된 검은 영역 중 지정 면적 이하만 지운다.
