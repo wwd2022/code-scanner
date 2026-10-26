@@ -117,5 +117,5 @@ button:disabled{opacity:.45;cursor:default}button:focus-visible,input:focus-visi
 .direction-row .location-dial{width:120px;height:120px}
 .direction-row .location-dial:after{width:40px;height:40px;transform:translate(calc(-50% + var(--stick-x,0px)*.65),calc(-50% + var(--stick-y,0px)*.65))}
 
-#designPreview{position:relative;height:160px;margin-bottom:14px;overflow:hidden;border:1px solid #dce3ec;border-radius:10px}
+#designPreview{position:sticky;top:0;z-index:3;height:110px;margin-bottom:10px;overflow:hidden;border:1px solid #dce3ec;border-radius:10px;background:#f7f7f2}
 #designPreview svg{display:block;width:100%;height:100%}
