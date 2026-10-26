@@ -132,12 +132,6 @@ function updateBoxStyle(){
  if(detectedHits.length)showBoxes(detectedHits);
 }
 
-// 인쇄물 보정을 대비 필터와 함께 켜거나 끈다. (체인지 프린트 코렉션)
-// 기존 모드 저장값과 OCR 설정을 동기화한다.
-function changePrintCorrection(){
- filterMode.value=printCorrection.checked?'print':'contrast';
- updatePreview();
-}
 toolDrawers.forEach(drawer=>drawer.addEventListener('toggle',()=>{if(drawer.open)closeTools(drawer);}));
 imageViewport.addEventListener('pointerdown',handlePhotoPointer);
 imageViewport.addEventListener('pointermove',handlePhotoPointer);
@@ -148,12 +142,14 @@ imageViewport.addEventListener('dblclick',event=>{
  closeTools();scanCamera();
 });
 // 위치 박스를 16방향으로 움직인다. (셋 로케이션 디렉션)
-// 방향 변경 즉시 저장하며 초기화·복원 중에는 저장을 건너뛴다.
+// 연속 방향 변경은 마지막 값만 저장한다.
 let locationDirectionIndex=12;
 const locationDial=document.getElementById('locationDial');
 function setLocationDirection(index,persist=true){
- locationDirectionIndex=((index%16)+16)%16;
- if(persist)saveSettings();
+ const next=((index%16)+16)%16;
+ if(persist&&locationDirectionIndex===next)return;
+ locationDirectionIndex=next;
+ if(persist)queueSettingsSave();
  const angle=(locationDirectionIndex-4)*Math.PI/8;
  locationDial.style.setProperty('--stick-x',Math.cos(angle)*55+'px');
  locationDial.style.setProperty('--stick-y',Math.sin(angle)*55+'px');
@@ -161,12 +157,14 @@ function setLocationDirection(index,persist=true){
  if(detectedHits.length)showBoxes(detectedHits);
 }
 // 코드 박스를 원래 인식 좌표 기준으로 이동한다. (셋 코드 디렉션)
-// OCR 좌표는 유지하고 방향 변경 즉시 저장한다.
+// OCR 좌표는 유지하고 마지막 방향을 저장한다.
 let codeDirectionIndex=null;
 const codeDial=document.getElementById('codeDial');
 function setCodeDirection(index,persist=true){
- codeDirectionIndex=((index%16)+16)%16;
- if(persist)saveSettings();
+ const next=((index%16)+16)%16;
+ if(persist&&codeDirectionIndex===next)return;
+ codeDirectionIndex=next;
+ if(persist)queueSettingsSave();
  const angle=(codeDirectionIndex-4)*Math.PI/8;
  codeDial.style.setProperty('--stick-x',Math.cos(angle)*55+'px');
  codeDial.style.setProperty('--stick-y',Math.sin(angle)*55+'px');
@@ -197,6 +195,7 @@ codeDial.addEventListener('pointermove',handleLocationStick);
 function toggleBoxes(){
  if(imageViewport.hidden||!detectedHits.length)return;
  boxes.hidden=!boxes.hidden;
+ if(!boxes.hidden)showBoxes(detectedHits);
  const indicator=document.getElementById('boxVisibility');
  indicator.hidden=false;indicator.textContent=boxes.hidden?'박스 숨김':'박스 표시';
 }
@@ -208,32 +207,12 @@ imageViewport.addEventListener('pointerup',event=>{
 });
 imageViewport.addEventListener('click',event=>{if(event.pointerType!=='touch')toggleBoxes();});
 document.querySelectorAll('.box-style-settings input,.box-style-settings select').forEach(input=>input.addEventListener('input',updateBoxStyle));
-printCorrection.addEventListener('change',changePrintCorrection);
 updateBoxStyle();
 excel.addEventListener('change',loadExcel);
 sheet.addEventListener('change',changeSheet);
 start.addEventListener('click',startCamera);
 stop.addEventListener('click',stopCamera);
 resume.addEventListener('click',resumeCamera);
-strength.addEventListener('input',changeFilter);
-brightness.addEventListener('input',()=>{document.getElementById('brightnessValue').value=brightness.value;});
-threshold.addEventListener('input',()=>{document.getElementById('thresholdValue').value=threshold.value;});
-screenNoise.addEventListener('input',()=>{
- document.getElementById('screenNoiseValue').value=screenNoise.value;
- liveEpoch++;dots.replaceChildren();
-});
-screenNoise.addEventListener('change',updatePreview);
-ocrSize.addEventListener('change',()=>{liveEpoch++;dots.replaceChildren();updatePreview();});
-previewQuality.addEventListener('change',updatePreview);
-removeSpecks.addEventListener('change',()=>{liveEpoch++;dots.replaceChildren();updatePreview();});
-for(const input of [speckArea,speckThreshold]){
- input.addEventListener('input',()=>{
-  updateSpeckOutputs();liveEpoch++;dots.replaceChildren();
- });
- input.addEventListener('change',updatePreview);
-}
-removeLines.addEventListener('change',updatePreview);
-previewCorrection.addEventListener('change',updatePreview);
 tabButtons.forEach(button=>button.addEventListener('click',()=>switchTab(button.dataset.tab)));
 photoInput.addEventListener('change',loadPhoto);
 document.getElementById('testGenerate').addEventListener('click',makeTestImage);
@@ -291,8 +270,10 @@ function appendScanRaw(name,value,failed){
 }
 
 // 인식 결과 박스와 상태 메시지를 표시한다. (쇼 스캔 리절츠)
-// OCR 결과를 수정하지 않고 화면에만 반영한다.
+// 같은 결과를 조회 기록과 연결한다.
 function showScanResults(hits,area,stats,seconds,errorCount){
+ for(const hit of hits)addRecord(hit);
+ refreshRecords();
  showBoxes(hits);
  scanStats.textContent=(area?'확대 영역 · ':'전체 이미지 · ')+stats.join(' · ')+' → 합계 '+hits.length+'곳 · '+seconds+'초'+(errorCount?' · 일부 검사 실패':'');
  status.textContent=hits.length?hits.length+'개 코드 표시 · 확인 표시는 사진과 비교하세요.':'코드를 찾지 못함 · 확대 위치나 보정 설정을 바꿔 재검사하세요.';
@@ -360,7 +341,16 @@ liveView.addEventListener('dblclick',()=>{if(activeTab==='camera'&&!stream&&!sta
 // 같은 주소와 브라우저에서 재접속하면 마지막 설정을 복원한다.
 const settingsKey='code-scanner.settings.v1';
 const settingsFields=[...document.querySelectorAll('#settingsDrawer input[id],#settingsDrawer select[id],#testControls input[id],#testControls select[id]')];
+let settingsSaveTimer=0,settingsDirty=false;
+// 연속 입력은 마지막 값만 저장하고 페이지를 떠날 때 마무리한다.
+function queueSettingsSave(){
+ settingsDirty=true;clearTimeout(settingsSaveTimer);
+ settingsSaveTimer=setTimeout(saveSettings,300);
+}
 function saveSettings(){
+ clearTimeout(settingsSaveTimer);settingsSaveTimer=0;
+ if(!settingsDirty)return;
+ settingsDirty=false;
  const values={};
  for(const input of settingsFields)values[input.id]=input.type==='checkbox'?input.checked:input.value;
  try{
@@ -409,19 +399,21 @@ function restoreSettings(){
  }
 }
 settingsFields.forEach(input=>{
- input.addEventListener('input',saveSettings);
- input.addEventListener('change',saveSettings);
+ input.addEventListener('input',queueSettingsSave);
+ input.addEventListener('change',queueSettingsSave);
 });
+window.addEventListener('pagehide',saveSettings);
 setLocationDirection(locationDirectionIndex,false);
 restoreSettings();
 
 // 조절하는 슬라이더와 제목만 하단에 표시한다.
 // 설정창은 투명하게 만들고 원본 표시 선택은 유지한다.
 const settingsDrawer=document.getElementById('settingsDrawer');
+const previewInputs=new Set([strength,previewQuality,ocrSize,removeSpecks,speckArea,speckThreshold,screenNoise,printCorrection,brightness,threshold,removeLines,previewCorrection]);
 let adjustmentPointer=null,adjustmentTimer=0,adjustmentFrame=0;
 let adjustmentSlider=null,adjustmentLabel=null;
 function beginSettingsPreview(event){
- if(!event.target.matches('input[type=range]')||busy||starting)return;
+ if(!previewInputs.has(event.target)||!event.target.matches('input[type=range]')||busy||starting)return;
  if(event.type==='pointerdown'){
   adjustmentPointer=event.pointerId;
   event.target.setPointerCapture(event.pointerId);
@@ -437,37 +429,58 @@ function beginSettingsPreview(event){
  }
  settingsAdjusting=true;settingsDrawer.classList.add('adjusting');
  settingsDrawer.closest('main').classList.add('adjusting-settings');
- if(!adjustmentFrame)adjustmentFrame=requestAnimationFrame(paintSettingsPreview);
+ queueSettingsPreview();
  if(adjustmentPointer===null)adjustmentTimer=setTimeout(endSettingsPreview,700);
 }
 
 // 여러 입력 이벤트를 한 화면 갱신으로 모은다.
 // 가장 최근 설정값만 사용하고 중간 값의 중복 보정은 생략한다.
+function queueSettingsPreview(){
+ if(!adjustmentFrame)adjustmentFrame=requestAnimationFrame(paintSettingsPreview);
+}
 function paintSettingsPreview(){
  adjustmentFrame=0;
- if(settingsAdjusting)updatePreview();
+ updatePreview();
+}
+
+// 보정 입력의 표시·무효화·미리보기 갱신을 한 경로로 모은다.
+function handleCorrectionInput(event){
+ const input=event.target;
+ if(!previewInputs.has(input))return;
+ if(input===printCorrection)filterMode.value=printCorrection.checked?'print':'contrast';
+ const output=document.getElementById(input.id+'Value');
+ if(input.type==='range'&&output)output.value=input.value;
+ liveEpoch++;dots.replaceChildren();
+ if(input.type==='range')beginSettingsPreview(event);
+ else queueSettingsPreview();
 }
 
 // 슬라이더 조절이 끝나면 원래 표시 설정으로 돌아간다. (엔드 세팅스 프리뷰)
 // 슬라이더·제목의 원래 배치와 미리보기 ON/OFF 선택을 복원한다.
 function endSettingsPreview(event){
  if(event?.pointerId!==undefined&&event.pointerId!==adjustmentPointer)return;
+ if(!settingsAdjusting)return;
  clearTimeout(adjustmentTimer);adjustmentPointer=null;
  cancelAnimationFrame(adjustmentFrame);adjustmentFrame=0;
- if(!settingsAdjusting)return;
  settingsAdjusting=false;settingsDrawer.classList.remove('adjusting');
  settingsDrawer.closest('main').classList.remove('adjusting-settings');
  adjustmentSlider?.classList.remove('adjustment-slider');
  adjustmentLabel?.classList.remove('adjustment-label');
  adjustmentSlider=null;adjustmentLabel=null;
- updatePreview();
+ queueSettingsPreview();
 }
 settingsDrawer.addEventListener('pointerdown',beginSettingsPreview);
-settingsDrawer.addEventListener('input',beginSettingsPreview);
+settingsDrawer.addEventListener('input',handleCorrectionInput);
 settingsDrawer.addEventListener('toggle',()=>{if(!settingsDrawer.open)endSettingsPreview();});
 window.addEventListener('pointerup',endSettingsPreview);
 window.addEventListener('pointercancel',endSettingsPreview);
 window.addEventListener('blur',endSettingsPreview);
+
+// 회전·화면 크기·이미지 배치가 바뀌면 현재 좌표로 다시 배치한다.
+if(typeof ResizeObserver!=='undefined'){
+ const boxResizeObserver=new ResizeObserver(()=>{if(frozenMode)showBoxes(detectedHits);});
+ boxResizeObserver.observe(frozen);
+}else window.addEventListener('resize',()=>{if(frozenMode)showBoxes(detectedHits);});
 
 
 
@@ -492,3 +505,4 @@ function updateSpeckOutputs(){
  document.getElementById('speckAreaValue').value=speckArea.value;
  document.getElementById('speckThresholdValue').value=speckThreshold.value;
 }
+

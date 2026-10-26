@@ -113,7 +113,7 @@ async function scanCamera(){
  const started=performance.now(),settings=getCorrectionSettings();
  try{
   if(activeTab==='camera'){
-   if(!drawCorrected(originalFrame,0))throw new Error('영상이 아직 준비되지 않았습니다.');
+   if(!drawCorrected(originalFrame,0,settings.ocrMaxEdge))throw new Error('영상이 아직 준비되지 않았습니다.');
   }else{
    originalFrame.width=photoSource.width;originalFrame.height=photoSource.height;
    originalFrame.getContext('2d').drawImage(photoSource,0,0);
@@ -148,7 +148,8 @@ function createOcrRegions(width,height,stages,maxEdge=3200){
  for(let row=0;row<2;row++)for(let col=0;col<3;col++){
   const number=row*3+col+1,key='zoom'+number;
   if(!enabled.has(key))continue;
-  regions.push({key,name:'확대 '+number,x:Math.round((width-tw)*col/2),y:(height-th)*row,width:tw,height:th,scale:Math.min(2,Math.min(2000,maxEdge)/Math.max(tw,th))});
+  // 확대 예산을 넘는 구역은 원래 픽셀을 유지한다.
+  regions.push({key,name:'확대 '+number,x:Math.round((width-tw)*col/2),y:(height-th)*row,width:tw,height:th,scale:Math.max(1,Math.min(2,Math.min(2000,maxEdge)/Math.max(tw,th)))});
  }
  return regions;
 }
@@ -218,7 +219,7 @@ function cropReviewRegion(hit){
 // 대상 중심에 가장 가까운 결과와 해당 후보만 반환한다.
 async function recognizeReviewRegion(crop){
  const width=crop.image.width,height=crop.image.height;
- const settings=getCorrectionSettings();
+ const settings=getCorrectionSettings(Math.max(originalFrame.width,originalFrame.height));
  const result=await recognizeCorrected(crop.image,settings,null,Math.min(4,settings.ocrMaxEdge/800,1800/Math.max(width,height)),null,null,'7');
  const hits=result.hits;
  const distance=hit=>Math.hypot(((hit.bbox.x0+hit.bbox.x1)/2-crop.centerX)/width,((hit.bbox.y0+hit.bbox.y1)/2-crop.centerY)/height);
@@ -226,3 +227,4 @@ async function recognizeReviewRegion(crop){
  const best=hits[0];
  return best?[best.code,...best.alternatives]:[];
 }
+

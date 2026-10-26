@@ -32,7 +32,7 @@ function drawCorrected(target,amount=null,maxSize=2200){
  ctx.drawImage(camera,sourceX,sourceY,sourceWidth,sourceHeight,0,0,width,height);
  if(amount===null||amount){
   const image=ctx.getImageData(0,0,width,height);
-  if(amount===null)applyCorrection(image,getCorrectionSettings());
+  if(amount===null)applyCorrection(image,{...getCorrectionSettings(),pixelScale:Math.max(width,height)/correctionReferenceEdge});
   else applyFilter(image.data,amount);
   ctx.putImageData(image,0,0);
  }
@@ -54,7 +54,7 @@ function renderPreview(source,target){
   const ctx=previewBuffer.getContext('2d',{willReadFrequently:true});
   ctx.drawImage(source,0,0,w,h);
   const pixels=ctx.getImageData(0,0,w,h);
-  applyCorrection(pixels,{...getCorrectionSettings(),pixelScale:Math.min(w/width,h/height)});
+  applyCorrection(pixels,{...getCorrectionSettings(),pixelScale:Math.max(w,h)/correctionReferenceEdge});
   ctx.putImageData(pixels,0,0);
   image=previewBuffer;
  }
@@ -77,16 +77,12 @@ function updatePreview(){
  }
 }
 
-// 보정 강도 표시와 다음 OCR 설정을 갱신한다.
-// 미리보기는 설정창의 공통 입력 처리에서 한 번만 갱신한다.
-function changeFilter(){
- strengthValue.value=strength.value;liveEpoch++;dots.replaceChildren();
-}
-
-// 그림자를 줄이고 인쇄 글자를 흑백으로 분리한다. (프린트 필터)
-// 원본은 보존하며 주변 밝기 기준과 긴 표 선만 보정한다.
-function printFilter(image,offset=16,cleanLines=true){
+// 공간 보정값은 전체 이미지의 긴 변 2200px 기준이다.
+const correctionReferenceEdge=2200;
+// 주변 밝기와 긴 표 선의 처리 범위를 해상도에 맞춘다.
+function printFilter(image,offset=16,cleanLines=true,pixelScale=1){
  const {width:w,height:h,data}=image,n=w*h,gray=new Uint8Array(n),blur=new Uint8Array(n);
+ const radius=Math.max(1,Math.round(25*pixelScale));
  for(let i=0;i<n;i++)gray[i]=Math.round(data[i*4]*.299+data[i*4+1]*.587+data[i*4+2]*.114);
  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
   let sum=0;
@@ -101,12 +97,12 @@ function printFilter(image,offset=16,cleanLines=true){
   for(let x=0;x<w;x++){sum+=blur[y*w+x];integral[(y+1)*stride+x+1]=integral[y*stride+x+1]+sum;}
  }
  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
-  const x0=Math.max(0,x-25),y0=Math.max(0,y-25),x1=Math.min(w,x+26),y1=Math.min(h,y+26);
+  const x0=Math.max(0,x-radius),y0=Math.max(0,y-radius),x1=Math.min(w,x+radius+1),y1=Math.min(h,y+radius+1);
   const mean=(integral[y1*stride+x1]-integral[y0*stride+x1]-integral[y1*stride+x0]+integral[y0*stride+x0])/((x1-x0)*(y1-y0));
   mask[y*w+x]=blur[y*w+x]<mean-offset?1:0;
  }
  if(cleanLines){
-  const lines=new Uint8Array(n),length=80;
+  const lines=new Uint8Array(n),length=Math.max(2,Math.round(80*pixelScale)),padding=Math.max(0,Math.round(pixelScale));
   for(let y=0;y<h;y++){
    let begin=-1;
    for(let x=0;x<=w;x++){
@@ -122,7 +118,7 @@ function printFilter(image,offset=16,cleanLines=true){
    }
   }
   for(let y=0;y<h;y++)for(let x=0;x<w;x++)if(lines[y*w+x]){
-   for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++)if(x+dx>=0&&x+dx<w&&y+dy>=0&&y+dy<h)mask[(y+dy)*w+x+dx]=0;
+   for(let dy=-padding;dy<=padding;dy++)for(let dx=-padding;dx<=padding;dx++)if(x+dx>=0&&x+dx<w&&y+dy>=0&&y+dy<h)mask[(y+dy)*w+x+dx]=0;
   }
  }
  for(let i=0;i<n;i++){const v=mask[i]?0:255;data[i*4]=data[i*4+1]=data[i*4+2]=v;}
@@ -134,7 +130,7 @@ function applyCorrection(image,settings){
  if(settings.screenNoise)reduceScreenNoise(image,settings.screenNoise);
  if(settings.brightness)for(let i=0;i<image.data.length;i+=4)for(let c=0;c<3;c++)image.data[i+c]+=settings.brightness;
  applyFilter(image.data,settings.strength);
- if(settings.mode==='print')printFilter(image,settings.threshold,settings.removeLines);
+ if(settings.mode==='print')printFilter(image,settings.threshold,settings.removeLines,settings.pixelScale??1);
  if(settings.removeSpecks){
   const area=Math.floor(settings.speckArea*(settings.pixelScale??1)**2);
   if(area>0)removeSmallDarkRegions(image,area,settings.speckThreshold);
@@ -150,7 +146,9 @@ function renderScanPass(source,pass,settings){
  const ctx=image.getContext('2d',{willReadFrequently:true});
  ctx.drawImage(source,pass.x,pass.y,pass.width,pass.height,0,0,image.width,image.height);
  const pixels=ctx.getImageData(0,0,image.width,image.height);
- applyCorrection(pixels,{...settings,pixelScale:Math.min(image.width/pass.width,image.height/pass.height)});
+ // 잘라낸 영역도 전체 이미지의 기준 배율을 유지한다.
+ const pixelScale=(settings.referenceEdge||Math.max(source.width,source.height))/correctionReferenceEdge*Math.min(image.width/pass.width,image.height/pass.height);
+ applyCorrection(pixels,{...settings,pixelScale});
  ctx.putImageData(pixels,0,0);
  if(pass.scale<=1)return {image,scaleX:image.width/pass.width,scaleY:image.height/pass.height};
  const output=document.createElement('canvas');
@@ -188,8 +186,8 @@ function reduceScreenNoise(image,amount){
 
 // 모든 입력 모드에서 현재 보정값을 같은 형식으로 읽는다.
 // 미리보기·전체 인식·부분 재인식의 설정 누락을 막는다.
-function getCorrectionSettings(){
- return {ocrMaxEdge:Number(ocrSize.value),removeSpecks:removeSpecks.checked,speckArea:Number(speckArea.value),speckThreshold:Number(speckThreshold.value),screenNoise:Number(screenNoise.value),mode:filterMode.value,brightness:Number(brightness.value),strength:Number(strength.value),threshold:Number(threshold.value),removeLines:removeLines.checked};
+function getCorrectionSettings(referenceEdge=0){
+ return {referenceEdge,ocrMaxEdge:Number(ocrSize.value),removeSpecks:removeSpecks.checked,speckArea:Number(speckArea.value),speckThreshold:Number(speckThreshold.value),screenNoise:Number(screenNoise.value),mode:filterMode.value,brightness:Number(brightness.value),strength:Number(strength.value),threshold:Number(threshold.value),removeLines:removeLines.checked};
 }
 
 // 대각선을 포함해 연결된 검은 영역 중 지정 면적 이하만 지운다.
@@ -225,3 +223,4 @@ function getPreviewMaxSize(){
  const maxEdge=Number(ocrSize.value);
  return settingsAdjusting&&previewQuality.value==='low'?Math.min(640,maxEdge):maxEdge;
 }
+

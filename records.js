@@ -12,11 +12,13 @@ function placeLabel(element,anchor,angle,width,height){
 // 인식 글자는 그대로 두고 코드·위치 라벨을 주변에 표시한다. (쇼 박시스)
 // 기존 색상·조이스틱 설정을 유지하며 OCR 박스 위 덮개를 제거한다.
 function showBoxes(hits){
- boxes.replaceChildren();
  const indicator=document.getElementById('boxVisibility');
  indicator.hidden=false;indicator.textContent=boxes.hidden?'박스 숨김':'박스 표시';
+ // 숨김 중에는 보존하고 다시 표시할 때 최신 좌표로 만든다.
+ if(boxes.hidden||imageViewport.hidden||frozen.hidden)return;
  const width=boxes.clientWidth,height=boxes.clientHeight;
  if(!width||!height||!frame.width||!frame.height)return;
+ boxes.replaceChildren();
  const codeAngle=codeDirectionIndex===null?-Math.PI/2:(codeDirectionIndex-4)*Math.PI/8;
  const placeAngle=(locationDirectionIndex-4)*Math.PI/8;
  for(const hit of hits){
@@ -42,17 +44,29 @@ function showBoxes(hits){
  }
 }
 
-// 유효한 코드와 조회 위치를 한 줄로 기록한다. (애드 레코드)
-// 엑셀에 없는 코드도 위치 없음으로 추가하고 규격 밖 코드는 제외한다.
-function addRecord(code){
- if(!/^[A-Z0-9]{4}-[A-Z0-9]{6}$/.test(code))return;
- const row=document.createElement('div');row.className='record';
- const found=locations.get(code);
- if(!found){row.classList.add('missing');row.textContent=code+' - 위치 없음 (엑셀에 없는 코드)';}
- else if(!found.length){row.classList.add('missing');row.textContent=code+' - 위치 없음 (엑셀 위치 미입력)';}
- else row.textContent=code+' - '+found.join(' / ');
- records.append(row);document.getElementById('empty').hidden=true;
- document.getElementById('count').textContent=String(++recordCount);
+// 같은 인식 객체를 보관해 직접 수정도 기록에 반영한다.
+const recordedHits=new Set();
+function addRecord(hit){
+ if(/^[A-Z0-9]{4}-[A-Z0-9]{6}$/.test(hit.code))recordedHits.add(hit);
+}
+
+// 누적 기록은 코드별로 합치고 현재 엑셀의 위치를 조회한다.
+function refreshRecords(){
+ const codes=new Map();
+ for(const hit of recordedHits)codes.set(hit.code,!!hit.review||!!codes.get(hit.code));
+ records.replaceChildren();
+ for(const [code,review] of codes){
+  const row=document.createElement('div');row.className='record';
+  const found=locations.get(code);
+  if(!found){row.classList.add('missing');row.textContent=code+' - 위치 없음 (엑셀에 없는 코드)';}
+  else if(!found.length){row.classList.add('missing');row.textContent=code+' - 위치 없음 (엑셀 위치 미입력)';}
+  else row.textContent=code+' - '+found.join(' / ');
+  if(review)row.textContent+=' · 확인 필요';
+  records.append(row);
+ }
+ recordCount=codes.size;
+ document.getElementById('empty').hidden=recordCount>0;
+ document.getElementById('count').textContent=String(recordCount);
 }
 
 // 코드 확인 팝업의 입력과 버튼을 한 번 연결한다.
@@ -117,7 +131,7 @@ function applyCodeReview(event){
   reviewInput.focus();return;
  }
  reviewHit.code=value;reviewHit.review=false;reviewHit.alternatives=[];
- showBoxes(detectedHits);status.textContent=value+' 확인 완료 · 위치 갱신';
+ refreshRecords();showBoxes(detectedHits);status.textContent=value+' 확인 완료 · 위치 갱신';
  codeReview.close();
 }
 
@@ -139,3 +153,4 @@ codeReview.addEventListener('close',()=>{
  reviewCrop=null;reviewImage.width=reviewImage.height=1;
 });
 document.getElementById('testReview').addEventListener('click',openReviewTest);
+

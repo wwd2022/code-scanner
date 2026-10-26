@@ -80,12 +80,13 @@
 <label for="threshold">인쇄물 글자 농도 <output id="thresholdValue">16</output></label>
 <input id="threshold" type="range" min="4" max="32" step="2" value="16">
 <label class="inline-label"><input id="removeSpecks" type="checkbox"> 작은 검은 영역 제거</label>
-<label for="speckArea">최대 제거 면적 <output id="speckAreaValue">6</output>픽셀</label>
+<label for="speckArea">최대 제거 면적 <output id="speckAreaValue">6</output> 기준 픽셀</label>
 <input id="speckArea" type="range" min="1" max="64" step="1" value="6">
 <label for="speckThreshold">검정 판정 밝기 <output id="speckThresholdValue">128</output></label>
 <input id="speckThreshold" type="range" min="1" max="254" step="1" value="128">
 <small>대각선까지 연결된 검은 영역이 설정 면적 이하면 흰색으로 지웁니다. 밝기 기준을 높이면 회색도 검정에 포함합니다. 작은 값부터 조절하세요. 하이픈·작은 글자 획도 지워질 수 있습니다.</small>
 <label class="inline-label"><input id="removeLines" type="checkbox" checked> 표 테두리 완화</label>
+<small>주변 밝기 반경·표 선 길이·제거 면적은 전체 이미지 긴 변 2200px 기준이며, 해상도에 맞춰 비례 조정합니다. 저해상도 미리보기는 근사값입니다.</small>
 <label for="previewQuality">슬라이더 미리보기 화질</label>
 <select id="previewQuality">
 <option value="standard">기본 · 인식 해상도 기준</option>
@@ -144,7 +145,7 @@
 <summary>결과 <span id="count">0</span></summary>
 <div class="drawer-body">
 <h2>조회 기록</h2>
-<div id="empty" class="empty">인식된 코드와 위치는 사진 위 박스에 표시됩니다.</div>
+<div id="empty" class="empty">인식 완료 시 코드별 조회 기록이 추가됩니다.</div>
 <div id="records"></div>
 <div id="scanStats" class="empty"></div>
 <details class="raw-details"><summary>OCR 상세 문자</summary><pre id="raw"></pre></details>
@@ -180,3 +181,4 @@
 <script src="app.js"></script>
 </body>
 </html>
+

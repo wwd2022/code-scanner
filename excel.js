@@ -49,6 +49,7 @@ function showWorkbook(){
  sheet.value=workbook.selected;
  document.getElementById('sheetLabel').hidden=sheet.options.length<2;
  locations=buildLocations(workbook.sheets[workbook.selected]);
+ refreshRecords();
  if(frozenMode)showBoxes(detectedHits);
  excelStatus.textContent=workbook.name+' · '+workbook.selected+' · '+locations.size+'개 코드';
  start.disabled=!!stream||starting;
@@ -98,3 +99,4 @@ async function restoreExcel(){
  }catch(error){excelStatus.textContent='자동 저장소를 사용할 수 없습니다. 엑셀을 직접 선택하세요.';}
  finally{busy=false;lockInputs(false);excel.disabled=false;}
 }
+
