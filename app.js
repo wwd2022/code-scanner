@@ -479,7 +479,7 @@ function beginSettingsPreview(event){
  if(!previewInputs.has(event.target)||!event.target.matches('input[type=range]')||busy||starting)return;
  if(event.type==='pointerdown'){
   adjustmentPointer=event.pointerId;
-  event.target.setPointerCapture(event.pointerId);
+  return;
  }
  clearTimeout(adjustmentTimer);
  if(adjustmentSlider!==event.target){
@@ -522,7 +522,7 @@ function handleCorrectionInput(event){
 // 슬라이더·제목의 원래 배치와 미리보기 ON/OFF 선택을 복원한다.
 function endSettingsPreview(event){
  if(event?.pointerId!==undefined&&event.pointerId!==adjustmentPointer)return;
- if(!settingsAdjusting)return;
+ if(!settingsAdjusting){adjustmentPointer=null;return;}
  clearTimeout(adjustmentTimer);adjustmentPointer=null;
  clearTimeout(adjustmentFrame);adjustmentFrame=0;
  settingsAdjusting=false;settingsDrawer.classList.remove('adjusting');
@@ -587,6 +587,7 @@ const performanceDescriptions={
 };
 function syncPerformanceInputs(locked=busy||starting){
  liveInterval.disabled=locked||!liveOcr.checked;liveSize.disabled=locked||!liveOcr.checked;
+ glyphMin.disabled=glyphMax.disabled=locked||glyphMode.value!=='manual';
 }
 function refreshPerformanceSettings(){
  if(!Object.prototype.hasOwnProperty.call(performanceLabels,performancePreset.value))performancePreset.value='custom';
@@ -658,6 +659,7 @@ function showPerformanceResult(result){
  const brief=document.getElementById('recognitionSummary');brief.hidden=false;brief.value='최근: '+summary;
  document.getElementById('ocrInputSize').value='최근 보정 '+result.correctionResolution+'px → OCR '+inputSizes+'px';
  document.getElementById('accelerationStatus').value='최근 경로: '+result.correctionPath;
+ document.getElementById('glyphRangeStatus').value=result.glyphSummary;
  document.getElementById('scanSummary').hidden=false;
  document.getElementById('performanceReport').hidden=false;
  document.getElementById('performanceTotal').textContent=performanceLabels[result.preset]+' · '+summary+(result.warning?' · '+result.warning:'');
@@ -689,12 +691,16 @@ window.addEventListener('pagehide',()=>{
 refreshPerformanceSettings();
 
 // 숫자 입력을 마친 뒤 범위를 적용하고 기존 설정 저장에 반영한다.
-for(const [id,fallback] of [['ocrSize',1280],['reviewScale',1],['reviewOcrSize',1800]]){
+for(const [id,fallback] of [['ocrSize',1280],['reviewScale',1],['reviewOcrSize',1800],['glyphMin',4],['glyphMax',120]]){
  const input=document.getElementById(id);
  input.addEventListener('change',()=>{
   if(id==='reviewScale'&&!input.value.trim())return;
   const value=readNumericSetting(input,fallback);
   input.value=id==='reviewScale'?value:Math.round(value);
+  if(id==='glyphMin'||id==='glyphMax'){
+   const low=Math.round(readNumericSetting(glyphMin,4)),high=Math.round(readNumericSetting(glyphMax,120));
+   if(low>high){if(id==='glyphMin')glyphMax.value=low;else glyphMin.value=high;}
+  }
   queueSettingsSave();
  });
 }
@@ -709,6 +715,7 @@ function collectSettings(){
    values[input.id]=String(input.id==='reviewScale'?value:Math.round(value));
   }else values[input.id]=input.value;
  }
+ if(Number(values.glyphMin)>Number(values.glyphMax))[values.glyphMin,values.glyphMax]=[values.glyphMax,values.glyphMin];
  return {values,codeDirection:codeDirectionIndex,locationDirection:locationDirectionIndex};
 }
 
@@ -734,6 +741,8 @@ function parseTransferredSettings(text){
   changes.push([input,value]);
  }
  if(!changes.length)throw new Error('적용할 설정이 없습니다.');
+ const low=Number(data.values.glyphMin??glyphMin.value),high=Number(data.values.glyphMax??glyphMax.value);
+ if(low>high)throw new Error('최소 글자 높이가 최대 높이보다 큽니다.');
  for(const key of ['codeDirection','locationDirection']){
   if(!Object.prototype.hasOwnProperty.call(data,key))continue;
   const value=data[key];

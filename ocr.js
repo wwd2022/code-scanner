@@ -92,23 +92,28 @@ function collectHits(data){
   }
   for(const match of findCodes(text)){
    const selected=spans.filter(span=>span.end>match.start&&span.start<match.end);
-   const bounds=[];
+   const bounds=[],glyphHeights=[];
    for(const span of selected){
     const symbols=span.word.symbols||[];
     if(symbols.length&&symbols.map(symbol=>symbol.text).join('')===span.word.text){
      let offset=span.start;
      for(const symbol of symbols){
       const end=offset+symbol.text.length;
-      if(end>match.start&&offset<match.end&&symbol.bbox)bounds.push(symbol.bbox);
+      if(end>match.start&&offset<match.end&&symbol.bbox){
+       bounds.push(symbol.bbox);
+       if(/^[A-Za-z0-9]$/.test(symbol.text)&&symbol.bbox.y1>symbol.bbox.y0)glyphHeights.push(symbol.bbox.y1-symbol.bbox.y0);
+      }
       offset=end;
      }
     }else if(span.word.bbox){
      const b=span.word.bbox,length=span.end-span.start;
+     if(b.y1>b.y0)glyphHeights.push(b.y1-b.y0);
      bounds.push({...b,x0:b.x0+(b.x1-b.x0)*Math.max(0,match.start-span.start)/length,x1:b.x0+(b.x1-b.x0)*Math.min(length,match.end-span.start)/length});
     }
    }
    if(!bounds.length)continue;
-   hits.push({code:match.code,review:match.review,confidence:Math.min(...selected.map(span=>span.word.confidence??0)),bbox:{x0:Math.min(...bounds.map(b=>b.x0)),y0:Math.min(...bounds.map(b=>b.y0)),x1:Math.max(...bounds.map(b=>b.x1)),y1:Math.max(...bounds.map(b=>b.y1))}});
+   glyphHeights.sort((a,b)=>a-b);
+   hits.push({code:match.code,review:match.review,glyphHeight:glyphHeights.length?glyphHeights[Math.floor(glyphHeights.length/2)]:Math.max(...bounds.map(b=>b.y1))-Math.min(...bounds.map(b=>b.y0)),confidence:Math.min(...selected.map(span=>span.word.confidence??0)),bbox:{x0:Math.min(...bounds.map(b=>b.x0)),y0:Math.min(...bounds.map(b=>b.y0)),x1:Math.max(...bounds.map(b=>b.x1)),y1:Math.max(...bounds.map(b=>b.y1))}});
   }
  }
  return hits;
@@ -135,7 +140,7 @@ function mergeHits(groups){
    if(!previous)choices.set(hit.code,{...hit,votes:1});
    else{
     previous.votes++;previous.review=previous.review&&hit.review;
-    if(hit.confidence>previous.confidence){previous.confidence=hit.confidence;previous.bbox=hit.bbox;}
+    if(hit.confidence>previous.confidence){previous.confidence=hit.confidence;previous.bbox=hit.bbox;previous.glyphHeight=hit.glyphHeight;}
    }
   }
   // 같은 보정 영상의 반복 오독이 신뢰도 높은 원본을 밀어내지 않게 한다.
@@ -185,7 +190,7 @@ async function scanCamera(){
   appendScanRaw('전체·분리 검사',result.text,false);
   detectedHits=result.hits;
   document.getElementById('scanSingleCount').value=detectedHits.length+'곳 · OCR '+result.attempts+'회'+(result.errors.length?' · 실패 '+result.errors.length+'회':'');
-  showScanResults(detectedHits,area,['보정 '+result.correctionResolution+' → 입력 '+result.resolution,...result.stats],((performance.now()-started)/1000).toFixed(1),result.errors.length);
+  showScanResults(detectedHits,area,['보정 '+result.correctionResolution+' → 입력 '+result.resolution,...result.stats,result.glyphSummary],((performance.now()-started)/1000).toFixed(1),result.errors.length);
   showPerformanceResult({...result,captureMs,liveWaitMs,totalMs:performance.now()-started,preset,source:activeTab,imageRevision,area});
  }catch(error){
   if(error.name==='AbortError'||!isCurrent()){
@@ -315,9 +320,9 @@ async function recognizeCorrected(source,settings,area=null,scale=1,onPrepared=n
     if(stages)showScanStageResult(regions[i],0,false,'미실행 · 워커 실패');
    }
    if(!groups.some(Boolean))throw new Error(errors.join(' / ')||'검사할 영역이 없습니다.');
-   const mergeStart=performance.now(),hits=mergeHits(groups.filter(Boolean)),mergeMs=performance.now()-mergeStart;
+   const mergeStart=performance.now(),sized=selectGlyphSizes(mergeHits(groups.filter(Boolean)),settings),hits=sized.hits,mergeMs=performance.now()-mergeStart;
    const completed=stageStats.filter(Boolean);
-   return {hits,text:texts.filter(Boolean).join('\n\n'),stats:completed.map(item=>item.name+' '+item.width+'×'+item.height+' · '+item.count+'곳'),errors,attempts,resolution,stageStats:completed,queueMs,prepMs,workersMs,ocrMs,mergeMs,usedWorkers:entries.length,warning:pool.warning,correctionPath:rendered.correctionPath,correctionResolution:rendered.correctionResolution};
+   return {hits,glyphSummary:sized.summary,text:texts.filter(Boolean).join('\n\n'),stats:completed.map(item=>item.name+' '+item.width+'×'+item.height+' · '+item.count+'곳'),errors,attempts,resolution,stageStats:completed,queueMs,prepMs,workersMs,ocrMs,mergeMs,usedWorkers:entries.length,warning:pool.warning,correctionPath:rendered.correctionPath,correctionResolution:rendered.correctionResolution};
   }finally{
    if(rendered)rendered.image.width=rendered.image.height=1;
    for(const entry of entries){
@@ -351,7 +356,7 @@ function cropReviewRegion(hit){
  const image=document.createElement('canvas');image.width=width+padding*2;image.height=height+padding*2;
  const ctx=image.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,image.width,image.height);
  ctx.drawImage(reviewSource,x,y,width,height,padding,padding,width,height);
- return {image,glyphHeight:Math.max(1,h),centerX:(b.x0+b.x1)/2-x+padding,centerY:(b.y0+b.y1)/2-y+padding};
+ return {image,glyphHeight:Math.max(1,(hit.glyphHeight||h/scaleY)*scaleY),centerX:(b.x0+b.x1)/2-x+padding,centerY:(b.y0+b.y1)/2-y+padding};
 }
 
 // 잘라낸 코드는 한 줄 모드로 읽은 뒤 전체 인식 모드를 복원한다.
@@ -364,7 +369,7 @@ async function recognizeReviewRegion(crop,onPrepared=null){
  const requestedScale=scaleInput.value.trim()?readNumericSetting(scaleInput,1):Math.max(1,Math.min(4,32/crop.glyphHeight));
  const scale=Math.min(requestedScale,maxEdge/Math.max(width,height));
  // 이미 보정된 픽셀은 확대만 하고 필터를 다시 적용하지 않는다.
- const settings={...base,ocrMaxEdge:maxEdge,correctionMaxEdge:0,mode:'contrast',strength:0,brightness:0,screenNoise:0,removeLines:false,removeSpecks:false};
+ const settings={...base,ocrMaxEdge:maxEdge,correctionMaxEdge:0,mode:'contrast',strength:0,brightness:0,screenNoise:0,removeLines:false,removeSpecks:false,glyphMode:'manual',glyphMin:Math.max(1,crop.glyphHeight*.5),glyphMax:crop.glyphHeight*2};
  const result=await recognizeCorrected(crop.image,settings,null,scale,onPrepared,null,'7');
  const hits=result.hits;
  const distance=hit=>Math.hypot(((hit.bbox.x0+hit.bbox.x1)/2-crop.centerX)/width,((hit.bbox.y0+hit.bbox.y1)/2-crop.centerY)/height);
@@ -514,4 +519,21 @@ async function optimizePerformance(){
   await runOcrSession(()=>trimOcrWorkers(Number(workerCount.value))).catch(()=>{});
   if(activeScan===run){activeScan=null;busy=false;showScanEnd();}
  }
+}
+
+// 크기는 원본 좌표에서 비교해 분할 확대율의 영향을 받지 않는다.
+function selectGlyphSizes(hits,settings){
+ const height=hit=>hit.glyphHeight||hit.bbox.y1-hit.bbox.y0;
+ let low=settings.glyphMin||4,high=settings.glyphMax||120;
+ const manual=settings.glyphMode==='manual';
+ if(!manual){
+  const reliable=hits.filter(hit=>!hit.review&&hit.confidence>=60);
+  const sizes=(reliable.length>=5?reliable:hits).map(height).filter(value=>Number.isFinite(value)&&value>0).sort((a,b)=>a-b);
+  if(!sizes.length)return {hits,summary:'글자 크기 자동 · 기준 코드 없음'};
+  const first=sizes.length>=5?sizes[Math.floor((sizes.length-1)*.1)]:sizes[0];
+  const last=sizes.length>=5?sizes[Math.ceil((sizes.length-1)*.9)]:sizes[sizes.length-1];
+  low=Math.max(1,Math.floor(first*.5));high=Math.min(3200,Math.ceil(last*2));
+ }
+ const selected=hits.filter(hit=>height(hit)>=low&&height(hit)<=high);
+ return {hits:selected,summary:'글자 높이 '+(manual?'수동':'자동')+' '+Math.round(low)+'~'+Math.round(high)+'px · 범위 밖 '+(hits.length-selected.length)+'곳 제외'};
 }

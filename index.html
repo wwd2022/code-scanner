@@ -105,6 +105,14 @@
 <input id="ocrSize" type="number" min="128" max="3200" step="1" value="1280" inputmode="numeric">
 <small>낮추면 보정·OCR 픽셀이 줄지만 작은 글자가 누락될 수 있습니다. 원본보다 키우지 않습니다.</small>
 <output id="ocrInputSize" class="performance-note">이미지를 준비하면 입력 크기를 표시합니다.</output>
+<label for="glyphMode">인식 글자 크기 범위</label>
+<select id="glyphMode"><option value="auto" selected>자동 · 코드 크기 분포 기준</option><option value="manual">수동 · 최소·최대 높이 지정</option></select>
+<div class="glyph-range-inputs">
+<label for="glyphMin">최소 높이 (px)<input id="glyphMin" type="number" min="1" max="3200" step="1" value="4" inputmode="numeric"></label>
+<label for="glyphMax">최대 높이 (px)<input id="glyphMax" type="number" min="1" max="3200" step="1" value="120" inputmode="numeric"></label>
+</div>
+<small>현재 원본 이미지에서 영문·숫자 한 글자의 높이 기준입니다. 자동은 인식된 코드 크기로 범위를 계산합니다. 수동 범위 밖의 결과는 제외하며, OCR 연산량을 줄이는 설정은 아닙니다. 분할 확대 좌표는 원본 크기로 환산합니다. 단계별 발견 수는 크기 필터 적용 전이며 최종 개수는 적용 후입니다.</small>
+<output id="glyphRangeStatus" class="performance-note">최근 크기 범위: 인식 후 표시</output>
 <label for="correctionSize">보정 처리 해상도</label>
 <select id="correctionSize"><option value="1280" selected>1280px 기준</option><option value="1920">1920px 기준</option><option value="0">OCR 입력 기준 · 기존 방식</option></select>
 <small>보정을 이 크기 이하에서 수행한 뒤 OCR 설정 크기로 맞춥니다. 높은 OCR 해상도로 되돌려도 축소한 세부 정보가 복구되지는 않습니다. 필터를 모두 끄면 원본 픽셀을 유지합니다.</small>
