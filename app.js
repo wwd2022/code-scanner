@@ -218,6 +218,11 @@ resume.addEventListener('click',resumeCamera);
 strength.addEventListener('input',changeFilter);
 brightness.addEventListener('input',()=>{document.getElementById('brightnessValue').value=brightness.value;});
 threshold.addEventListener('input',()=>{document.getElementById('thresholdValue').value=threshold.value;});
+screenNoise.addEventListener('input',()=>{
+ document.getElementById('screenNoiseValue').value=screenNoise.value;
+ liveEpoch++;dots.replaceChildren();
+});
+screenNoise.addEventListener('change',updatePreview);
 removeLines.addEventListener('change',updatePreview);
 previewCorrection.addEventListener('change',updatePreview);
 tabButtons.forEach(button=>button.addEventListener('click',()=>switchTab(button.dataset.tab)));
@@ -380,6 +385,7 @@ function restoreSettings(){
   if(saved.codeDirection!=null&&Number.isInteger(codeDirection)&&codeDirection>=0&&codeDirection<16)setCodeDirection(codeDirection,false);
   if(saved.locationDirection!=null&&Number.isInteger(locationDirection)&&locationDirection>=0&&locationDirection<16)setLocationDirection(locationDirection,false);
   strengthValue.value=strength.value;
+  document.getElementById('screenNoiseValue').value=screenNoise.value;
   document.getElementById('brightnessValue').value=brightness.value;
   document.getElementById('thresholdValue').value=threshold.value;
   document.getElementById('testNoiseValue').value=document.getElementById('testNoise').value+'%';

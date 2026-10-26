@@ -67,6 +67,9 @@
 <label class="inline-label"><input id="previewCorrection" type="checkbox" role="switch" aria-describedby="previewCorrectionHint"> 보정 이미지 표시 <output id="previewCorrectionValue">OFF · 원본</output></label>
 <small id="previewCorrectionHint">ON: 현재 설정의 보정 이미지를 표시 · OFF: 원본 표시. OCR 설정은 유지됩니다.</small>
 <div id="advanced">
+<label for="screenNoise">모니터 노이즈 완화 <output id="screenNoiseValue">0</output>%</label>
+<input id="screenNoise" type="range" min="0" max="100" step="10" value="0" aria-describedby="screenNoiseHint">
+<small id="screenNoiseHint">0% 끄기 · 색 점과 잔무늬를 줄입니다. 높이면 얇은 글자가 흐려질 수 있으며 굵은 줄무늬는 남을 수 있습니다.</small>
 <label class="inline-label"><input id="printCorrection" type="checkbox" checked> 인쇄물 보정</label>
 <input type="hidden" id="filterMode" value="print">
 <label for="strength">흑백 대비 강도 <output id="strengthValue">0</output>%</label>

@@ -20,10 +20,11 @@ const tabButtons=[...document.querySelectorAll('[data-tab]')];
 
 const filterMode=document.getElementById('filterMode'),brightness=document.getElementById('brightness');
 const threshold=document.getElementById('threshold'),removeLines=document.getElementById('removeLines'),deepScan=document.getElementById('deepScan');
+const screenNoise=document.getElementById('screenNoise');
 const printCorrection=document.getElementById('printCorrection');
 let settingsAdjusting=false;
 const previewCorrection=document.getElementById('previewCorrection');
 const scanStageInputs=[...document.querySelectorAll('[data-scan-stage]')];
-const correctionInputs=[printCorrection,brightness,threshold,removeLines,deepScan,previewCorrection,...scanStageInputs];
+const correctionInputs=[screenNoise,printCorrection,brightness,threshold,removeLines,deepScan,previewCorrection,...scanStageInputs];
 const boxOpacity=document.getElementById("boxOpacity"),boxOpacityValue=document.getElementById("boxOpacityValue");
 const imageViewport=document.getElementById('imageViewport'),zoomLevel=document.getElementById('zoomLevel'),zoomHint=document.getElementById('zoomHint');

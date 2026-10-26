@@ -158,7 +158,7 @@ async function scanCamera(){
  if(!stages.length){showScanStagesRequired();return;}
  busy=true;showScanStart(stages);
  const started=performance.now();
- const settings={mode:filterMode.value,brightness:Number(brightness.value),threshold:Number(threshold.value),removeLines:removeLines.checked,deep:deepScan.checked,strength:Number(strength.value),stages};
+ const settings={screenNoise:Number(screenNoise.value),mode:filterMode.value,brightness:Number(brightness.value),threshold:Number(threshold.value),removeLines:removeLines.checked,deep:deepScan.checked,strength:Number(strength.value),stages};
  try{
   if(activeTab==='camera'){
    if(!drawCorrected(originalFrame,0))throw new Error('영상이 아직 준비되지 않았습니다.');
@@ -213,7 +213,7 @@ function cropReviewRegion(hit){
 // 잘라낸 원본과 보정본을 확대해 공통 OCR로 다시 읽는다.
 // 대상 중심에 가장 가까운 결과와 해당 후보만 반환한다.
 async function recognizeReviewRegion(crop){
- const settings={mode:filterMode.value,brightness:Number(brightness.value),threshold:Number(threshold.value),removeLines:removeLines.checked,strength:Number(strength.value)};
+ const settings={screenNoise:Number(screenNoise.value),mode:filterMode.value,brightness:Number(brightness.value),threshold:Number(threshold.value),removeLines:removeLines.checked,strength:Number(strength.value)};
  const width=crop.image.width,height=crop.image.height,scale=Math.min(4,1800/Math.max(width,height));
  const passes=['original',settings.mode].map(mode=>({x:0,y:0,width,height,scale,mode}));
  const results=await runParallelPasses(passes,settings,crop.image);

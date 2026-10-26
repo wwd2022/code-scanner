@@ -32,7 +32,7 @@ function drawCorrected(target,amount=null,maxSize=2200){
  ctx.drawImage(camera,sourceX,sourceY,sourceWidth,sourceHeight,0,0,width,height);
  if(amount===null||amount){
   const image=ctx.getImageData(0,0,width,height);
-  if(amount===null)applyCorrection(image,{mode:filterMode.value,brightness:Number(brightness.value),strength:Number(strength.value),threshold:Number(threshold.value),removeLines:removeLines.checked});
+  if(amount===null)applyCorrection(image,{screenNoise:Number(screenNoise.value),mode:filterMode.value,brightness:Number(brightness.value),strength:Number(strength.value),threshold:Number(threshold.value),removeLines:removeLines.checked});
   else applyFilter(image.data,amount);
   ctx.putImageData(image,0,0);
  }
@@ -54,7 +54,7 @@ function renderPreview(source,target){
   const ctx=previewBuffer.getContext('2d',{willReadFrequently:true});
   ctx.drawImage(source,0,0,w,h);
   const pixels=ctx.getImageData(0,0,w,h);
-  applyCorrection(pixels,{mode:filterMode.value,brightness:Number(brightness.value),threshold:Number(threshold.value),removeLines:removeLines.checked,strength:Number(strength.value)});
+  applyCorrection(pixels,{screenNoise:Number(screenNoise.value),mode:filterMode.value,brightness:Number(brightness.value),threshold:Number(threshold.value),removeLines:removeLines.checked,strength:Number(strength.value)});
   ctx.putImageData(pixels,0,0);
   image=previewBuffer;
  }
@@ -148,9 +148,10 @@ function createScanPasses(width,height,settings){
  return passes;
 }
 
-// 밝기·흑백 대비·인쇄물 보정을 차례로 적용한다. (어플라이 코렉션)
+// 모니터 노이즈·밝기·대비·인쇄물 보정을 차례로 적용한다. (어플라이 코렉션)
 // 미리보기와 모든 OCR 입력에서 같은 필터를 사용한다.
 function applyCorrection(image,settings){
+ if(settings.screenNoise)reduceScreenNoise(image,settings.screenNoise);
  if(settings.brightness)for(let i=0;i<image.data.length;i+=4)for(let c=0;c<3;c++)image.data[i+c]+=settings.brightness;
  applyFilter(image.data,settings.strength);
  if(settings.mode==='print')printFilter(image,settings.threshold,settings.removeLines);
@@ -176,4 +177,24 @@ function renderScanPass(source,pass,settings){
 // 전체 화면과 확대 검사 결과를 같은 좌표계에서 비교한다.
 function mapScanHits(hits,pass,scaleX,scaleY){
  return hits.map(hit=>({...hit,bbox:{x0:hit.bbox.x0/scaleX+pass.x,y0:hit.bbox.y0/scaleY+pass.y,x1:hit.bbox.x1/scaleX+pass.x,y1:hit.bbox.y1/scaleY+pass.y}}));
+}
+
+// 주변 3×3 픽셀의 중간 밝기로 화면 색 점과 잔무늬를 완화한다.
+// 강도 0은 원본이며 크기·좌표·투명도는 유지한다.
+function reduceScreenNoise(image,amount){
+ const {width,height,data}=image,gray=new Uint8Array(width*height),values=new Uint8Array(9);
+ const mix=Math.max(0,Math.min(100,amount))/100;
+ if(!mix)return;
+ for(let i=0;i<gray.length;i++)gray[i]=Math.round(data[i*4]*.299+data[i*4+1]*.587+data[i*4+2]*.114);
+ for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+  let count=0;
+  for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+   const value=gray[Math.max(0,Math.min(height-1,y+dy))*width+Math.max(0,Math.min(width-1,x+dx))];
+   let index=count++;
+   while(index>0&&values[index-1]>value){values[index]=values[index-1];index--;}
+   values[index]=value;
+  }
+  const offset=(y*width+x)*4,median=values[4];
+  for(let c=0;c<3;c++)data[offset+c]=Math.round(data[offset+c]*(1-mix)+median*mix);
+ }
 }
