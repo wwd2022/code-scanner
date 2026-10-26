@@ -112,6 +112,16 @@ function handlePhotoPointer(event){
 
 // 코드·위치 박스의 글꼴과 색상 등을 변경한다. (업데이트 박스 스타일)
 // OCR 데이터는 유지하고 글자 크기 변경 시 박스 위치를 다시 계산한다.
+// 예시 박스도 실제 박스의 스타일과 배치 함수를 사용한다.
+function updateDesignPreview(){
+ const preview=document.getElementById('designPreview');
+ preview.style.cssText=boxes.style.cssText;
+ const width=preview.clientWidth,height=preview.clientHeight;
+ if(!width||!height)return;
+ const anchor={x:width*.25,y:height*70/160,w:width*.5,h:height*24/160};
+ placeLabel(document.getElementById('previewCodeBox'),anchor,codeDirectionIndex===null?-Math.PI/2:(codeDirectionIndex-4)*Math.PI/8,width,height);
+ placeLabel(document.getElementById('previewPlaceBox'),anchor,(locationDirectionIndex-4)*Math.PI/8,width,height);
+}
 function updateBoxStyle(){
  for(const type of ['code','place']){
   const font=document.getElementById(type+'Font').value;
@@ -130,6 +140,7 @@ function updateBoxStyle(){
   document.getElementById(type+'OpacityValue').value=opacity+'%';
  }
  if(detectedHits.length)showBoxes(detectedHits);
+ updateDesignPreview();
 }
 
 toolDrawers.forEach(drawer=>drawer.addEventListener('toggle',()=>{if(drawer.open)closeTools(drawer);}));
@@ -154,6 +165,7 @@ function setLocationDirection(index,persist=true){
  locationDial.style.setProperty('--stick-x',Math.cos(angle)*55+'px');
  locationDial.style.setProperty('--stick-y',Math.sin(angle)*55+'px');
  document.getElementById('locationDirection').textContent='방향 '+(locationDirectionIndex+1)+'/16';
+ updateDesignPreview();
  if(detectedHits.length)showBoxes(detectedHits);
 }
 // 코드 박스를 원래 인식 좌표 기준으로 이동한다. (셋 코드 디렉션)
@@ -169,6 +181,7 @@ function setCodeDirection(index,persist=true){
  codeDial.style.setProperty('--stick-x',Math.cos(angle)*55+'px');
  codeDial.style.setProperty('--stick-y',Math.sin(angle)*55+'px');
  document.getElementById('codeDirection').textContent='방향 '+(codeDirectionIndex+1)+'/16';
+ updateDesignPreview();
  if(detectedHits.length)showBoxes(detectedHits);
 }
 // 조이스틱 드래그를 16개 방향으로 맞춘다. (핸들 로케이션 스틱)
@@ -418,6 +431,7 @@ settingsPanelButtons.forEach(button=>button.addEventListener('click',()=>{
   document.getElementById(tab.dataset.settingsPanel).hidden=!selected;
  }
  settingsDrawer.querySelector('.drawer-body').scrollTop=0;
+ updateDesignPreview();
 }));
 const previewInputs=new Set([strength,previewQuality,ocrSize,removeSpecks,speckArea,speckThreshold,screenNoise,printCorrection,brightness,threshold,removeLines,previewCorrection]);
 let adjustmentPointer=null,adjustmentTimer=0,adjustmentFrame=0;
@@ -516,3 +530,5 @@ function updateSpeckOutputs(){
  document.getElementById('speckThresholdValue').value=speckThreshold.value;
 }
 
+
+window.addEventListener('resize',updateDesignPreview);
