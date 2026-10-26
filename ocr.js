@@ -101,13 +101,15 @@ function mergeHits(groups){
  }).sort((a,b)=>a.bbox.y0-b.bbox.y0||a.bbox.x0-b.bbox.x0);
 }
 
-// 현재 입력을 보정 이미지 한 장으로 만들어 한 번만 인식한다.
+// 보정 이미지를 한 번 만들고 선택한 전체·분리 구역을 검사한다.
 // 확대 사진은 보이는 영역만 처리하고 결과 좌표는 원본에 맞춘다.
 async function scanCamera(){
  if(busy||starting||(activeTab==='camera'&&frozenMode))return;
  if(activeTab==='camera'&&(!stream||camera.readyState<2)){showScanCameraRequired();return;}
  if(activeTab!=='camera'&&!photoReady)return;
- busy=true;showScanStart();
+ const stages=scanStageInputs.filter(input=>input.checked&&(deepScan.checked||input.dataset.scanStage==='corrected')).map(input=>input.dataset.scanStage);
+ if(!stages.length){status.textContent='인식 설정에서 검사 단계를 하나 이상 선택하세요.';return;}
+ busy=true;showScanStart(stages);
  const started=performance.now(),settings=getCorrectionSettings();
  try{
   if(activeTab==='camera'){
@@ -126,28 +128,64 @@ async function scanCamera(){
   recognitionStage='보정 이미지';
   const result=await recognizeCorrected(originalFrame,settings,area,1,(image,pass)=>{
    if(previewCorrection.checked)frame.getContext('2d').drawImage(image,pass.x,pass.y,pass.width,pass.height);
-  });
-  appendScanRaw('보정 이미지 1회',result.text,false);
-  detectedHits=mergeHits([result.hits]);
-  document.getElementById('scanSingleCount').value=detectedHits.length+'개 · OCR 1회';
-  showScanResults(detectedHits,area,['보정 이미지 1장 · OCR 1회'],((performance.now()-started)/1000).toFixed(1),0);
+  },stages);
+  appendScanRaw('전체·분리 검사',result.text,false);
+  detectedHits=result.hits;
+  document.getElementById('scanSingleCount').value=detectedHits.length+'개 · OCR '+result.attempts+'회'+(result.errors.length?' · 실패 '+result.errors.length+'회':'');
+  showScanResults(detectedHits,area,result.stats,((performance.now()-started)/1000).toFixed(1),result.errors.length);
  }catch(error){
   showScanFailure(error);
   if(worker){await worker.terminate().catch(()=>{});worker=null;}
  }finally{recognitionStage='';busy=false;showScanEnd();}
 }
 
-// 전체 인식과 부분 재인식에 같은 단일 이미지 OCR을 사용한다.
-// 보정은 한 번만 수행하고 임시 이미지는 성공·실패 모두 해제한다.
-async function recognizeCorrected(source,settings,area=null,scale=1,onPrepared=null){
+// 전체와 겹치는 여섯 구역의 좌표를 보정 이미지 기준으로 만든다.
+// 선택된 단계만 반환하며 구역 간 여백을 겹쳐 경계의 글자 잘림을 줄인다.
+function createOcrRegions(width,height,stages){
+ const enabled=new Set(stages||['corrected']),regions=[];
+ if(enabled.has('corrected'))regions.push({key:'corrected',name:'전체 보정',x:0,y:0,width,height,scale:1});
+ const tw=Math.ceil(width*.5),th=Math.ceil(height*.65);
+ for(let row=0;row<2;row++)for(let col=0;col<3;col++){
+  const number=row*3+col+1,key='zoom'+number;
+  if(!enabled.has(key))continue;
+  regions.push({key,name:'확대 '+number,x:Math.round((width-tw)*col/2),y:(height-th)*row,width:tw,height:th,scale:Math.min(2,2000/Math.max(tw,th))});
+ }
+ return regions;
+}
+
+// 보정 이미지는 한 번 생성하고 전체·분리 검사에서 재사용한다.
+// 부분 재인식은 기본 한 번만 검사하며 모든 좌표를 원본에 맞춰 반환한다.
+async function recognizeCorrected(source,settings,area=null,scale=1,onPrepared=null,stages=null){
  const pass=area?{...area,scale}:{x:0,y:0,width:source.width,height:source.height,scale};
  let rendered;
  try{
   const engine=await getWorker();
   rendered=renderScanPass(source,pass,settings);
   if(onPrepared)onPrepared(rendered.image,pass);
-  const {data}=await engine.recognize(rendered.image,{}, {text:true,blocks:true});
-  return {hits:mapScanHits(collectHits(data),pass,rendered.scaleX,rendered.scaleY),text:data.text};
+  const regions=createOcrRegions(rendered.image.width,rendered.image.height,stages);
+  const groups=[],texts=[],stats=[],errors=[];
+  for(let i=0;i<regions.length;i++){
+   const region=regions[i];
+   recognitionStage=region.name+' ('+(i+1)+'/'+regions.length+')';
+   let image=rendered.image;
+   try{
+    if(region.key!=='corrected'){
+     image=document.createElement('canvas');
+     image.width=Math.max(1,Math.round(region.width*region.scale));image.height=Math.max(1,Math.round(region.height*region.scale));
+     image.getContext('2d').drawImage(rendered.image,region.x,region.y,region.width,region.height,0,0,image.width,image.height);
+    }
+    const {data}=await engine.recognize(image,{}, {text:true,blocks:true});
+    const hits=mapScanHits(mapScanHits(collectHits(data),region,image.width/region.width,image.height/region.height),pass,rendered.scaleX,rendered.scaleY);
+    groups.push(hits);texts.push('['+region.name+']\n'+data.text);
+    stats.push(region.name+' '+hits.length+'곳');
+    if(stages)showScanStageResult(region,hits.length,false);
+   }catch(error){
+    errors.push(region.name+': '+error.message);texts.push('['+region.name+' 실패] '+error.message);
+    if(stages)showScanStageResult(region,0,true);
+   }finally{if(image!==rendered.image)image.width=image.height=1;}
+  }
+  if(!groups.length)throw new Error(errors.join(' / ')||'검사할 영역이 없습니다.');
+  return {hits:mergeHits(groups),text:texts.join('\n\n'),stats,errors,attempts:regions.length};
  }finally{if(rendered)rendered.image.width=rendered.image.height=1;}
 }
 
@@ -169,7 +207,7 @@ function cropReviewRegion(hit){
 async function recognizeReviewRegion(crop){
  const width=crop.image.width,height=crop.image.height;
  const result=await recognizeCorrected(crop.image,getCorrectionSettings(),null,Math.min(4,1800/Math.max(width,height)));
- const hits=mergeHits([result.hits]);
+ const hits=result.hits;
  const distance=hit=>Math.hypot(((hit.bbox.x0+hit.bbox.x1)/2-crop.centerX)/width,((hit.bbox.y0+hit.bbox.y1)/2-crop.centerY)/height);
  hits.sort((a,b)=>distance(a)-distance(b));
  const best=hits[0];

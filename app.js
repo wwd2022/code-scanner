@@ -3,6 +3,7 @@
 function lockInputs(locked){
  tabButtons.forEach(button=>button.disabled=locked);
  correctionInputs.forEach(input=>input.disabled=locked);
+ syncScanStageInputs(locked);
  photoInput.disabled=locked;
  readImage.disabled=locked||(activeTab==='camera'?!stream:!photoReady);
  readImage.textContent=activeTab==='camera'&&frozenMode?'다시 촬영':'코드 인식';
@@ -261,11 +262,12 @@ function showScanCameraRequired(){
 
 // 인식 시작 시 입력과 결과 화면을 잠근다. (쇼 스캔 스타트)
 // OCR 실행 중 설정 변경을 방지한다.
-function showScanStart(){
+function showScanStart(stages){
  lockInputs(true);excel.disabled=true;sheet.disabled=true;resume.disabled=true;strength.disabled=true;
  liveCanvas.setAttribute('aria-busy','true');
  document.getElementById('scanSingleCount').value='검사 중…';
- raw.textContent='';scanStats.textContent='';status.textContent='보정 이미지 한 장을 준비합니다…';
+ document.querySelectorAll('[data-stage-count]').forEach(output=>output.value=stages.includes(output.dataset.stageCount)?'대기':'미실행');
+ raw.textContent='';scanStats.textContent='';status.textContent='보정 이미지 준비 · 선택한 '+stages.length+'단계 검사';
 }
 
 // 촬영한 이미지를 결과 화면에 표시한다. (쇼 스캔 프레임)
@@ -297,6 +299,7 @@ function showScanResults(hits,area,stats,seconds,errorCount){
 // OCR 워커 종료와 복구는 기존 인식 코드에서 처리한다.
 function showScanFailure(error){
  document.getElementById('scanSingleCount').value='실패';
+ document.querySelectorAll('[data-stage-count]').forEach(output=>{if(output.value==='대기')output.value='실패';});
  status.textContent='인식 실패: '+error.message;
 }
 
@@ -470,3 +473,18 @@ function updateGaussianOutputs(){
  document.getElementById('gaussianXValue').value=Number(gaussianX.value).toFixed(1);
  document.getElementById('gaussianYValue').value=Number(gaussianY.value).toFixed(1);
 }
+
+// 확대 검사 사용 여부와 처리 상태에 맞춰 단계 선택을 잠근다.
+// 선택값은 유지하며 기존 설정 저장·복원 방식을 사용한다.
+function syncScanStageInputs(locked=busy||starting){
+ for(const input of scanStageInputs)input.disabled=locked||(!deepScan.checked&&input.dataset.scanStage.startsWith('zoom'));
+}
+
+// 각 단계의 최신 발견 수 또는 실패 상태를 표시한다.
+// 최종 결과는 별도로 중복 통합하므로 단계별 수에는 중복이 포함된다.
+function showScanStageResult(region,count,failed){
+ const output=document.querySelector('[data-stage-count="'+region.key+'"]');
+ if(output)output.value=failed?'실패':count+'개';
+}
+deepScan.addEventListener('change',()=>syncScanStageInputs());
+syncScanStageInputs();
