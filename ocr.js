@@ -1,5 +1,10 @@
 // OCR 호출과 워커 개수 변경을 같은 대기열에서 처리한다.
 let ocrWorkers=[],ocrLane=Promise.resolve();
+const reviewSource=document.createElement('canvas');
+let reviewSourceArea=null,reviewSourceEpoch=-1;
+function clearReviewSource(){
+ reviewSource.width=reviewSource.height=1;reviewSourceArea=null;reviewSourceEpoch=-1;
+}
 function runOcrSession(task,isCurrent=()=>true){
  const next=ocrLane.then(()=>{assertOcrCurrent(isCurrent);return task();});
  ocrLane=next.catch(()=>{});
@@ -146,6 +151,7 @@ async function scanCamera(){
  if(activeTab!=='camera'&&!photoReady)return;
  const stages=scanStageInputs.filter(input=>input.checked&&(deepScan.checked||input.dataset.scanStage==='corrected')).map(input=>input.dataset.scanStage);
  if(!stages.length){status.textContent='인식 설정에서 검사 단계를 하나 이상 선택하세요.';return;}
+ clearReviewSource();
  const run={epoch:++scanEpoch,cancelled:false,running:0,phase:'화면 준비'};activeScan=run;
  const isCurrent=()=>activeScan===run&&!run.cancelled&&run.epoch===scanEpoch;
  const started=performance.now(),settings=getCorrectionSettings(),preset=performancePreset.value;
@@ -168,7 +174,11 @@ async function scanCamera(){
   assertOcrCurrent(isCurrent);
   const area=activeTab==='camera'?null:getVisiblePhotoRegion();
   const result=await recognizeCorrected(originalFrame,settings,area,1,(image,pass)=>{
-   if(isCurrent()&&previewCorrection.checked)frame.getContext('2d').drawImage(image,pass.x,pass.y,pass.width,pass.height);
+   if(!isCurrent())return;
+   reviewSource.width=image.width;reviewSource.height=image.height;
+   reviewSource.getContext('2d').drawImage(image,0,0);
+   reviewSourceArea={x:pass.x,y:pass.y,width:pass.width,height:pass.height};reviewSourceEpoch=run.epoch;
+   if(previewCorrection.checked)frame.getContext('2d').drawImage(image,pass.x,pass.y,pass.width,pass.height);
   },stages,'11',{isCurrent,run});
   assertOcrCurrent(isCurrent);
   appendScanRaw('전체·분리 검사',result.text,false);
@@ -182,7 +192,7 @@ async function scanCamera(){
    status.textContent='인식 취소 · 실행 중 작업 완료, 결과 폐기';
   }else showScanFailure({message:error.message||String(error)});
  }finally{
-  if(activeScan===run){activeScan=null;busy=false;showScanEnd();}
+  if(activeScan===run){if(run.cancelled)clearReviewSource();activeScan=null;busy=false;showScanEnd();}
  }
 }
 
@@ -324,18 +334,22 @@ async function recognizeCorrected(source,settings,area=null,scale=1,onPrepared=n
  },isCurrent);
 }
 
-// 불확실한 코드 주변을 여백과 함께 원본에서 잘라낸다.
-// 화면 확대율과 관계없이 원본 이미지의 픽셀 좌표를 사용한다.
+// 전체 OCR에 사용한 보정 영상에서 코드 주변을 잘라낸다.
+// 원본 좌표를 보정 영상의 크기·검사 영역에 맞춰 변환한다.
 function cropReviewRegion(hit){
- const b=hit.bbox,w=b.x1-b.x0,h=b.y1-b.y0;
+ if(!reviewSourceArea||reviewSourceEpoch!==scanEpoch)return null;
+ const area=reviewSourceArea,scaleX=reviewSource.width/area.width,scaleY=reviewSource.height/area.height;
+ const original=hit.bbox;
+ const b={x0:(original.x0-area.x)*scaleX,y0:(original.y0-area.y)*scaleY,x1:(original.x1-area.x)*scaleX,y1:(original.y1-area.y)*scaleY};
+ const w=b.x1-b.x0,h=b.y1-b.y0;
  const x=Math.max(0,Math.floor(b.x0-Math.max(12,w*.08)));
  const y=Math.max(0,Math.floor(b.y0-Math.max(8,h*.6)));
- const right=Math.min(originalFrame.width,Math.ceil(b.x1+Math.max(12,w*.08)));
- const bottom=Math.min(originalFrame.height,Math.ceil(b.y1+Math.max(8,h*.6)));
+ const right=Math.min(reviewSource.width,Math.ceil(b.x1+Math.max(12,w*.08)));
+ const bottom=Math.min(reviewSource.height,Math.ceil(b.y1+Math.max(8,h*.6)));
  const padding=Math.max(3,Math.round(h*.3)),width=Math.max(1,right-x),height=Math.max(1,bottom-y);
  const image=document.createElement('canvas');image.width=width+padding*2;image.height=height+padding*2;
  const ctx=image.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,image.width,image.height);
- ctx.drawImage(originalFrame,x,y,width,height,padding,padding,width,height);
+ ctx.drawImage(reviewSource,x,y,width,height,padding,padding,width,height);
  return {image,glyphHeight:Math.max(1,h),centerX:(b.x0+b.x1)/2-x+padding,centerY:(b.y0+b.y1)/2-y+padding};
 }
 
@@ -343,16 +357,18 @@ function cropReviewRegion(hit){
 // 대상 중심에 가장 가까운 결과와 해당 후보만 반환한다.
 async function recognizeReviewRegion(crop,onPrepared=null){
  const width=crop.image.width,height=crop.image.height;
- const base=getCorrectionSettings(),corrected=document.getElementById('reviewCorrection').checked;
- const selected=document.getElementById('reviewScale').value;
- const scale=Math.min(selected==='auto'?Math.max(1,Math.min(4,32/crop.glyphHeight)):Number(selected),1800/Math.max(width,height));
- // 작은 획을 지우는 필터는 제외하고 확대된 글자 크기로 보정한다.
- const settings={...base,ocrMaxEdge:1800,correctionMaxEdge:1800,correctAfterUpscale:true,reviewGlyphHeight:crop.glyphHeight,mode:corrected?'print':'contrast',strength:corrected?base.strength:0,brightness:corrected?base.brightness:0,threshold:Math.min(base.threshold,12),screenNoise:0,removeLines:false,removeSpecks:false};
+ const base=getCorrectionSettings();
+ const scaleInput=document.getElementById('reviewScale');
+ const maxEdge=Math.round(readNumericSetting(document.getElementById('reviewOcrSize'),1800));
+ const requestedScale=scaleInput.value.trim()?readNumericSetting(scaleInput,1):Math.max(1,Math.min(4,32/crop.glyphHeight));
+ const scale=Math.min(requestedScale,maxEdge/Math.max(width,height));
+ // 이미 보정된 픽셀은 확대만 하고 필터를 다시 적용하지 않는다.
+ const settings={...base,ocrMaxEdge:maxEdge,correctionMaxEdge:0,mode:'contrast',strength:0,brightness:0,screenNoise:0,removeLines:false,removeSpecks:false};
  const result=await recognizeCorrected(crop.image,settings,null,scale,onPrepared,null,'7');
  const hits=result.hits;
  const distance=hit=>Math.hypot(((hit.bbox.x0+hit.bbox.x1)/2-crop.centerX)/width,((hit.bbox.y0+hit.bbox.y1)/2-crop.centerY)/height);
  hits.sort((a,b)=>distance(a)-distance(b));
  const best=hits[0];
- return {candidates:best?[best.code,...best.alternatives]:[],correctionPath:result.correctionPath};
+ return {candidates:best?[best.code,...best.alternatives]:[],correctionPath:'전체 OCR 입력 재사용 · 추가 보정 없음'};
 }
 

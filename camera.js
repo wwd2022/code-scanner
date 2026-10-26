@@ -47,6 +47,7 @@ async function checkLive(){
 // 미리보기와 주기적 OCR 검사를 시작한다. (비긴 라이브)
 // 이전 표시를 지우고 새 화면의 코드 위치를 검사한다.
 function beginLive(){
+ clearReviewSource();
  liveEpoch++;dots.replaceChildren();clearTimeout(liveTimer);cancelAnimationFrame(animationId);
  updateOcrInputSize();
  lastPaint=0;animationId=requestAnimationFrame(paintLive);

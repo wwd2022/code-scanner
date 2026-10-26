@@ -1,6 +1,7 @@
 // 선택한 사진을 표시 옵션에 따라 보여준다. (프리뷰 포토)
 // 이전 인식 박스를 지우며 원본 픽셀은 유지한다.
 function previewPhoto(){
+ clearReviewSource();
  scanEpoch++;imageRevision++;
  if(activeTab==='test')document.getElementById('testPerformance').value='현재 이미지를 유지하고 성능 설정을 바꿔 같은 이미지 재인식을 누르세요.';
  frame.width=photoSource.width;frame.height=photoSource.height;

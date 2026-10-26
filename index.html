@@ -83,12 +83,8 @@
 <small id="performanceHint">균형 · 보정·OCR 1280px · 전체·6구역 검사 · OCR 워커 1개</small>
 <details id="advanced" class="performance-advanced">
 <summary>고급 설정</summary>
-<label for="ocrSize">촬영 후 OCR 해상도</label>
-<select id="ocrSize">
-<option value="1280" selected>긴 변 최대 1280px</option>
-<option value="1920">긴 변 최대 1920px</option>
-<option value="3200">긴 변 최대 3200px</option>
-</select>
+<label for="ocrSize">촬영 후 OCR 최대 긴 변 (128~3200px)</label>
+<input id="ocrSize" type="number" min="128" max="3200" step="1" value="1280" inputmode="numeric">
 <small>낮추면 보정·OCR 픽셀이 줄지만 작은 글자가 누락될 수 있습니다. 원본보다 키우지 않습니다.</small>
 <output id="ocrInputSize" class="performance-note">이미지를 준비하면 입력 크기를 표시합니다.</output>
 <label for="correctionSize">보정 처리 해상도</label>
@@ -230,13 +226,13 @@
 <dialog id="codeReview" aria-labelledby="reviewTitle" aria-describedby="reviewMessage">
 <form id="reviewForm" novalidate>
 <h2 id="reviewTitle">코드 확인</h2>
-<canvas id="reviewImage" role="img" aria-label="선택한 코드의 원본 이미지"></canvas>
-<small id="reviewPreviewLabel">선택 영역 원본</small>
+<canvas id="reviewImage" role="img" aria-label="전체 OCR 입력에서 자른 이미지"></canvas>
+<small id="reviewPreviewLabel">전체 OCR 입력에서 자른 이미지</small>
 <div class="review-settings">
-<label><input id="reviewCorrection" type="checkbox" checked> 작은 코드 보정</label>
-<label for="reviewScale">확대 <select id="reviewScale"><option value="auto" selected>자동 · 최대 4배</option><option value="2">2배</option><option value="4">4배</option></select></label>
+<label for="reviewScale">배율 <input id="reviewScale" type="number" min="0.1" max="16" step="0.1" placeholder="자동" inputmode="decimal"></label>
+<label for="reviewOcrSize">OCR 최대 긴 변 (px) <input id="reviewOcrSize" type="number" min="128" max="3200" step="1" value="1800" inputmode="numeric"></label>
 </div>
-<small>작은 코드 보정: 확대 후 밝기·대비·인쇄물 보정 적용. 얇은 획 보호를 위해 표선·작은 점·노이즈 제거는 끕니다. 한 줄 OCR·워커 1개·긴 변 최대 1800px로 재인식합니다.</small>
+<small>전체 인식의 보정 이미지에서 잘라 배율만 조절하며 추가 보정은 하지 않습니다. 배율은 0.1~16배, 빈칸은 자동(최대 4배)입니다. OCR 최대 긴 변(128~3200px)이 배율보다 우선합니다.</small>
 <p id="reviewMessage" role="status" aria-live="polite"></p>
 <label for="reviewInput">품목코드 직접 입력</label>
 <input id="reviewInput" type="text" placeholder="AB12-A00345" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="done" autofocus>

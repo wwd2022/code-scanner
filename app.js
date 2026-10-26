@@ -23,7 +23,7 @@ function closeTools(except=null){
 // 이전 인식 결과와 사진 확대 상태를 초기화한다.
 function switchTab(tab){
  if(busy||starting||activeTab===tab)return;
- stopCamera();scanEpoch++;activeTab=tab;photoReady=false;frozenMode=false;
+ stopCamera();clearReviewSource();scanEpoch++;activeTab=tab;photoReady=false;frozenMode=false;
  setPhotoZoom(1);imageViewport.classList.remove('camera-shot');imageViewport.scrollLeft=0;imageViewport.scrollTop=0;closeTools();zoomLevel.hidden=true;zoomHint.hidden=true;
  detectedHits=[];boxes.hidden=false;document.getElementById('boxVisibility').hidden=true;boxes.replaceChildren();raw.textContent='';scanStats.textContent='';
  tabButtons.forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.tab===tab)));
@@ -385,7 +385,7 @@ liveView.addEventListener('dblclick',()=>{if(activeTab==='camera'&&!stream&&!sta
 // 인식·박스·테스트 입력값을 기기에 저장한다. (세이브 세팅스)
 // 같은 주소와 브라우저에서 재접속하면 마지막 설정을 복원한다.
 const settingsKey='code-scanner.settings.v1';
-const settingsFields=[...document.querySelectorAll('#settingsDrawer input[id],#settingsDrawer select[id],#testControls input[id],#testControls select[id],#reviewForm input[type=checkbox][id],#reviewForm select[id]')];
+const settingsFields=[...document.querySelectorAll('#settingsDrawer input[id],#settingsDrawer select[id],#testControls input[id],#testControls select[id],#reviewForm input[type=number][id],#reviewForm select[id]')];
 let settingsSaveTimer=0,settingsDirty=false;
 // 연속 입력은 마지막 값만 저장하고 페이지를 떠날 때 마무리한다.
 function queueSettingsSave(){
@@ -640,7 +640,7 @@ function updateOcrInputSize(){
  }
  const output=document.getElementById('ocrInputSize');
  if(!width||!height){output.value='이미지를 준비하면 입력 크기를 표시합니다.';return;}
- const scale=Math.min(1,Number(ocrSize.value)/Math.max(width,height));
+ const scale=Math.min(1,Math.round(readNumericSetting(ocrSize,1280))/Math.max(width,height));
  const correctionScale=hasImageCorrection(getCorrectionSettings())?Math.min(scale,(Number(correctionSize.value)||Infinity)/Math.max(width,height)):scale;
  const correctionPixels=Math.max(1,Math.round(width*correctionScale))+'×'+Math.max(1,Math.round(height*correctionScale));
  output.value='다음 입력 예상: '+Math.max(1,Math.round(width*scale))+'×'+Math.max(1,Math.round(height*scale))+'px · 보정 '+correctionPixels+'px · 추가 확대 최대 2배';
@@ -685,3 +685,14 @@ window.addEventListener('pagehide',()=>{
  runOcrSession(async()=>{await trimOcrWorkers(0);releaseCorrectionWorker();}).catch(()=>{});
 });
 refreshPerformanceSettings();
+
+// 숫자 입력을 마친 뒤 범위를 적용하고 기존 설정 저장에 반영한다.
+for(const [id,fallback] of [['ocrSize',1280],['reviewScale',1],['reviewOcrSize',1800]]){
+ const input=document.getElementById(id);
+ input.addEventListener('change',()=>{
+  if(id==='reviewScale'&&!input.value.trim())return;
+  const value=readNumericSetting(input,fallback);
+  input.value=id==='reviewScale'?value:Math.round(value);
+  queueSettingsSave();
+ });
+}

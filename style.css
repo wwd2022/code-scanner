@@ -148,3 +148,6 @@ button:disabled{opacity:.45;cursor:default}button:focus-visible,input:focus-visi
 .review-settings label{display:flex;align-items:center;gap:6px}
 .review-settings select{padding:6px;min-height:36px}
 #reviewForm small{color:#647182;font-size:11px;line-height:1.4}
+
+.review-settings input[type=number]{width:88px;padding:6px;min-height:36px}
+#ocrSize{width:100%;padding:7px;min-height:38px}

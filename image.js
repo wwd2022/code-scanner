@@ -143,17 +143,17 @@ function applyCorrection(image,settings,prepared=null){
 }
 
 // 낮은 해상도는 먼저 축소한 뒤 보정해 픽셀 연산도 줄인다.
-// 전체 검사는 보정 후 확대하고, 작은 코드 재검사는 확대 후 보정한다.
+// 보정 결과만 확대하고 실제 좌표 배율을 반환한다.
 async function renderScanPass(source,pass,settings){
  const correctionEdge=hasImageCorrection(settings)?settings.correctionMaxEdge||Infinity:Infinity;
- const workingScale=Math.min(settings.correctAfterUpscale?pass.scale:1,pass.scale,correctionEdge/Math.max(pass.width,pass.height));
+ const workingScale=Math.min(1,pass.scale,correctionEdge/Math.max(pass.width,pass.height));
  const image=document.createElement('canvas');
  image.width=Math.max(1,Math.round(pass.width*workingScale));image.height=Math.max(1,Math.round(pass.height*workingScale));
  const ctx=image.getContext('2d',{willReadFrequently:true});
  ctx.drawImage(source,pass.x,pass.y,pass.width,pass.height,0,0,image.width,image.height);
  // 잘라낸 영역도 전체 이미지의 기준 배율을 유지한다.
  const actualScale=Math.min(image.width/pass.width,image.height/pass.height);
- const pixelScale=settings.reviewGlyphHeight?Math.max(.5,settings.reviewGlyphHeight*actualScale/32):(settings.referenceEdge||Math.max(source.width,source.height))/correctionReferenceEdge*actualScale;
+ const pixelScale=(settings.referenceEdge||Math.max(source.width,source.height))/correctionReferenceEdge*actualScale;
  let correctionPath;
  try{correctionPath=await correctCanvas(image,{...settings,pixelScale});}
  catch(error){image.width=image.height=1;throw error;}
@@ -197,7 +197,7 @@ function reduceScreenNoise(image,amount){
 // 모든 입력 모드에서 현재 보정값을 같은 형식으로 읽는다.
 // 미리보기·전체 인식·부분 재인식의 설정 누락을 막는다.
 function getCorrectionSettings(referenceEdge=0){
- return {referenceEdge,ocrMaxEdge:Number(ocrSize.value),correctionMaxEdge:Number(correctionSize.value),acceleration:preprocessAcceleration.value,ocrWorkers:Number(workerCount.value),removeSpecks:removeSpecks.checked,speckArea:Number(speckArea.value),speckThreshold:Number(speckThreshold.value),screenNoise:Number(screenNoise.value),mode:filterMode.value,brightness:Number(brightness.value),strength:Number(strength.value),threshold:Number(threshold.value),removeLines:removeLines.checked};
+ return {referenceEdge,ocrMaxEdge:Math.round(readNumericSetting(ocrSize,1280)),correctionMaxEdge:Number(correctionSize.value),acceleration:preprocessAcceleration.value,ocrWorkers:Number(workerCount.value),removeSpecks:removeSpecks.checked,speckArea:Number(speckArea.value),speckThreshold:Number(speckThreshold.value),screenNoise:Number(screenNoise.value),mode:filterMode.value,brightness:Number(brightness.value),strength:Number(strength.value),threshold:Number(threshold.value),removeLines:removeLines.checked};
 }
 
 // 대각선을 포함해 연결된 검은 영역 중 지정 면적 이하만 지운다.
@@ -288,3 +288,8 @@ async function correctCanvas(canvas,settings){
  return '화면 스레드 · 대체 처리';
 }
 
+
+function readNumericSetting(input,fallback){
+ const value=input.valueAsNumber;
+ return Number.isFinite(value)?Math.max(Number(input.min),Math.min(Number(input.max),value)):fallback;
+}

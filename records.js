@@ -79,15 +79,16 @@ const reviewImage=document.getElementById('reviewImage'),reviewMessage=document.
 const reviewCandidates=document.getElementById('reviewCandidates');
 let reviewHit=null,reviewCrop=null,reviewRunning=false;
 
-// 선택한 코드 주변의 원본을 잘라 확인 창에 표시한다.
-// 카메라·사진·테스트에서 같은 원본 좌표와 팝업을 사용한다.
+// 전체 인식의 보정 영상에서 자른 코드를 확인 창에 표시한다.
 function openCodeReview(hit){
  if(busy||starting||codeReview.open)return;
- reviewHit=hit;reviewCrop=cropReviewRegion(hit);
+ const crop=cropReviewRegion(hit);
+ if(!crop){status.textContent='전체 인식을 다시 실행한 뒤 코드를 선택하세요.';return;}
+ reviewHit=hit;reviewCrop=crop;
  reviewImage.width=reviewCrop.image.width;reviewImage.height=reviewCrop.image.height;
  reviewImage.getContext('2d').drawImage(reviewCrop.image,0,0);
- reviewImage.setAttribute('aria-label','선택 영역 원본 · 흰 여백 포함');
- document.getElementById('reviewPreviewLabel').textContent='선택 영역 원본';
+ reviewImage.setAttribute('aria-label','전체 OCR 보정 영상에서 자른 코드 · 흰 여백 포함');
+ document.getElementById('reviewPreviewLabel').textContent='전체 OCR 입력에서 자른 이미지';
  reviewInput.value=hit.code;showReviewCandidates(hit.alternatives||[]);
  reviewMessage.textContent='사진과 비교해 직접 입력하거나 재인식하세요.';
  closeTools();codeReview.showModal();
@@ -117,7 +118,7 @@ async function retryCodeReview(){
    if(reviewHit!==target||!codeReview.open)return;
    reviewImage.width=image.width;reviewImage.height=image.height;
    reviewImage.getContext('2d').drawImage(image,0,0);
-   const description='실제 OCR 입력 · 보정 '+(document.getElementById('reviewCorrection').checked?'ON':'OFF')+' · '+image.width+'×'+image.height+'px';
+   const description='실제 OCR 입력 · 기존 보정 유지 · '+image.width+'×'+image.height+'px';
    reviewImage.setAttribute('aria-label',description);document.getElementById('reviewPreviewLabel').textContent=description;
   });
   if(reviewHit!==target||!codeReview.open)return;
