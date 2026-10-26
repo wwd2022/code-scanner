@@ -19,6 +19,7 @@ async function trimOcrWorkers(limit){
 
 // 각 워커에 같은 언어·사전·문자 설정을 적용해 재사용한다.
 async function prepareOcrWorkers(limit,jobs,isCurrent){
+ limit=Math.max(1,Math.min(4,Number(limit)||1));
  if(!window.Tesseract)throw new Error('OCR 라이브러리 로딩 실패. 인터넷 연결 후 새로고침하세요.');
  await trimOcrWorkers(limit);
  const needed=Math.min(limit,jobs);
@@ -173,7 +174,7 @@ async function scanCamera(){
   appendScanRaw('전체·분리 검사',result.text,false);
   detectedHits=result.hits;
   document.getElementById('scanSingleCount').value=detectedHits.length+'곳 · OCR '+result.attempts+'회'+(result.errors.length?' · 실패 '+result.errors.length+'회':'');
-  showScanResults(detectedHits,area,['보정 기준 '+result.resolution,...result.stats],((performance.now()-started)/1000).toFixed(1),result.errors.length);
+  showScanResults(detectedHits,area,['보정 '+result.correctionResolution+' → 입력 '+result.resolution,...result.stats],((performance.now()-started)/1000).toFixed(1),result.errors.length);
   showPerformanceResult({...result,captureMs,liveWaitMs,totalMs:performance.now()-started,preset,source:activeTab,imageRevision,area});
  }catch(error){
   if(error.name==='AbortError'||!isCurrent()){
@@ -220,8 +221,8 @@ async function recognizeCorrected(source,settings,area=null,scale=1,onPrepared=n
    if(onPrepared)onPrepared(rendered.image,pass);
    const regions=createOcrRegions(rendered.image.width,rendered.image.height,stages,maxEdge);
    const resolution=rendered.image.width+'×'+rendered.image.height;
-   if(stages)document.getElementById('ocrInputSize').value='이번 보정 기준: '+resolution+'px · 실제 OCR 입력은 단계별로 표시';
-   if(stages)status.textContent='OCR 워커 준비 중…';
+   if(stages)document.getElementById('ocrInputSize').value='보정 '+rendered.correctionResolution+'px → OCR 기준 '+resolution+'px';
+   if(stages){status.textContent='OCR 워커 준비 중…';document.getElementById('accelerationStatus').value='최근 경로: '+rendered.correctionPath;}
    if(context.run)context.run.phase='OCR 워커 준비';
    const workerStart=performance.now();
    const pool=await prepareOcrWorkers(settings.ocrWorkers||1,regions.length,isCurrent);entries=pool.entries;
@@ -305,7 +306,7 @@ async function recognizeCorrected(source,settings,area=null,scale=1,onPrepared=n
    if(!groups.some(Boolean))throw new Error(errors.join(' / ')||'검사할 영역이 없습니다.');
    const mergeStart=performance.now(),hits=mergeHits(groups.filter(Boolean)),mergeMs=performance.now()-mergeStart;
    const completed=stageStats.filter(Boolean);
-   return {hits,text:texts.filter(Boolean).join('\n\n'),stats:completed.map(item=>item.name+' '+item.width+'×'+item.height+' · '+item.count+'곳'),errors,attempts,resolution,stageStats:completed,queueMs,prepMs,workersMs,ocrMs,mergeMs,usedWorkers:entries.length,warning:pool.warning,correctionPath:rendered.correctionPath};
+   return {hits,text:texts.filter(Boolean).join('\n\n'),stats:completed.map(item=>item.name+' '+item.width+'×'+item.height+' · '+item.count+'곳'),errors,attempts,resolution,stageStats:completed,queueMs,prepMs,workersMs,ocrMs,mergeMs,usedWorkers:entries.length,warning:pool.warning,correctionPath:rendered.correctionPath,correctionResolution:rendered.correctionResolution};
   }finally{
    if(rendered)rendered.image.width=rendered.image.height=1;
    for(const entry of entries){

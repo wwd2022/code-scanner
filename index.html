@@ -80,17 +80,24 @@
 <button type="button" data-performance-preset="fast" aria-pressed="false">고성능</button>
 <button type="button" data-performance-preset="custom" aria-pressed="false">사용자 설정</button>
 </div>
-<small id="performanceHint">균형 · 기존 해상도와 전체·6구역 검사 유지 · OCR 워커 1개</small>
+<small id="performanceHint">균형 · 보정·OCR 1280px · 전체·6구역 검사 · OCR 워커 1개</small>
 <details id="advanced" class="performance-advanced">
 <summary>고급 설정</summary>
 <label for="ocrSize">촬영 후 OCR 해상도</label>
 <select id="ocrSize">
-<option value="1280">긴 변 최대 1280px</option>
+<option value="1280" selected>긴 변 최대 1280px</option>
 <option value="1920">긴 변 최대 1920px</option>
-<option value="3200" selected>긴 변 최대 3200px</option>
+<option value="3200">긴 변 최대 3200px</option>
 </select>
 <small>낮추면 보정·OCR 픽셀이 줄지만 작은 글자가 누락될 수 있습니다. 원본보다 키우지 않습니다.</small>
 <output id="ocrInputSize" class="performance-note">이미지를 준비하면 입력 크기를 표시합니다.</output>
+<label for="correctionSize">보정 처리 해상도</label>
+<select id="correctionSize"><option value="1280" selected>1280px 기준</option><option value="1920">1920px 기준</option><option value="0">OCR 입력 기준 · 기존 방식</option></select>
+<small>보정을 이 크기 이하에서 수행한 뒤 OCR 설정 크기로 맞춥니다. 높은 OCR 해상도로 되돌려도 축소한 세부 정보가 복구되지는 않습니다. 필터를 모두 끄면 원본 픽셀을 유지합니다.</small>
+<label for="preprocessAcceleration">OCR 보정 하드웨어 가속</label>
+<select id="preprocessAcceleration"><option value="auto" selected>자동 · WebGL2 우선</option><option value="cpu">CPU 워커</option></select>
+<small>노이즈·밝기·대비·인쇄물 흐림을 WebGL2로 처리합니다. 초기 준비와 픽셀 전송 비용이 있으며 이진화·표선·작은 영역 제거는 CPU가 처리합니다. 미지원·오류 시 CPU로 전환합니다.</small>
+<output id="accelerationStatus" class="performance-note">최근 경로: 인식 후 표시 · 실제 GPU 선택은 브라우저가 결정합니다.</output>
 <label class="inline-label"><input id="liveOcr" type="checkbox" checked> 실시간 OCR</label>
 <small>촬영 전 빨간 점 검사입니다. 끄면 미리보기만 유지합니다. 촬영 후 인식과 동시에 실행하지 않습니다.</small>
 <label for="liveInterval">실시간 검사 간격</label>
@@ -100,8 +107,8 @@
 <select id="liveSize"><option value="960">긴 변 최대 960px</option><option value="1280">긴 변 최대 1280px</option><option value="2200" selected>긴 변 최대 2200px</option></select>
 <small>촬영 후 해상도와 별개입니다. 낮추면 실시간 검사가 가벼워지지만 작은 코드 감지가 줄 수 있습니다.</small>
 <label for="workerCount">OCR 워커 수</label>
-<select id="workerCount"><option value="1" selected>1개 · 순차 처리</option><option value="2">2개 · 독립 영역 병렬 처리</option></select>
-<small>2개는 전체·확대 구역을 큐로 나눕니다. 워커별 엔진 메모리가 추가되며 단일 영역은 1개만 사용합니다. 변경은 현재 작업 후 적용됩니다.</small>
+<select id="workerCount"><option value="1" selected>1개 · 순차 처리</option><option value="2">2개 · 독립 영역 병렬 처리</option><option value="4">4개 · 독립 영역 병렬 처리</option></select>
+<small>2·4개는 전체·확대 구역을 큐로 나눕니다. 워커별 엔진 메모리가 추가되며 단일 영역은 1개만 사용합니다. 변경은 현재 작업 후 적용됩니다.</small>
 <label for="previewQuality">보정 미리보기 품질</label>
 <select id="previewQuality"><option value="low" selected>낮음 · 최대 640px</option><option value="standard">기본 · 최대 960px</option></select>
 <small>표시용 보정에만 적용합니다. OCR 입력과 별개이며 높이면 화면 갱신 비용이 늘어납니다.</small>

@@ -80,16 +80,19 @@ function updatePreview(){
 // 공간 보정값은 전체 이미지의 긴 변 2200px 기준이다.
 const correctionReferenceEdge=2200;
 // 주변 밝기와 긴 표 선의 처리 범위를 해상도에 맞춘다.
-function printFilter(image,offset=16,cleanLines=true,pixelScale=1){
- const {width:w,height:h,data}=image,n=w*h,gray=new Uint8Array(n),blur=new Uint8Array(n);
+function printFilter(image,offset=16,cleanLines=true,pixelScale=1,preparedBlur=null){
+ const {width:w,height:h,data}=image,n=w*h,blur=preparedBlur||new Uint8Array(n);
  const radius=Math.max(1,Math.round(25*pixelScale));
- for(let i=0;i<n;i++)gray[i]=Math.round(data[i*4]*.299+data[i*4+1]*.587+data[i*4+2]*.114);
- for(let y=0;y<h;y++)for(let x=0;x<w;x++){
-  let sum=0;
-  for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
-   sum+=gray[Math.max(0,Math.min(h-1,y+dy))*w+Math.max(0,Math.min(w-1,x+dx))]*(dy===0?2:1)*(dx===0?2:1);
+ if(!preparedBlur){
+  const gray=new Uint8Array(n);
+  for(let i=0;i<n;i++)gray[i]=Math.round(data[i*4]*.299+data[i*4+1]*.587+data[i*4+2]*.114);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+   let sum=0;
+   for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+    sum+=gray[Math.max(0,Math.min(h-1,y+dy))*w+Math.max(0,Math.min(w-1,x+dx))]*(dy===0?2:1)*(dx===0?2:1);
+   }
+   blur[y*w+x]=Math.round(sum/16);
   }
-  blur[y*w+x]=Math.round(sum/16);
  }
  const stride=w+1,integral=new Float64Array(stride*(h+1)),mask=new Uint8Array(n);
  for(let y=0;y<h;y++){
@@ -126,11 +129,13 @@ function printFilter(image,offset=16,cleanLines=true,pixelScale=1){
 
 // 모니터 노이즈·밝기·대비·인쇄물 보정을 차례로 적용한다. (어플라이 코렉션)
 // 미리보기와 모든 OCR 입력에서 같은 필터를 사용한다.
-function applyCorrection(image,settings){
- if(settings.screenNoise)reduceScreenNoise(image,settings.screenNoise);
- if(settings.brightness)for(let i=0;i<image.data.length;i+=4)for(let c=0;c<3;c++)image.data[i+c]+=settings.brightness;
- applyFilter(image.data,settings.strength);
- if(settings.mode==='print')printFilter(image,settings.threshold,settings.removeLines,settings.pixelScale??1);
+function applyCorrection(image,settings,prepared=null){
+ if(!prepared){
+  if(settings.screenNoise)reduceScreenNoise(image,settings.screenNoise);
+  if(settings.brightness)for(let i=0;i<image.data.length;i+=4)for(let c=0;c<3;c++)image.data[i+c]+=settings.brightness;
+  applyFilter(image.data,settings.strength);
+ }
+ if(settings.mode==='print')printFilter(image,settings.threshold,settings.removeLines,settings.pixelScale??1,prepared?.blur);
  if(settings.removeSpecks){
   const area=Math.floor(settings.speckArea*(settings.pixelScale??1)**2);
   if(area>0)removeSmallDarkRegions(image,area,settings.speckThreshold);
@@ -140,7 +145,8 @@ function applyCorrection(image,settings){
 // 낮은 해상도는 먼저 축소한 뒤 보정해 픽셀 연산도 줄인다.
 // 확대 시에는 보정을 한 번 적용한 결과만 확대하고 실제 좌표 배율을 반환한다.
 async function renderScanPass(source,pass,settings){
- const workingScale=Math.min(1,pass.scale);
+ const correctionEdge=hasImageCorrection(settings)?settings.correctionMaxEdge||Infinity:Infinity;
+ const workingScale=Math.min(1,pass.scale,correctionEdge/Math.max(pass.width,pass.height));
  const image=document.createElement('canvas');
  image.width=Math.max(1,Math.round(pass.width*workingScale));image.height=Math.max(1,Math.round(pass.height*workingScale));
  const ctx=image.getContext('2d',{willReadFrequently:true});
@@ -150,12 +156,15 @@ async function renderScanPass(source,pass,settings){
  let correctionPath;
  try{correctionPath=await correctCanvas(image,{...settings,pixelScale});}
  catch(error){image.width=image.height=1;throw error;}
- if(pass.scale<=1)return {image,scaleX:image.width/pass.width,scaleY:image.height/pass.height,correctionPath};
+ const correctionResolution=image.width+'×'+image.height;
+ const targetWidth=Math.max(1,Math.round(pass.width*pass.scale)),targetHeight=Math.max(1,Math.round(pass.height*pass.scale));
+ if(image.width===targetWidth&&image.height===targetHeight)return {image,scaleX:image.width/pass.width,scaleY:image.height/pass.height,correctionPath,correctionResolution};
  const output=document.createElement('canvas');
- output.width=Math.max(1,Math.round(pass.width*pass.scale));output.height=Math.max(1,Math.round(pass.height*pass.scale));
- output.getContext('2d').drawImage(image,0,0,output.width,output.height);
+ output.width=targetWidth;output.height=targetHeight;
+ const outputCtx=output.getContext('2d');outputCtx.imageSmoothingQuality='high';
+ outputCtx.drawImage(image,0,0,output.width,output.height);
  image.width=image.height=1;
- return {image:output,scaleX:output.width/pass.width,scaleY:output.height/pass.height,correctionPath};
+ return {image:output,scaleX:output.width/pass.width,scaleY:output.height/pass.height,correctionPath,correctionResolution};
 }
 
 // 확대 구역의 박스를 원본 사진 위치로 변환한다. (맵 스캔 히츠)
@@ -187,7 +196,7 @@ function reduceScreenNoise(image,amount){
 // 모든 입력 모드에서 현재 보정값을 같은 형식으로 읽는다.
 // 미리보기·전체 인식·부분 재인식의 설정 누락을 막는다.
 function getCorrectionSettings(referenceEdge=0){
- return {referenceEdge,ocrMaxEdge:Number(ocrSize.value),ocrWorkers:Number(workerCount.value),removeSpecks:removeSpecks.checked,speckArea:Number(speckArea.value),speckThreshold:Number(speckThreshold.value),screenNoise:Number(screenNoise.value),mode:filterMode.value,brightness:Number(brightness.value),strength:Number(strength.value),threshold:Number(threshold.value),removeLines:removeLines.checked};
+ return {referenceEdge,ocrMaxEdge:Number(ocrSize.value),correctionMaxEdge:Number(correctionSize.value),acceleration:preprocessAcceleration.value,ocrWorkers:Number(workerCount.value),removeSpecks:removeSpecks.checked,speckArea:Number(speckArea.value),speckThreshold:Number(speckThreshold.value),screenNoise:Number(screenNoise.value),mode:filterMode.value,brightness:Number(brightness.value),strength:Number(strength.value),threshold:Number(threshold.value),removeLines:removeLines.checked};
 }
 
 // 대각선을 포함해 연결된 검은 영역 중 지정 면적 이하만 지운다.
@@ -241,7 +250,7 @@ function getCorrectionWorker(){
    if(!request)return;
    correctionRequests.delete(message.id);
    if(message.error)request.reject(new Error(message.error));
-   else request.resolve(message.buffer);
+   else request.resolve(message);
   };
   const fail=event=>{event.preventDefault?.();correctionWorkerFailed=true;releaseCorrectionWorker();};
   created.onerror=fail;created.onmessageerror=fail;
@@ -249,9 +258,12 @@ function getCorrectionWorker(){
  }catch(error){correctionWorkerFailed=true;return null;}
 }
 
+function hasImageCorrection(settings){
+ return !!(settings.screenNoise||settings.brightness||settings.strength||settings.mode==='print'||settings.removeSpecks);
+}
 // 전송 실패 시 원본 픽셀을 다시 읽어 같은 필터로 처리한다.
 async function correctCanvas(canvas,settings){
- if(!settings.screenNoise&&!settings.brightness&&!settings.strength&&settings.mode!=='print'&&!settings.removeSpecks)return '원본';
+ if(!hasImageCorrection(settings))return '원본';
  const ctx=canvas.getContext('2d',{willReadFrequently:true});
  const width=canvas.width,height=canvas.height;
  let pixels=ctx.getImageData(0,0,width,height);
@@ -259,13 +271,13 @@ async function correctCanvas(canvas,settings){
  if(target){
   const id=++correctionRequestId;
   try{
-   const buffer=await new Promise((resolve,reject)=>{
+   const result=await new Promise((resolve,reject)=>{
     correctionRequests.set(id,{resolve,reject});
     try{target.postMessage({id,width,height,buffer:pixels.data.buffer,settings},[pixels.data.buffer]);}
     catch(error){correctionRequests.delete(id);reject(error);}
    });
-   ctx.putImageData(new ImageData(new Uint8ClampedArray(buffer),width,height),0,0);
-   return '보정 워커';
+   ctx.putImageData(new ImageData(new Uint8ClampedArray(result.buffer),width,height),0,0);
+   return result.path;
   }catch(error){
    correctionWorkerFailed=true;releaseCorrectionWorker();
    pixels=ctx.getImageData(0,0,width,height);

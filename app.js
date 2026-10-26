@@ -570,17 +570,17 @@ function updateSpeckOutputs(){
 
 window.addEventListener('resize',updateDesignPreview);
 
-// 프리셋은 해상도·검사 단계를 유지하고 자원 배분을 바꾼다.
+// 1280px 보정을 기준으로 자원 배분을 바꾸고 기존 캐시는 유지한다.
 const performanceProfiles={
- power:{ocrSize:'3200',liveOcr:false,liveInterval:'2000',liveSize:'960',workerCount:'1',deepScan:true,previewQuality:'low'},
- balanced:{ocrSize:'3200',liveOcr:true,liveInterval:'600',liveSize:'2200',workerCount:'1',deepScan:true,previewQuality:'low'},
- fast:{ocrSize:'3200',liveOcr:true,liveInterval:'1200',liveSize:'1280',workerCount:'2',deepScan:true,previewQuality:'low'}
+ power:{ocrSize:'1280',correctionSize:'1280',preprocessAcceleration:'cpu',liveOcr:false,liveInterval:'2000',liveSize:'960',workerCount:'1',deepScan:true,previewQuality:'low'},
+ balanced:{ocrSize:'1280',correctionSize:'1280',preprocessAcceleration:'auto',liveOcr:true,liveInterval:'600',liveSize:'2200',workerCount:'1',deepScan:true,previewQuality:'low'},
+ fast:{ocrSize:'1280',correctionSize:'1280',preprocessAcceleration:'auto',liveOcr:true,liveInterval:'1200',liveSize:'1280',workerCount:'4',deepScan:true,previewQuality:'low'}
 };
 const performanceLabels={power:'절전',balanced:'균형',fast:'고성능',custom:'사용자 설정'};
 const performanceDescriptions={
- power:'촬영 후 해상도·전체·6구역 검사 유지 · 실시간 OCR 끄기 · 워커 1개',
- balanced:'기존 해상도·전체·6구역 검사 유지 · 실시간 600ms · 워커 1개',
- fast:'촬영 후 해상도·전체·6구역 검사 유지 · 워커 2개 · 촬영 전 검사는 1280px·1200ms',
+ power:'보정·OCR 1280px · 전체·6구역 검사 · 실시간 끄기 · CPU 보정 · 워커 1개',
+ balanced:'보정·OCR 1280px · 전체·6구역 검사 · 실시간 600ms · WebGL2 우선 · 워커 1개',
+ fast:'보정·OCR 1280px · 전체·6구역 검사 · 워커 4개 · WebGL2 우선 · 실시간 1280px·1200ms',
  custom:'직접 선택한 값 적용 · 촬영 후 검사와 실시간 검사는 자원을 나눠 사용합니다.'
 };
 function syncPerformanceInputs(locked=busy||starting){
@@ -641,7 +641,9 @@ function updateOcrInputSize(){
  const output=document.getElementById('ocrInputSize');
  if(!width||!height){output.value='이미지를 준비하면 입력 크기를 표시합니다.';return;}
  const scale=Math.min(1,Number(ocrSize.value)/Math.max(width,height));
- output.value='다음 입력 예상: '+Math.max(1,Math.round(width*scale))+'×'+Math.max(1,Math.round(height*scale))+'px · 추가 확대 최대 2배·2000px 기준, 이미 큰 구역은 원래 픽셀 유지';
+ const correctionScale=hasImageCorrection(getCorrectionSettings())?Math.min(scale,(Number(correctionSize.value)||Infinity)/Math.max(width,height)):scale;
+ const correctionPixels=Math.max(1,Math.round(width*correctionScale))+'×'+Math.max(1,Math.round(height*correctionScale));
+ output.value='다음 입력 예상: '+Math.max(1,Math.round(width*scale))+'×'+Math.max(1,Math.round(height*scale))+'px · 보정 '+correctionPixels+'px · 추가 확대 최대 2배';
 }
 
 // 벽시계 경과와 병렬 영역 시간을 나누고 같은 이미지의 최근 두 회만 보관한다.
@@ -650,9 +652,10 @@ function showPerformanceResult(result){
  const seconds=ms=>(ms/1000).toFixed(2)+'초';
  const unique=new Set(result.hits.map(hit=>hit.code)).size;
  const inputSizes=[...new Set(result.stageStats.map(stage=>stage.width+'×'+stage.height))].join(' / ');
- const summary=seconds(result.totalMs)+' · 입력 '+inputSizes+' · OCR 워커 '+result.usedWorkers+'개 · 중복 제거 '+result.hits.length+'곳 / '+unique+'종';
+ const summary=seconds(result.totalMs)+' · 보정 '+result.correctionResolution+' → 입력 '+inputSizes+' · OCR 워커 '+result.usedWorkers+'개 · 중복 제거 '+result.hits.length+'곳 / '+unique+'종';
  const brief=document.getElementById('recognitionSummary');brief.hidden=false;brief.value='최근: '+summary;
- document.getElementById('ocrInputSize').value='최근 실제 OCR 입력: '+inputSizes+'px';
+ document.getElementById('ocrInputSize').value='최근 보정 '+result.correctionResolution+'px → OCR '+inputSizes+'px';
+ document.getElementById('accelerationStatus').value='최근 경로: '+result.correctionPath;
  document.getElementById('scanSummary').hidden=false;
  document.getElementById('performanceReport').hidden=false;
  document.getElementById('performanceTotal').textContent=performanceLabels[result.preset]+' · '+summary+(result.warning?' · '+result.warning:'');
@@ -669,7 +672,7 @@ function showPerformanceResult(result){
  if(result.source==='test'){
   const areaKey=JSON.stringify(result.area);
   recentPerformance=recentPerformance.filter(item=>item.revision===result.imageRevision&&item.areaKey===areaKey).slice(-1);
-  recentPerformance.push({revision:result.imageRevision,areaKey,text:performanceLabels[result.preset]+' · '+summary});
+  recentPerformance.push({revision:result.imageRevision,areaKey,text:performanceLabels[result.preset]+' · '+result.correctionPath+' · '+summary});
   document.getElementById('testPerformance').value=recentPerformance.map((item,index)=>(recentPerformance.length===2&&index===0?'이전: ':'최근: ')+item.text).join('\n');
  }
 }
