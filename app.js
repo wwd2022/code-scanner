@@ -122,18 +122,24 @@ function updateDesignPreview(){
  placeLabel(document.getElementById('previewCodeBox'),anchor,codeDirectionIndex===null?-Math.PI/2:(codeDirectionIndex-4)*Math.PI/8,width,height);
  placeLabel(document.getElementById('previewPlaceBox'),anchor,(locationDirectionIndex-4)*Math.PI/8,width,height);
 }
+// 배경색의 알파만 바꿔 글자와 독립적으로 표시한다.
+function boxBackground(color,opacity){
+ const value=parseInt(color.slice(1),16);
+ return 'rgba('+[(value>>16)&255,(value>>8)&255,value&255,opacity/100].join(',')+')';
+}
 function updateBoxStyle(){
  for(const type of ['code','place']){
   const font=document.getElementById(type+'Font').value;
   const size=document.getElementById(type+'Size').value;
   const opacity=document.getElementById(type+'Opacity').value;
   const bg=document.getElementById(type+'Bg').value;
+  const bgOpacity=document.getElementById(type+'BgOpacity').value;
   const color=document.getElementById(type+'Color').value;
   const border=document.getElementById(type+'Border').value;
   boxes.style.setProperty('--'+type+'-font',font);
   boxes.style.setProperty('--'+type+'-size',size+'px');
-  boxes.style.setProperty('--'+type+'-opacity',opacity/100);
-  boxes.style.setProperty('--'+type+'-bg',bg);
+  boxes.style.setProperty('--'+type+'-text-opacity',opacity/100);
+  boxes.style.setProperty('--'+type+'-bg',boxBackground(bg,bgOpacity));
   boxes.style.setProperty('--'+type+'-color',color);
   boxes.style.setProperty('--'+type+'-border',border);
   const shape=document.getElementById(type+'Shape').value;
@@ -150,6 +156,11 @@ function updateBoxStyle(){
   document.getElementById(type+'PadYValue').value=padY+'%';
   document.getElementById(type+'SizeValue').value=size+'px';
   document.getElementById(type+'OpacityValue').value=opacity+'%';
+  document.getElementById(type+'BgOpacityValue').value=bgOpacity+'%';
+ }
+ for(const group of document.querySelectorAll('.design-choices')){
+  const value=document.getElementById(group.dataset.choiceFor).value;
+  for(const button of group.querySelectorAll('button'))button.setAttribute('aria-pressed',String(button.dataset.value===value));
  }
  if(detectedHits.length)showBoxes(detectedHits);
  updateDesignPreview();
@@ -232,6 +243,11 @@ imageViewport.addEventListener('pointerup',event=>{
 });
 imageViewport.addEventListener('click',event=>{if(event.pointerType!=='touch')toggleBoxes();});
 document.querySelectorAll('.box-style-settings input,.box-style-settings select').forEach(input=>input.addEventListener('input',updateBoxStyle));
+document.querySelectorAll('.design-choices button').forEach(button=>button.addEventListener('click',()=>{
+ const input=document.getElementById(button.parentElement.dataset.choiceFor);
+ input.value=button.dataset.value;
+ input.dispatchEvent(new Event('input',{bubbles:true}));
+}));
 updateBoxStyle();
 excel.addEventListener('change',loadExcel);
 sheet.addEventListener('change',changeSheet);
@@ -406,6 +422,10 @@ function restoreSettings(){
     if(input.type==='color'&&!/^#[0-9a-f]{6}$/i.test(value))continue;
     input.value=value;
    }
+  }
+  // 이전 전체 투명도는 글자·배경에 함께 복원한다.
+  for(const type of ['code','place']){
+   if(values[type+'BgOpacity']===undefined&&typeof values[type+'Opacity']==='string')document.getElementById(type+'BgOpacity').value=document.getElementById(type+'Opacity').value;
   }
   const codeDirection=Number(saved.codeDirection),locationDirection=Number(saved.locationDirection);
   if(saved.codeDirection!=null&&Number.isInteger(codeDirection)&&codeDirection>=0&&codeDirection<16)setCodeDirection(codeDirection,false);

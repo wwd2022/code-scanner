@@ -126,8 +126,8 @@
 <section id="designSettings" aria-label="디자인 조정" hidden>
 <div id="designPreview" role="img" aria-label="코드 AB12-000000, 위치 B999-0301 박스 예시">
 <svg viewBox="0 0 360 160" preserveAspectRatio="none" aria-hidden="true"><rect width="360" height="160" fill="#f7f7f2"/><text x="180" y="88" text-anchor="middle" font-family="monospace" font-size="24" textLength="180" lengthAdjust="spacingAndGlyphs" fill="#222">AB12-000000</text></svg>
-<div id="previewCodeBox" class="code-box">AB12-000000</div>
-<div id="previewPlaceBox" class="location-box">B999-0301</div>
+<div id="previewCodeBox" class="code-box"><span class="box-text">AB12-000000</span></div>
+<div id="previewPlaceBox" class="location-box"><span class="box-text">B999-0301</span></div>
 </div>
 <h3>박스 방향 · 16방향 드래그</h3>
 <div class="direction-row">
@@ -140,29 +140,39 @@
 </div>
 <div class="box-style-settings">
 <h3>코드 박스</h3>
-<label>글꼴 <select id="codeFont"><option value="monospace">고정폭</option><option value="sans-serif">기본</option><option value="serif">명조</option></select></label>
+<label>글꼴<select id="codeFont" hidden><option value="monospace">고정폭</option><option value="sans-serif">기본</option><option value="serif">명조</option></select></label>
+<div class="design-choices" role="group" aria-label="글꼴" data-choice-for="codeFont"><button type="button" data-value="monospace" aria-pressed="true">고정폭</button><button type="button" data-value="sans-serif" aria-pressed="false">기본</button><button type="button" data-value="serif" aria-pressed="false">명조</button></div>
 <label>글자 크기 <input id="codeSize" type="range" min="8" max="32" value="11"> <output id="codeSizeValue">11px</output></label>
-<label>박스 모양 <select id="codeShape"><option value="default">기존</option><option value="square">직각</option><option value="rounded">둥근 사각형</option><option value="pill">캡슐형</option></select></label>
+<label>박스 모양<select id="codeShape" hidden><option value="default">기존</option><option value="square">직각</option><option value="rounded">둥근 사각형</option><option value="pill">캡슐형</option></select></label>
+<div class="design-choices" role="group" aria-label="박스 모양" data-choice-for="codeShape"><button type="button" data-value="default" aria-pressed="true">기존</button><button type="button" data-value="square" aria-pressed="false">직각</button><button type="button" data-value="rounded" aria-pressed="false">둥근 사각형</button><button type="button" data-value="pill" aria-pressed="false">캡슐형</button></div>
 <label>가로 여백 <input id="codePadX" type="range" min="0" max="150" step="1" value="0"> <output id="codePadXValue">0%</output></label>
 <label>세로 여백 <input id="codePadY" type="range" min="0" max="150" step="1" value="0"> <output id="codePadYValue">0%</output></label>
-<label>글자 효과 <select id="codeTextEffect"><option value="default">기존</option><option value="none">없음</option><option value="shadow">그림자</option><option value="outline">외곽선</option><option value="both">그림자 + 외곽선</option></select></label>
+<label>글자 효과<select id="codeTextEffect" hidden><option value="default">기존</option><option value="none">없음</option><option value="shadow">그림자</option><option value="outline">외곽선</option><option value="both">그림자 + 외곽선</option></select></label>
+<div class="design-choices" role="group" aria-label="글자 효과" data-choice-for="codeTextEffect"><button type="button" data-value="default" aria-pressed="true">기존</button><button type="button" data-value="none" aria-pressed="false">없음</button><button type="button" data-value="shadow" aria-pressed="false">그림자</button><button type="button" data-value="outline" aria-pressed="false">외곽선</button><button type="button" data-value="both" aria-pressed="false">그림자 + 외곽선</button></div>
 <label>효과 색상 <input id="codeEffectColor" type="color" value="#ffffff"></label>
-<label>투명도 <input id="codeOpacity" type="range" min="10" max="100" step="5" value="65"> <output id="codeOpacityValue">65%</output></label>
+<label>글자 투명도 <input id="codeOpacity" type="range" min="0" max="100" step="5" value="65"> <output id="codeOpacityValue">65%</output></label>
+<label>배경 투명도 <input id="codeBgOpacity" type="range" min="0" max="100" step="5" value="65"> <output id="codeBgOpacityValue">65%</output></label>
 <label>배경색 <input id="codeBg" type="color" value="#d1eadc"></label>
 <label>글자 색상 <input id="codeColor" type="color" value="#111111"></label>
-<label>테두리 <select id="codeBorder"><option value="solid">실선</option><option value="none">없음</option><option value="dashed">점선</option><option value="dotted">점점선</option><option value="double">이중선</option></select></label>
+<label>테두리<select id="codeBorder" hidden><option value="solid">실선</option><option value="none">없음</option><option value="dashed">점선</option><option value="dotted">점점선</option><option value="double">이중선</option></select></label>
+<div class="design-choices" role="group" aria-label="테두리" data-choice-for="codeBorder"><button type="button" data-value="solid" aria-pressed="true">실선</button><button type="button" data-value="none" aria-pressed="false">없음</button><button type="button" data-value="dashed" aria-pressed="false">점선</button><button type="button" data-value="dotted" aria-pressed="false">점점선</button><button type="button" data-value="double" aria-pressed="false">이중선</button></div>
 <h3>위치 박스</h3>
-<label>글꼴 <select id="placeFont"><option value="sans-serif">기본</option><option value="monospace">고정폭</option><option value="serif">명조</option></select></label>
+<label>글꼴<select id="placeFont" hidden><option value="sans-serif">기본</option><option value="monospace">고정폭</option><option value="serif">명조</option></select></label>
+<div class="design-choices" role="group" aria-label="글꼴" data-choice-for="placeFont"><button type="button" data-value="sans-serif" aria-pressed="true">기본</button><button type="button" data-value="monospace" aria-pressed="false">고정폭</button><button type="button" data-value="serif" aria-pressed="false">명조</button></div>
 <label>글자 크기 <input id="placeSize" type="range" min="8" max="32" value="12"> <output id="placeSizeValue">12px</output></label>
-<label>박스 모양 <select id="placeShape"><option value="default">기존</option><option value="square">직각</option><option value="rounded">둥근 사각형</option><option value="pill">캡슐형</option></select></label>
+<label>박스 모양<select id="placeShape" hidden><option value="default">기존</option><option value="square">직각</option><option value="rounded">둥근 사각형</option><option value="pill">캡슐형</option></select></label>
+<div class="design-choices" role="group" aria-label="박스 모양" data-choice-for="placeShape"><button type="button" data-value="default" aria-pressed="true">기존</button><button type="button" data-value="square" aria-pressed="false">직각</button><button type="button" data-value="rounded" aria-pressed="false">둥근 사각형</button><button type="button" data-value="pill" aria-pressed="false">캡슐형</button></div>
 <label>가로 여백 <input id="placePadX" type="range" min="0" max="150" step="1" value="58"> <output id="placePadXValue">58%</output></label>
 <label>세로 여백 <input id="placePadY" type="range" min="0" max="150" step="1" value="33"> <output id="placePadYValue">33%</output></label>
-<label>글자 효과 <select id="placeTextEffect"><option value="default">기존</option><option value="none">없음</option><option value="shadow">그림자</option><option value="outline">외곽선</option><option value="both">그림자 + 외곽선</option></select></label>
+<label>글자 효과<select id="placeTextEffect" hidden><option value="default">기존</option><option value="none">없음</option><option value="shadow">그림자</option><option value="outline">외곽선</option><option value="both">그림자 + 외곽선</option></select></label>
+<div class="design-choices" role="group" aria-label="글자 효과" data-choice-for="placeTextEffect"><button type="button" data-value="default" aria-pressed="true">기존</button><button type="button" data-value="none" aria-pressed="false">없음</button><button type="button" data-value="shadow" aria-pressed="false">그림자</button><button type="button" data-value="outline" aria-pressed="false">외곽선</button><button type="button" data-value="both" aria-pressed="false">그림자 + 외곽선</button></div>
 <label>효과 색상 <input id="placeEffectColor" type="color" value="#000000"></label>
-<label>투명도 <input id="placeOpacity" type="range" min="10" max="100" step="5" value="100"> <output id="placeOpacityValue">100%</output></label>
+<label>글자 투명도 <input id="placeOpacity" type="range" min="0" max="100" step="5" value="100"> <output id="placeOpacityValue">100%</output></label>
+<label>배경 투명도 <input id="placeBgOpacity" type="range" min="0" max="100" step="5" value="100"> <output id="placeBgOpacityValue">100%</output></label>
 <label>배경색 <input id="placeBg" type="color" value="#202b3c"></label>
 <label>글자 색상 <input id="placeColor" type="color" value="#ffffff"></label>
-<label>테두리 <select id="placeBorder"><option value="none">없음</option><option value="solid">실선</option><option value="dashed">점선</option><option value="dotted">점점선</option><option value="double">이중선</option></select></label>
+<label>테두리<select id="placeBorder" hidden><option value="none">없음</option><option value="solid">실선</option><option value="dashed">점선</option><option value="dotted">점점선</option><option value="double">이중선</option></select></label>
+<div class="design-choices" role="group" aria-label="테두리" data-choice-for="placeBorder"><button type="button" data-value="none" aria-pressed="true">없음</button><button type="button" data-value="solid" aria-pressed="false">실선</button><button type="button" data-value="dashed" aria-pressed="false">점선</button><button type="button" data-value="dotted" aria-pressed="false">점점선</button><button type="button" data-value="double" aria-pressed="false">이중선</button></div>
 </div>
 </section>
 </div>

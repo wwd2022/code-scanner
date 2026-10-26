@@ -122,3 +122,10 @@ button:disabled{opacity:.45;cursor:default}button:focus-visible,input:focus-visi
 
 .code-box{padding:var(--code-pad-y,0em) var(--code-pad-x,0em);border-radius:var(--code-radius,2px);text-shadow:var(--code-text-shadow,0 0 2px #fff,0 0 3px #fff);-webkit-text-stroke:var(--code-text-stroke,0px transparent);paint-order:stroke fill}
 .location-box{padding:var(--place-pad-y,.33em) var(--place-pad-x,.58em);border-radius:var(--place-radius,5px);text-shadow:var(--place-text-shadow,none);-webkit-text-stroke:var(--place-text-stroke,0px transparent);paint-order:stroke fill}
+
+.code-box,.location-box{opacity:1}
+.code-box .box-text{opacity:var(--code-text-opacity,.65)}
+.location-box .box-text{opacity:var(--place-text-opacity,1)}
+.design-choices{display:flex;flex-wrap:wrap;gap:5px;margin:4px 0 12px}
+.design-choices button{min-height:34px;padding:5px 9px;font-size:12px}
+.design-choices button[aria-pressed=true]{background:#273950;color:#fff;border-color:#273950}

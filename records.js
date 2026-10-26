@@ -36,8 +36,11 @@ function showBoxes(hits){
     if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();openCodeReview(hit);}
    });
   }
-  code.textContent=hit.code;code.title=hit.review?'확인 필요: '+hit.code:hit.code;
-  place.className='location-box';place.textContent=location;place.title=hit.code+' / '+location;
+  const codeText=document.createElement('span');codeText.className='box-text';codeText.textContent=hit.code;code.append(codeText);
+  code.title=hit.review?'확인 필요: '+hit.code:hit.code;
+  place.className='location-box';
+  const placeText=document.createElement('span');placeText.className='box-text';placeText.textContent=location;place.append(placeText);
+  place.title=hit.code+' / '+location;
   boxes.append(code,place);
   placeLabel(code,anchor,codeAngle,width,height);
   placeLabel(place,anchor,placeAngle,width,height);
