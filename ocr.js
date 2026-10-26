@@ -196,3 +196,31 @@ async function scanCamera(){
  }catch(error){showScanFailure(error);if(worker){await worker.terminate().catch(()=>{});worker=null;}}
  finally{recognitionStage='';busy=false;showScanEnd();}
 }
+
+// 불확실한 코드 주변을 여백과 함께 원본에서 잘라낸다.
+// 화면 확대율과 관계없이 원본 이미지의 픽셀 좌표를 사용한다.
+function cropReviewRegion(hit){
+ const b=hit.bbox,w=b.x1-b.x0,h=b.y1-b.y0;
+ const x=Math.max(0,Math.floor(b.x0-Math.max(12,w*.08)));
+ const y=Math.max(0,Math.floor(b.y0-Math.max(8,h*.6)));
+ const right=Math.min(originalFrame.width,Math.ceil(b.x1+Math.max(12,w*.08)));
+ const bottom=Math.min(originalFrame.height,Math.ceil(b.y1+Math.max(8,h*.6)));
+ const image=document.createElement('canvas');image.width=Math.max(1,right-x);image.height=Math.max(1,bottom-y);
+ image.getContext('2d').drawImage(originalFrame,x,y,image.width,image.height,0,0,image.width,image.height);
+ return {image,centerX:(b.x0+b.x1)/2-x,centerY:(b.y0+b.y1)/2-y};
+}
+
+// 잘라낸 원본과 보정본을 확대해 공통 OCR로 다시 읽는다.
+// 대상 중심에 가장 가까운 결과와 해당 후보만 반환한다.
+async function recognizeReviewRegion(crop){
+ const settings={mode:filterMode.value,brightness:Number(brightness.value),threshold:Number(threshold.value),removeLines:removeLines.checked,strength:Number(strength.value)};
+ const width=crop.image.width,height=crop.image.height,scale=Math.min(4,1800/Math.max(width,height));
+ const passes=['original',settings.mode].map(mode=>({x:0,y:0,width,height,scale,mode}));
+ const results=await runParallelPasses(passes,settings,crop.image);
+ if(results.every(result=>result.error))throw new Error(results.map(result=>result.error).join(' / '));
+ const hits=mergeHits(results.map(result=>result.hits));
+ const distance=hit=>Math.hypot(((hit.bbox.x0+hit.bbox.x1)/2-crop.centerX)/width,((hit.bbox.y0+hit.bbox.y1)/2-crop.centerY)/height);
+ hits.sort((a,b)=>distance(a)-distance(b));
+ const best=hits[0];
+ return best?[best.code,...best.alternatives]:[];
+}

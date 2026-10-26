@@ -33,6 +33,7 @@
 <label>노이즈 <input id="testNoise" type="range" min="0" max="100" step="10" value="0"><output id="testNoiseValue">0%</output></label>
 <button id="testGenerate" type="button">이미지 생성</button>
 <button id="testExport" type="button">엑셀에서 추출</button>
+<button id="testReview" type="button">코드 확인 UI</button>
 </div>
 <video id="camera" autoplay muted playsinline aria-hidden="true"></video>
 <section id="workspace" aria-label="인식 이미지">
@@ -130,6 +131,21 @@
 </nav>
 <button id="readImage" type="button" disabled>코드 인식</button>
 </main>
+<dialog id="codeReview" aria-labelledby="reviewTitle" aria-describedby="reviewMessage">
+<form id="reviewForm" novalidate>
+<h2 id="reviewTitle">코드 확인</h2>
+<canvas id="reviewImage" role="img" aria-label="선택한 코드의 원본 이미지"></canvas>
+<p id="reviewMessage" role="status" aria-live="polite"></p>
+<label for="reviewInput">품목코드 직접 입력</label>
+<input id="reviewInput" type="text" placeholder="AB12-A00345" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="done" autofocus>
+<div id="reviewCandidates" aria-label="다른 인식 후보"></div>
+<div class="review-actions">
+<button id="reviewRetry" type="button">재인식</button>
+<button id="reviewCancel" type="button">취소</button>
+<button id="reviewApply" type="submit">적용</button>
+</div>
+</form>
+</dialog>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/tesseract.min.js"></script>
 <script src="state.js"></script>

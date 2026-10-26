@@ -91,3 +91,20 @@ button:disabled{opacity:.45;cursor:default}button:focus-visible,input:focus-visi
 .scan-stages>summary{font-weight:600;cursor:pointer}
 .scan-stages output{margin-left:auto;white-space:nowrap;font-size:12px;color:#526275}
 .zoom-stages{padding-left:12px}
+
+.code-box.needs-review{pointer-events:auto;cursor:pointer;touch-action:manipulation;min-height:28px;padding:4px 6px;z-index:2}
+.code-box.needs-review:focus-visible{outline:2px solid #1673d0}
+#codeReview{width:min(420px,calc(100% - 24px));max-height:calc(100dvh - 24px);padding:18px;border:0;border-radius:16px;color:#20262e;background:#fff;overflow:auto;box-shadow:0 16px 60px #101c2b55}
+#codeReview::backdrop{background:#101c2baa}
+#reviewForm{display:flex;flex-direction:column;gap:12px}
+#reviewForm h2{margin:0}
+#reviewImage{display:block;width:100%;height:auto;max-height:180px;object-fit:contain;border:1px solid #dce3ec;border-radius:8px;background:#f4f6f9}
+#reviewMessage{margin:0;color:#566375;font-size:13px;overflow-wrap:anywhere}
+#reviewForm label{font-size:13px;font-weight:600}
+#reviewInput{width:100%;min-height:46px;padding:10px;border:1px solid #b9c6d6;border-radius:8px;font:18px monospace;text-transform:uppercase}
+#reviewCandidates{display:flex;flex-wrap:wrap;gap:6px}
+#reviewCandidates:empty{display:none}
+#reviewCandidates button{min-height:36px;font:13px monospace;padding:6px 8px}
+.review-actions{display:flex;gap:8px}
+.review-actions button{flex:1;min-height:44px}
+#reviewApply{background:#273950;border-color:#273950;color:#fff}
