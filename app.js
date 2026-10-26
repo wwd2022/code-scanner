@@ -385,7 +385,7 @@ liveView.addEventListener('dblclick',()=>{if(activeTab==='camera'&&!stream&&!sta
 // 인식·박스·테스트 입력값을 기기에 저장한다. (세이브 세팅스)
 // 같은 주소와 브라우저에서 재접속하면 마지막 설정을 복원한다.
 const settingsKey='code-scanner.settings.v1';
-const settingsFields=[...document.querySelectorAll('#settingsDrawer input[id],#settingsDrawer select[id],#testControls input[id],#testControls select[id]')];
+const settingsFields=[...document.querySelectorAll('#settingsDrawer input[id],#settingsDrawer select[id],#testControls input[id],#testControls select[id],#reviewForm input[type=checkbox][id],#reviewForm select[id]')];
 let settingsSaveTimer=0,settingsDirty=false;
 // 연속 입력은 마지막 값만 저장하고 페이지를 떠날 때 마무리한다.
 function queueSettingsSave(){

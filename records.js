@@ -86,6 +86,8 @@ function openCodeReview(hit){
  reviewHit=hit;reviewCrop=cropReviewRegion(hit);
  reviewImage.width=reviewCrop.image.width;reviewImage.height=reviewCrop.image.height;
  reviewImage.getContext('2d').drawImage(reviewCrop.image,0,0);
+ reviewImage.setAttribute('aria-label','선택 영역 원본 · 흰 여백 포함');
+ document.getElementById('reviewPreviewLabel').textContent='선택 영역 원본';
  reviewInput.value=hit.code;showReviewCandidates(hit.alternatives||[]);
  reviewMessage.textContent='사진과 비교해 직접 입력하거나 재인식하세요.';
  closeTools();codeReview.showModal();
@@ -107,15 +109,23 @@ function showReviewCandidates(codes){
 async function retryCodeReview(){
  if(reviewRunning||busy||!reviewCrop)return;
  reviewRunning=true;busy=true;
- const controls=[...codeReview.querySelectorAll('button,input')];
+ const controls=[...codeReview.querySelectorAll('button,input,select')],target=reviewHit;
  controls.forEach(control=>control.disabled=true);
  codeReview.setAttribute('aria-busy','true');reviewMessage.textContent='선택 영역 재인식 중…';
  try{
-  const candidates=await recognizeReviewRegion(reviewCrop);
+  const result=await recognizeReviewRegion(reviewCrop,image=>{
+   if(reviewHit!==target||!codeReview.open)return;
+   reviewImage.width=image.width;reviewImage.height=image.height;
+   reviewImage.getContext('2d').drawImage(image,0,0);
+   const description='실제 OCR 입력 · 보정 '+(document.getElementById('reviewCorrection').checked?'ON':'OFF')+' · '+image.width+'×'+image.height+'px';
+   reviewImage.setAttribute('aria-label',description);document.getElementById('reviewPreviewLabel').textContent=description;
+  });
+  if(reviewHit!==target||!codeReview.open)return;
+  const {candidates}=result;
   if(candidates.length){
    reviewInput.value=candidates[0];showReviewCandidates(candidates);
-   reviewMessage.textContent='재인식 결과입니다. 사진과 비교한 뒤 적용하세요.';
-  }else reviewMessage.textContent='코드를 찾지 못했습니다. 아래 입력창에서 직접 수정하세요.';
+   reviewMessage.textContent='재인식 완료 · '+result.correctionPath+' · 사진과 비교한 뒤 적용하세요.';
+  }else reviewMessage.textContent='코드를 찾지 못했습니다. 확대 배율을 바꾸거나 직접 입력하세요. · '+result.correctionPath;
  }catch(error){reviewMessage.textContent='재인식 실패: '+error.message+' · 직접 입력할 수 있습니다.';}
  finally{
   reviewRunning=false;busy=false;codeReview.setAttribute('aria-busy','false');

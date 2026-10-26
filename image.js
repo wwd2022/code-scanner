@@ -143,16 +143,17 @@ function applyCorrection(image,settings,prepared=null){
 }
 
 // 낮은 해상도는 먼저 축소한 뒤 보정해 픽셀 연산도 줄인다.
-// 확대 시에는 보정을 한 번 적용한 결과만 확대하고 실제 좌표 배율을 반환한다.
+// 전체 검사는 보정 후 확대하고, 작은 코드 재검사는 확대 후 보정한다.
 async function renderScanPass(source,pass,settings){
  const correctionEdge=hasImageCorrection(settings)?settings.correctionMaxEdge||Infinity:Infinity;
- const workingScale=Math.min(1,pass.scale,correctionEdge/Math.max(pass.width,pass.height));
+ const workingScale=Math.min(settings.correctAfterUpscale?pass.scale:1,pass.scale,correctionEdge/Math.max(pass.width,pass.height));
  const image=document.createElement('canvas');
  image.width=Math.max(1,Math.round(pass.width*workingScale));image.height=Math.max(1,Math.round(pass.height*workingScale));
  const ctx=image.getContext('2d',{willReadFrequently:true});
  ctx.drawImage(source,pass.x,pass.y,pass.width,pass.height,0,0,image.width,image.height);
  // 잘라낸 영역도 전체 이미지의 기준 배율을 유지한다.
- const pixelScale=(settings.referenceEdge||Math.max(source.width,source.height))/correctionReferenceEdge*Math.min(image.width/pass.width,image.height/pass.height);
+ const actualScale=Math.min(image.width/pass.width,image.height/pass.height);
+ const pixelScale=settings.reviewGlyphHeight?Math.max(.5,settings.reviewGlyphHeight*actualScale/32):(settings.referenceEdge||Math.max(source.width,source.height))/correctionReferenceEdge*actualScale;
  let correctionPath;
  try{correctionPath=await correctCanvas(image,{...settings,pixelScale});}
  catch(error){image.width=image.height=1;throw error;}

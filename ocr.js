@@ -332,21 +332,27 @@ function cropReviewRegion(hit){
  const y=Math.max(0,Math.floor(b.y0-Math.max(8,h*.6)));
  const right=Math.min(originalFrame.width,Math.ceil(b.x1+Math.max(12,w*.08)));
  const bottom=Math.min(originalFrame.height,Math.ceil(b.y1+Math.max(8,h*.6)));
- const image=document.createElement('canvas');image.width=Math.max(1,right-x);image.height=Math.max(1,bottom-y);
- image.getContext('2d').drawImage(originalFrame,x,y,image.width,image.height,0,0,image.width,image.height);
- return {image,centerX:(b.x0+b.x1)/2-x,centerY:(b.y0+b.y1)/2-y};
+ const padding=Math.max(3,Math.round(h*.3)),width=Math.max(1,right-x),height=Math.max(1,bottom-y);
+ const image=document.createElement('canvas');image.width=width+padding*2;image.height=height+padding*2;
+ const ctx=image.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,image.width,image.height);
+ ctx.drawImage(originalFrame,x,y,width,height,padding,padding,width,height);
+ return {image,glyphHeight:Math.max(1,h),centerX:(b.x0+b.x1)/2-x+padding,centerY:(b.y0+b.y1)/2-y+padding};
 }
 
 // 잘라낸 코드는 한 줄 모드로 읽은 뒤 전체 인식 모드를 복원한다.
 // 대상 중심에 가장 가까운 결과와 해당 후보만 반환한다.
-async function recognizeReviewRegion(crop){
+async function recognizeReviewRegion(crop,onPrepared=null){
  const width=crop.image.width,height=crop.image.height;
- const settings=getCorrectionSettings(Math.max(originalFrame.width,originalFrame.height));
- const result=await recognizeCorrected(crop.image,settings,null,Math.min(4,settings.ocrMaxEdge/800,1800/Math.max(width,height)),null,null,'7');
+ const base=getCorrectionSettings(),corrected=document.getElementById('reviewCorrection').checked;
+ const selected=document.getElementById('reviewScale').value;
+ const scale=Math.min(selected==='auto'?Math.max(1,Math.min(4,32/crop.glyphHeight)):Number(selected),1800/Math.max(width,height));
+ // 작은 획을 지우는 필터는 제외하고 확대된 글자 크기로 보정한다.
+ const settings={...base,ocrMaxEdge:1800,correctionMaxEdge:1800,correctAfterUpscale:true,reviewGlyphHeight:crop.glyphHeight,mode:corrected?'print':'contrast',strength:corrected?base.strength:0,brightness:corrected?base.brightness:0,threshold:Math.min(base.threshold,12),screenNoise:0,removeLines:false,removeSpecks:false};
+ const result=await recognizeCorrected(crop.image,settings,null,scale,onPrepared,null,'7');
  const hits=result.hits;
  const distance=hit=>Math.hypot(((hit.bbox.x0+hit.bbox.x1)/2-crop.centerX)/width,((hit.bbox.y0+hit.bbox.y1)/2-crop.centerY)/height);
  hits.sort((a,b)=>distance(a)-distance(b));
  const best=hits[0];
- return best?[best.code,...best.alternatives]:[];
+ return {candidates:best?[best.code,...best.alternatives]:[],correctionPath:result.correctionPath};
 }
 

@@ -231,6 +231,12 @@
 <form id="reviewForm" novalidate>
 <h2 id="reviewTitle">코드 확인</h2>
 <canvas id="reviewImage" role="img" aria-label="선택한 코드의 원본 이미지"></canvas>
+<small id="reviewPreviewLabel">선택 영역 원본</small>
+<div class="review-settings">
+<label><input id="reviewCorrection" type="checkbox" checked> 작은 코드 보정</label>
+<label for="reviewScale">확대 <select id="reviewScale"><option value="auto" selected>자동 · 최대 4배</option><option value="2">2배</option><option value="4">4배</option></select></label>
+</div>
+<small>작은 코드 보정: 확대 후 밝기·대비·인쇄물 보정 적용. 얇은 획 보호를 위해 표선·작은 점·노이즈 제거는 끕니다. 한 줄 OCR·워커 1개·긴 변 최대 1800px로 재인식합니다.</small>
 <p id="reviewMessage" role="status" aria-live="polite"></p>
 <label for="reviewInput">품목코드 직접 입력</label>
 <input id="reviewInput" type="text" placeholder="AB12-A00345" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="done" autofocus>
