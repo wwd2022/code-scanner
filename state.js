@@ -36,5 +36,6 @@ const scanStageInputs=[...document.querySelectorAll('[data-scan-stage]')];
 const performanceInputs=[ocrSize,correctionSize,preprocessAcceleration,liveOcr,liveInterval,liveSize,workerCount,deepScan,...scanStageInputs,previewQuality];
 const correctionInputs=[...performanceInputs,removeSpecks,speckArea,speckThreshold,screenNoise,printCorrection,brightness,threshold,removeLines,previewCorrection];
 let scanEpoch=0,activeScan=null,imageRevision=0;
+let testExpectedCodes=[];
 const boxOpacity=document.getElementById("boxOpacity"),boxOpacityValue=document.getElementById("boxOpacityValue");
 const imageViewport=document.getElementById('imageViewport'),zoomLevel=document.getElementById('zoomLevel'),zoomHint=document.getElementById('zoomHint');

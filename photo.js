@@ -28,6 +28,7 @@ function getTestRows(){
 function makeTestImage(){
  if(busy||starting)return;
  const rows=getTestRows();
+ testExpectedCodes=rows.map(row=>row[0]);
  if(!rows.length){photoReady=false;readImage.disabled=true;imageViewport.hidden=true;frozen.hidden=true;status.textContent='먼저 엑셀 탭에서 파일을 등록하세요.';return;}
  const layout=document.getElementById('testLayout').value,noise=Number(document.getElementById('testNoise').value);
  document.getElementById('testNoiseValue').value=noise+'%';

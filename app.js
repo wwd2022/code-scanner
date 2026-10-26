@@ -5,6 +5,8 @@ function lockInputs(locked){
  correctionInputs.forEach(input=>input.disabled=locked);
  syncPerformanceInputs(locked);
  presetButtons.forEach(button=>button.disabled=locked);
+ document.querySelectorAll('[data-settings-action],#optimizeStart,#optimizerExpected').forEach(input=>input.disabled=locked);
+ document.getElementById('optimizeCancel').disabled=!locked||!activeScan?.optimization;
  document.querySelectorAll('#testControls input,#testControls select,#testControls button').forEach(input=>input.disabled=locked);
  syncScanStageInputs(locked);
  photoInput.disabled=locked;
@@ -394,14 +396,14 @@ function queueSettingsSave(){
 }
 function saveSettings(){
  clearTimeout(settingsSaveTimer);settingsSaveTimer=0;
- if(!settingsDirty)return;
+ if(!settingsDirty)return true;
  settingsDirty=false;
- const values={};
- for(const input of settingsFields)values[input.id]=input.type==='checkbox'?input.checked:input.value;
  try{
-  localStorage.setItem(settingsKey,JSON.stringify({values,codeDirection:codeDirectionIndex,locationDirection:locationDirectionIndex}));
+  localStorage.setItem(settingsKey,JSON.stringify(collectSettings()));
+  return true;
  }catch(error){
   status.textContent='설정을 저장하지 못했습니다. 브라우저 저장 공간 설정을 확인하세요.';
+  return false;
  }
 }
 
@@ -696,3 +698,85 @@ for(const [id,fallback] of [['ocrSize',1280],['reviewScale',1],['reviewOcrSize',
   queueSettingsSave();
  });
 }
+
+// 저장·내보내기는 같은 설정 목록을 사용한다.
+function collectSettings(){
+ const values={};
+ for(const input of settingsFields){
+  if(input.type==='checkbox')values[input.id]=input.checked;
+  else if(input.type==='number'&&!(input.id==='reviewScale'&&!input.value.trim())){
+   const value=readNumericSetting(input,Number(input.defaultValue)||Number(input.min));
+   values[input.id]=String(input.id==='reviewScale'?value:Math.round(value));
+  }else values[input.id]=input.value;
+ }
+ return {values,codeDirection:codeDirectionIndex,locationDirection:locationDirectionIndex};
+}
+
+// 전체 내용을 확인한 뒤 적용해 잘못된 입력의 부분 반영을 막는다.
+function parseTransferredSettings(text){
+ if(text.length>100000)throw new Error('설정값이 너무 깁니다.');
+ const data=JSON.parse(text);
+ if(!data||data.app!=='code-scanner'||data.version!==1||!data.values||typeof data.values!=='object'||Array.isArray(data.values))throw new Error('이 앱에서 복사한 설정값을 붙여넣으세요.');
+ const changes=[];
+ for(const input of settingsFields){
+  if(!Object.prototype.hasOwnProperty.call(data.values,input.id))continue;
+  const value=data.values[input.id];
+  let valid=typeof value==='string';
+  if(input.type==='checkbox')valid=typeof value==='boolean';
+  else if(valid){
+   if(input.tagName==='SELECT')valid=[...input.options].some(option=>option.value===value);
+   if(input.type==='number'||input.type==='range')valid=(input.id==='reviewScale'&&value==='')||(value.trim()!==''&&Number.isFinite(Number(value))&&Number(value)>=Number(input.min)&&Number(value)<=Number(input.max));
+   if(input.type==='color')valid=/^#[0-9a-f]{6}$/i.test(value);
+   if(input.id==='filterMode')valid=['contrast','print'].includes(value);
+   if(input.id==='performancePreset')valid=['power','balanced','fast','custom'].includes(value);
+  }
+  if(!valid)throw new Error(input.id+' 설정값이 올바르지 않습니다.');
+  changes.push([input,value]);
+ }
+ if(!changes.length)throw new Error('적용할 설정이 없습니다.');
+ for(const key of ['codeDirection','locationDirection']){
+  if(!Object.prototype.hasOwnProperty.call(data,key))continue;
+  const value=data[key];
+  if(key==='codeDirection'&&value===null)continue;
+  if(!Number.isInteger(value)||value<0||value>15)throw new Error('박스 방향 설정이 올바르지 않습니다.');
+ }
+ return {data,changes};
+}
+
+function syncSettingsDisplay(){
+ for(const input of [strength,screenNoise,brightness,threshold,speckArea,speckThreshold]){
+  const output=document.getElementById(input.id+'Value');if(output)output.value=input.value;
+ }
+ document.getElementById('testNoiseValue').value=document.getElementById('testNoise').value+'%';
+ filterMode.value=printCorrection.checked?'print':'contrast';
+ updateBoxStyle();performanceSettingsChanged();
+ if(!busy&&!starting)queueSettingsPreview();
+}
+
+document.getElementById('exportSettings').addEventListener('click',()=>{
+ if(busy||starting)return;
+ const input=document.getElementById('settingsTransfer');
+ input.value=JSON.stringify({app:'code-scanner',version:1,...collectSettings()},null,2);
+ input.focus();input.select();input.setSelectionRange(0,input.value.length);
+ document.getElementById('settingsTransferStatus').value='전체 선택했습니다. 입력창의 텍스트를 복사하세요.';
+});
+document.getElementById('importSettings').addEventListener('click',()=>{
+ if(busy||starting)return;
+ const output=document.getElementById('settingsTransferStatus');
+ try{
+  const {data,changes}=parseTransferredSettings(document.getElementById('settingsTransfer').value);
+  for(const [input,value] of changes){if(input.type==='checkbox')input.checked=value;else input.value=value;}
+  if(Object.prototype.hasOwnProperty.call(data,'codeDirection')){
+   if(data.codeDirection===null){
+    codeDirectionIndex=null;codeDial.style.removeProperty('--stick-x');codeDial.style.removeProperty('--stick-y');
+    document.getElementById('codeDirection').textContent='원본 위치';
+   }else setCodeDirection(data.codeDirection,false);
+  }
+  if(Object.prototype.hasOwnProperty.call(data,'locationDirection'))setLocationDirection(data.locationDirection,false);
+  syncSettingsDisplay();queueSettingsSave();saveSettings();
+  output.value='설정 '+changes.length+'개 적용 완료';
+ }catch(error){output.value='적용하지 못했습니다: '+(error.message||String(error));}
+});
+document.getElementById('optimizeStart').addEventListener('click',optimizePerformance);
+document.getElementById('testOptimize').addEventListener('click',optimizePerformance);
+document.getElementById('optimizeCancel').addEventListener('click',cancelActiveScan);
