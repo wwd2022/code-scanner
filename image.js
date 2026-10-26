@@ -47,7 +47,7 @@ function renderPreview(source,target){
  const corrected=previewCorrection.checked||settingsAdjusting;
  let image=source;
  if(corrected){
-  const scale=settingsAdjusting?Math.min(1,640/Math.max(width,height)):1;
+  const scale=Math.min(1,getPreviewMaxSize()/Math.max(width,height));
   const w=Math.max(1,Math.round(width*scale)),h=Math.max(1,Math.round(height*scale));
   if(previewBuffer.width!==w)previewBuffer.width=w;
   if(previewBuffer.height!==h)previewBuffer.height=h;
@@ -70,7 +70,7 @@ function renderPreview(source,target){
 function updatePreview(){
  document.getElementById('previewCorrectionValue').value=settingsAdjusting?'조절 중 · 보정':previewCorrection.checked?'ON · 보정':'OFF · 원본';
  if(activeTab==='camera'&&!frozenMode){
-  if(stream&&drawCorrected(liveCanvas,0,settingsAdjusting?640:previewCorrection.checked?960:2200))renderPreview(liveCanvas,liveCanvas);
+  if(stream&&drawCorrected(liveCanvas,0,settingsAdjusting?getPreviewMaxSize():previewCorrection.checked?Math.min(960,getPreviewMaxSize()):2200))renderPreview(liveCanvas,liveCanvas);
  }else if(frozenMode){
   const source=activeTab==='camera'?originalFrame:photoSource;
   if(source.width&&source.height)renderPreview(source,frame);
@@ -217,4 +217,11 @@ function removeSmallDarkRegions(image,maxArea,threshold){
    const p=queue[i]*4;data[p]=data[p+1]=data[p+2]=255;
   }
  }
+}
+
+// 슬라이더의 저해상도 미리보기도 선택한 OCR 해상도를 넘지 않는다.
+// 실제 OCR 설정은 바꾸지 않고 조절 종료 후 기본 해상도로 돌아간다.
+function getPreviewMaxSize(){
+ const maxEdge=Number(ocrSize.value);
+ return settingsAdjusting&&previewQuality.value==='low'?Math.min(640,maxEdge):maxEdge;
 }
