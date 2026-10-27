@@ -152,9 +152,10 @@ function mergeHits(groups){
 }
 
 // 촬영·사진·테스트는 같은 설정과 인식 경로를 사용한다.
-async function scanCamera(){
- if(busy||starting||(activeTab==='camera'&&frozenMode))return;
- if(activeTab==='camera'&&(!stream||camera.readyState<2)){showScanCameraRequired();return;}
+async function scanCamera(rescanFrozen=false){
+ const reuseCameraFrame=activeTab==='camera'&&frozenMode&&rescanFrozen===true&&originalFrame.width>0;
+ if(busy||starting||(activeTab==='camera'&&frozenMode&&!reuseCameraFrame))return;
+ if(activeTab==='camera'&&!reuseCameraFrame&&(!stream||camera.readyState<2)){showScanCameraRequired();return;}
  if(activeTab!=='camera'&&!photoReady)return;
  const stages=scanStageInputs.filter(input=>input.checked&&(deepScan.checked||input.dataset.scanStage==='corrected')).map(input=>input.dataset.scanStage);
  if(!stages.length){status.textContent='인식 설정에서 검사 단계를 하나 이상 선택하세요.';return;}
@@ -165,21 +166,21 @@ async function scanCamera(){
  busy=true;showScanStart(stages);
  liveEpoch++;clearTimeout(liveTimer);cancelAnimationFrame(animationId);dots.replaceChildren();
  try{
-  if(activeTab==='camera'){
+  const area=activeTab!=='camera'||reuseCameraFrame?getVisiblePhotoRegion():null;
+  if(activeTab==='camera'&&!reuseCameraFrame){
    if(!drawCorrected(originalFrame,0,settings.ocrMaxEdge))throw new Error('영상이 아직 준비되지 않았습니다.');
-  }else{
+  }else if(activeTab!=='camera'){
    originalFrame.width=photoSource.width;originalFrame.height=photoSource.height;
    originalFrame.getContext('2d').drawImage(photoSource,0,0);
   }
   frame.width=originalFrame.width;frame.height=originalFrame.height;
   frame.getContext('2d').drawImage(originalFrame,0,0);
   if(activeTab==='camera')camera.pause();
-  frozenMode=true;detectedHits=[];showScanFrame();
+  frozenMode=true;detectedHits=[];showScanFrame(!reuseCameraFrame);
   const captureMs=performance.now()-started,waiting=performance.now();
   if(liveJob){run.phase='실시간 OCR';status.textContent='진행 중 실시간 OCR 완료 대기 · 결과 폐기';await liveJob.catch(()=>{});}
   const liveWaitMs=performance.now()-waiting;
   assertOcrCurrent(isCurrent);
-  const area=activeTab==='camera'?null:getVisiblePhotoRegion();
   const result=await recognizeCorrected(originalFrame,settings,area,1,(image,pass)=>{
    if(!isCurrent())return;
    reviewSource.width=image.width;reviewSource.height=image.height;

@@ -8,7 +8,7 @@ const liveView=document.getElementById('liveView'),liveCanvas=document.getElemen
 const strength=document.getElementById('strength'),strengthValue=document.getElementById('strengthValue'),liveStatus=document.getElementById('liveStatus');
 const liveFrame=document.createElement('canvas'),originalFrame=document.createElement('canvas');
 const scanStats=document.getElementById('scanStats');
-let animationId=0,liveTimer=0,liveJob=null,liveEpoch=0,lastPaint=0;
+let animationId=0,liveTimer=0,liveJob=null,liveEpoch=0,lastPaint=0,liveLastStarted=0;
 let workbook=null,locations=new Map(),stream=null,busy=false,starting=false;
 let database=null,recordCount=0,frozenMode=false,detectedHits=[];
 

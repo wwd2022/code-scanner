@@ -18,29 +18,38 @@ function showDots(hits){
  }
 }
 
+// 처리 시간이 검사 간격에 이미 포함되며 실행은 한 건만 유지한다.
+function scheduleLiveCheck(wait=null){
+ clearTimeout(liveTimer);
+ if(!stream||frozenMode||activeTab!=='camera'||!liveOcr.checked)return;
+ const delay=wait??Math.max(50,Number(liveInterval.value)-(performance.now()-liveLastStarted));
+ liveTimer=setTimeout(checkLive,delay);
+}
 // 실시간 OCR도 촬영 후 인식과 같은 보정·워커 경로를 사용한다.
 async function checkLive(){
  clearTimeout(liveTimer);
  if(!stream||frozenMode||activeTab!=='camera'||!liveOcr.checked)return;
  const delay=Number(liveInterval.value);
- if(busy||starting||liveJob||settingsAdjusting||document.hidden){liveTimer=setTimeout(checkLive,delay);return;}
+ if(busy||starting||liveJob||settingsAdjusting||document.hidden){scheduleLiveCheck(Math.max(150,delay));return;}
  const epoch=liveEpoch;
  const isCurrent=()=>epoch===liveEpoch&&!frozenMode&&!!stream&&liveOcr.checked&&!busy;
- dots.replaceChildren();liveStatus.textContent='화면 코드 확인 중…';
+ liveLastStarted=performance.now();
+ if(!dots.childElementCount)liveStatus.textContent='화면 코드 확인 중…';
  const job=(async()=>{
   const settings={...getCorrectionSettings(),ocrMaxEdge:Number(liveSize.value)};
   if(!drawCorrected(liveFrame,0,settings.ocrMaxEdge))return;
   const result=await recognizeCorrected(liveFrame,settings,null,1,null,null,'11',{isCurrent});
   if(!isCurrent())return;
   showDots(result.hits);
-  liveStatus.textContent=result.hits.length?result.hits.length+'곳 감지 · 빨간 점 위치의 코드를 확인하세요.':'정규식에 맞는 코드가 아직 보이지 않습니다.';
+  const elapsed=((performance.now()-liveLastStarted)/1000).toFixed(2)+'초';
+  liveStatus.textContent=(result.hits.length?result.hits.length+'곳 감지':'코드 미감지')+' · '+result.resolution+'px · '+elapsed;
  })();
  liveJob=job;
  try{await job;}
  catch(error){if(isCurrent()&&error.name!=='AbortError')liveStatus.textContent='실시간 확인 실패: '+(error.message||String(error));}
  finally{
   if(liveJob===job)liveJob=null;
-  if(stream&&!frozenMode&&liveOcr.checked)liveTimer=setTimeout(checkLive,Number(liveInterval.value));
+  scheduleLiveCheck();
  }
 }
 
@@ -51,7 +60,8 @@ function beginLive(){
  liveEpoch++;dots.replaceChildren();clearTimeout(liveTimer);cancelAnimationFrame(animationId);
  updateOcrInputSize();
  lastPaint=0;animationId=requestAnimationFrame(paintLive);
- if(liveOcr.checked)liveTimer=setTimeout(checkLive,Number(liveInterval.value));
+ liveLastStarted=0;
+ if(liveOcr.checked)scheduleLiveCheck(0);
  else liveStatus.textContent='실시간 OCR 꺼짐 · 인식 버튼으로 촬영';
 }
 

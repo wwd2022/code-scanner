@@ -25,6 +25,7 @@ function closeTools(except=null){
 // 이전 인식 결과와 사진 확대 상태를 초기화한다.
 function switchTab(tab){
  if(busy||starting||activeTab===tab)return;
+ clearPhotoTap();
  stopCamera();clearReviewSource();scanEpoch++;activeTab=tab;photoReady=false;frozenMode=false;
  setPhotoZoom(1);imageViewport.classList.remove('camera-shot');imageViewport.scrollLeft=0;imageViewport.scrollTop=0;closeTools();zoomLevel.hidden=true;zoomHint.hidden=true;
  detectedHits=[];boxes.hidden=false;document.getElementById('boxVisibility').hidden=true;boxes.replaceChildren();raw.textContent='';scanStats.textContent='';
@@ -74,16 +75,43 @@ function getVisiblePhotoRegion(){
 // 사진을 손가락으로 이동하거나 두 손가락으로 확대한다. (핸들 포토 포인터)
 // 더블 터치 시 현재 확대 영역 인식을 시작하며 이동 중에는 오인식을 막는다.
 const photoPointers=new Map();
-let pinchDistance=0,multiTouch=false,lastTap=0,lastTapX=0,lastTapY=0;
+let pinchDistance=0,multiTouch=false,photoTapTimer=0,pendingPhotoTap=null,lastPhotoTouch=-Infinity;
+function clearPhotoTap(){
+ clearTimeout(photoTapTimer);photoTapTimer=0;pendingPhotoTap=null;
+}
+function applyPhotoTap(){
+ const tap=pendingPhotoTap;clearPhotoTap();
+ if(!tap||tap.epoch!==scanEpoch||busy||starting||codeReview.open||imageViewport.hidden||!frozenMode)return;
+ if(tap.hit&&detectedHits.includes(tap.hit))openCodeReview(tap.hit);
+ else toggleBoxes();
+}
+// 단일 탭 동작은 더블탭 판정 뒤 적용한다.
+function queuePhotoTap(x,y,hit=null){
+ if(busy||starting||codeReview.open||imageViewport.hidden||!frozenMode)return;
+ if(pendingPhotoTap&&pendingPhotoTap.epoch!==scanEpoch)clearPhotoTap();
+ const now=performance.now();
+ if(pendingPhotoTap&&now-pendingPhotoTap.time<330&&Math.hypot(x-pendingPhotoTap.x,y-pendingPhotoTap.y)<35){
+  clearPhotoTap();closeTools();scanCamera(true);return;
+ }
+ if(pendingPhotoTap)applyPhotoTap();
+ if(codeReview.open)return;
+ pendingPhotoTap={x,y,hit,time:now,epoch:scanEpoch};
+ photoTapTimer=setTimeout(applyPhotoTap,330);
+}
+function queueMousePhotoTap(event,hit=null){
+ if(event.pointerType==='touch'||event.sourceCapabilities?.firesTouchEvents||performance.now()-lastPhotoTouch<700)return;
+ queuePhotoTap(event.clientX,event.clientY,hit);
+}
 function handlePhotoPointer(event){
  if(imageViewport.hidden||busy||!frozenMode||event.pointerType!=='touch')return;
+ lastPhotoTouch=performance.now();
  if(event.type==='pointerdown'){
   imageViewport.setPointerCapture(event.pointerId);
   photoPointers.set(event.pointerId,{x:event.clientX,y:event.clientY,startX:event.clientX,startY:event.clientY,moved:false,hit:event.target.closest('.code-box')?.scanHit||null});
   if(photoPointers.size===2){
    const [a,b]=[...photoPointers.values()];
    pinchDistance=Math.hypot(a.x-b.x,a.y-b.y);
-   multiTouch=true;lastTap=0;
+   multiTouch=true;clearPhotoTap();
   }
   return;
  }
@@ -94,7 +122,7 @@ function handlePhotoPointer(event){
    imageViewport.scrollLeft-=event.clientX-prev.x;
    imageViewport.scrollTop-=event.clientY-prev.y;
   }
-  if(Math.hypot(event.clientX-prev.startX,event.clientY-prev.startY)>10)prev.moved=true;
+  if(Math.hypot(event.clientX-prev.startX,event.clientY-prev.startY)>10){prev.moved=true;clearPhotoTap();}
   prev.x=event.clientX;prev.y=event.clientY;
   if(photoPointers.size===2){
    const [a,b]=[...photoPointers.values()];
@@ -109,16 +137,9 @@ function handlePhotoPointer(event){
  }
  photoPointers.delete(event.pointerId);
  if(event.type==='pointerup'&&!multiTouch&&!prev.moved){
-  if(prev.hit&&detectedHits.includes(prev.hit)){
-   lastTap=0;openCodeReview(prev.hit);
-   if(!photoPointers.size){pinchDistance=0;multiTouch=false;}
-   return;
-  }
-  const now=performance.now();
-  if(now-lastTap<330&&Math.hypot(event.clientX-lastTapX,event.clientY-lastTapY)<35){
-   lastTap=0;if(activeTab!=='camera'){closeTools();scanCamera();}
-  }else{lastTap=now;lastTapX=event.clientX;lastTapY=event.clientY;}
+  queuePhotoTap(event.clientX,event.clientY,prev.hit);
  }
+ if(event.type==='pointercancel')clearPhotoTap();
  if(!photoPointers.size){pinchDistance=0;multiTouch=false;}
 }
 
@@ -183,10 +204,6 @@ imageViewport.addEventListener('pointerdown',handlePhotoPointer);
 imageViewport.addEventListener('pointermove',handlePhotoPointer);
 imageViewport.addEventListener('pointerup',handlePhotoPointer);
 imageViewport.addEventListener('pointercancel',handlePhotoPointer);
-imageViewport.addEventListener('dblclick',event=>{
- if(activeTab==='camera'||event.sourceCapabilities?.firesTouchEvents)return;
- closeTools();scanCamera();
-});
 // 위치 박스를 16방향으로 움직인다. (셋 로케이션 디렉션)
 // 연속 방향 변경은 마지막 값만 저장한다.
 let locationDirectionIndex=12;
@@ -247,16 +264,7 @@ function toggleBoxes(){
  const indicator=document.getElementById('boxVisibility');
  indicator.hidden=false;indicator.textContent=boxes.hidden?'박스 숨김':'박스 표시';
 }
-let tapStart=null;
-imageViewport.addEventListener('pointerdown',event=>{
- if(event.isPrimary)tapStart={x:event.clientX,y:event.clientY,onCode:!!event.target.closest('.code-box'),multiple:false};
- else if(tapStart)tapStart.multiple=true;
-});
-imageViewport.addEventListener('pointerup',event=>{
- if(event.pointerType==='touch'&&event.isPrimary&&tapStart&&!tapStart.onCode&&!tapStart.multiple&&Math.hypot(event.clientX-tapStart.x,event.clientY-tapStart.y)<10&&!multiTouch)toggleBoxes();
- tapStart=null;
-});
-imageViewport.addEventListener('click',event=>{if(!codeReview.open&&event.pointerType!=='touch')toggleBoxes();});
+imageViewport.addEventListener('click',event=>queueMousePhotoTap(event));
 document.querySelectorAll('.box-style-settings input,.box-style-settings select').forEach(input=>input.addEventListener('input',updateBoxStyle));
 document.querySelectorAll('.design-choices button').forEach(button=>button.addEventListener('click',()=>{
  const input=document.getElementById(button.parentElement.dataset.choiceFor);
@@ -296,6 +304,7 @@ function showScanCameraRequired(){
 // 인식 시작 시 입력과 결과 화면을 잠근다. (쇼 스캔 스타트)
 // OCR 실행 중 설정 변경을 방지한다.
 function showScanStart(stages){
+ clearPhotoTap();
  lockInputs(true);excel.disabled=true;sheet.disabled=true;resume.disabled=true;strength.disabled=true;
  liveCanvas.setAttribute('aria-busy','true');
  cancelScan.hidden=false;cancelScan.disabled=false;
@@ -307,9 +316,9 @@ function showScanStart(stages){
 
 // 촬영한 이미지를 결과 화면에 표시한다. (쇼 스캔 프레임)
 // 카메라와 사진은 기존 화면 비율을 유지한다.
-function showScanFrame(){
+function showScanFrame(resetZoom=true){
  imageViewport.classList.toggle('camera-shot',activeTab==='camera');
- if(activeTab==='camera')setPhotoZoom(1);
+ if(activeTab==='camera'&&resetZoom)setPhotoZoom(1);
  liveView.hidden=true;imageViewport.hidden=false;frozen.hidden=false;
  zoomLevel.hidden=false;zoomHint.hidden=false;
  boxes.replaceChildren();liveStatus.textContent='정지 화면 · 인식 결과를 확인하세요.';
@@ -590,13 +599,13 @@ window.addEventListener('resize',updateDesignPreview);
 const performanceProfiles={
  power:{ocrSize:'1280',correctionSize:'1280',preprocessAcceleration:'cpu',liveOcr:false,liveInterval:'2000',liveSize:'960',workerCount:'1',deepScan:true,previewQuality:'low'},
  balanced:{ocrSize:'1280',correctionSize:'1280',preprocessAcceleration:'auto',liveOcr:true,liveInterval:'600',liveSize:'2200',workerCount:'1',deepScan:true,previewQuality:'low'},
- fast:{ocrSize:'1280',correctionSize:'1280',preprocessAcceleration:'auto',liveOcr:true,liveInterval:'1200',liveSize:'1280',workerCount:'4',deepScan:true,previewQuality:'low'}
+ fast:{ocrSize:'1280',correctionSize:'1280',preprocessAcceleration:'auto',liveOcr:true,liveInterval:'300',liveSize:'1280',workerCount:'4',deepScan:true,previewQuality:'low'}
 };
 const performanceLabels={power:'절전',balanced:'균형',fast:'고성능',custom:'사용자 설정'};
 const performanceDescriptions={
  power:'보정·OCR 1280px · 전체·6구역 검사 · 실시간 끄기 · CPU 보정 · 워커 1개',
  balanced:'보정·OCR 1280px · 전체·6구역 검사 · 실시간 600ms · WebGL2 우선 · 워커 1개',
- fast:'보정·OCR 1280px · 전체·6구역 검사 · 워커 4개 · WebGL2 우선 · 실시간 1280px·1200ms',
+ fast:'보정·OCR 1280px · 전체·6구역 검사 · 워커 4개 · WebGL2 우선 · 실시간 1280px·300ms',
  custom:'직접 선택한 값 적용 · 촬영 후 검사와 실시간 검사는 자원을 나눠 사용합니다.'
 };
 function syncPerformanceInputs(locked=busy||starting){
@@ -620,7 +629,7 @@ function performanceSettingsChanged(){
  refreshPerformanceSettings();queueSettingsSave();
  runOcrSession(()=>trimOcrWorkers(Number(workerCount.value))).catch(()=>{});
  if(stream&&!frozenMode){
-  if(liveOcr.checked)liveTimer=setTimeout(checkLive,Number(liveInterval.value));
+  if(liveOcr.checked)scheduleLiveCheck(0);
   else liveStatus.textContent='실시간 OCR 꺼짐 · 인식 버튼으로 촬영';
  }
 }

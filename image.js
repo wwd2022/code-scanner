@@ -42,6 +42,33 @@ function drawCorrected(target,amount=null,maxSize=2200){
 // 조절 중에는 작은 이미지에 보정하고 표시 크기는 유지한다.
 // 원본·OCR 좌표는 보존하며 미리보기용 캔버스를 재사용한다.
 const previewBuffer=typeof document==='undefined'?null:document.createElement('canvas');
+const livePreviewBuffer=typeof document==='undefined'?null:document.createElement('canvas');
+let livePreviewJob=null,livePreviewQueued=false;
+// 실시간 미리보기는 한 건만 보정하고 오래된 화면은 버린다.
+function renderLivePreview(){
+ if(!stream||frozenMode||busy||activeTab!=='camera')return;
+ if(livePreviewJob){livePreviewQueued=true;return;}
+ const epoch=liveEpoch,currentStream=stream;
+ const isCurrent=()=>epoch===liveEpoch&&stream===currentStream&&!frozenMode&&!busy&&activeTab==='camera';
+ const job=(async()=>{
+  const corrected=previewCorrection.checked||settingsAdjusting;
+  if(!corrected){drawCorrected(liveCanvas,0,2200);return;}
+  if(!drawCorrected(livePreviewBuffer,0,getPreviewMaxSize()))return;
+  const settings=getCorrectionSettings();
+  await correctCanvas(livePreviewBuffer,{...settings,pixelScale:Math.max(livePreviewBuffer.width,livePreviewBuffer.height)/correctionReferenceEdge});
+  if(!isCurrent())return;
+  if(liveCanvas.width!==livePreviewBuffer.width)liveCanvas.width=livePreviewBuffer.width;
+  if(liveCanvas.height!==livePreviewBuffer.height)liveCanvas.height=livePreviewBuffer.height;
+  liveCanvas.getContext('2d').drawImage(livePreviewBuffer,0,0);
+ })();
+ livePreviewJob=job;
+ job.catch(()=>{}).finally(()=>{
+  if(livePreviewJob===job)livePreviewJob=null;
+  const queued=livePreviewQueued;livePreviewQueued=false;
+  if(!stream||frozenMode||busy||!previewCorrection.checked)livePreviewBuffer.width=livePreviewBuffer.height=1;
+  if(queued&&stream&&!frozenMode&&!busy)queueSettingsPreview();
+ });
+}
 function renderPreview(source,target){
  const width=source.width,height=source.height;
  const corrected=previewCorrection.checked||settingsAdjusting;
@@ -70,7 +97,7 @@ function renderPreview(source,target){
 function updatePreview(){
  document.getElementById('previewCorrectionValue').value=settingsAdjusting?'조절 중 · 보정':previewCorrection.checked?'ON · 보정':'OFF · 원본';
  if(activeTab==='camera'&&!frozenMode){
-  if(stream&&drawCorrected(liveCanvas,0,settingsAdjusting?getPreviewMaxSize():previewCorrection.checked?Math.min(960,getPreviewMaxSize()):2200))renderPreview(liveCanvas,liveCanvas);
+  renderLivePreview();
  }else if(frozenMode){
   const source=activeTab==='camera'?originalFrame:photoSource;
   if(source.width&&source.height)renderPreview(source,frame);

@@ -33,8 +33,7 @@ function showBoxes(hits){
   code.setAttribute('aria-label',hit.code+' 확인 및 수정');
   code.addEventListener('click',event=>{
    event.stopPropagation();
-   if(event.pointerType==='touch'||event.sourceCapabilities?.firesTouchEvents)return;
-   openCodeReview(hit);
+   queueMousePhotoTap(event,hit);
   });
   code.addEventListener('keydown',event=>{
    if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();openCodeReview(hit);}

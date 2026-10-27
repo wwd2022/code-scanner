@@ -124,8 +124,8 @@
 <label class="inline-label"><input id="liveOcr" type="checkbox" checked> 실시간 OCR</label>
 <small>촬영 전 빨간 점 검사입니다. 끄면 미리보기만 유지합니다. 촬영 후 인식과 동시에 실행하지 않습니다.</small>
 <label for="liveInterval">실시간 검사 간격</label>
-<select id="liveInterval"><option value="600" selected>600ms</option><option value="1200">1200ms</option><option value="2000">2000ms</option></select>
-<small>이전 검사가 끝난 뒤 기다리는 간격입니다. 길수록 반복 연산이 줄어듭니다.</small>
+<select id="liveInterval"><option value="300">300ms · 빠르게</option><option value="600" selected>600ms</option><option value="1200">1200ms</option><option value="2000">2000ms</option></select>
+<small>검사 시작 사이의 목표 간격입니다. OCR 시간을 포함하며, 오래 걸리면 완료 후 최소 50ms 뒤 다음 검사로 이어집니다. 중복 실행은 하지 않습니다. 낮추면 반복 연산·전력 사용이 늘어납니다.</small>
 <label for="liveSize">실시간 OCR 해상도</label>
 <select id="liveSize"><option value="960">긴 변 최대 960px</option><option value="1280">긴 변 최대 1280px</option><option value="2200" selected>긴 변 최대 2200px</option></select>
 <small>촬영 후 해상도와 별개입니다. 낮추면 실시간 검사가 가벼워지지만 작은 코드 감지가 줄 수 있습니다.</small>
