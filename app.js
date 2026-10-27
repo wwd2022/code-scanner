@@ -4,6 +4,7 @@ function lockInputs(locked){
  tabButtons.forEach(button=>button.disabled=locked);
  correctionInputs.forEach(input=>input.disabled=locked);
  syncPerformanceInputs(locked);
+ syncInkInputs(locked);
  presetButtons.forEach(button=>button.disabled=locked);
  document.querySelectorAll('[data-settings-action],#optimizeStart').forEach(input=>input.disabled=locked);
  document.getElementById('optimizeCancel').disabled=!locked||!activeScan?.optimization;
@@ -464,7 +465,7 @@ function restoreSettings(){
   document.getElementById('testNoiseValue').value=document.getElementById('testNoise').value+'%';
   if(typeof values.printCorrection!=='boolean')printCorrection.checked=filterMode.value==='print';
   filterMode.value=printCorrection.checked?'print':'contrast';
-  updateBoxStyle();updatePreview();
+  syncInkInputs();updateBoxStyle();updatePreview();
  }catch(error){
   console.warn('저장된 설정을 복원하지 못했습니다.',error);
  }
@@ -491,7 +492,12 @@ settingsPanelButtons.forEach(button=>button.addEventListener('click',()=>{
  settingsDrawer.querySelector('.drawer-body').scrollTop=0;
  updateDesignPreview();
 }));
-const previewInputs=new Set([strength,previewQuality,removeSpecks,speckArea,speckThreshold,screenNoise,printCorrection,brightness,threshold,removeLines,previewCorrection]);
+function syncInkInputs(locked=busy||starting){
+ inkBlackLevel.disabled=locked||inkColor.value!=='black';
+ inkSaturation.disabled=locked||inkColor.value==='all';
+ for(const input of [inkBlackLevel,inkSaturation])document.getElementById(input.id+'Value').value=input.value;
+}
+const previewInputs=new Set([strength,previewQuality,inkColor,inkBlackLevel,inkSaturation,removeSpecks,speckArea,speckThreshold,screenNoise,printCorrection,brightness,threshold,removeLines,previewCorrection]);
 let adjustmentPointer=null,adjustmentTimer=0,adjustmentFrame=0;
 let adjustmentSlider=null,adjustmentLabel=null;
 function beginSettingsPreview(event){
@@ -530,6 +536,7 @@ function handleCorrectionInput(event){
  const input=event.target;
  if(!previewInputs.has(input))return;
  if(input===printCorrection)filterMode.value=printCorrection.checked?'print':'contrast';
+ if([inkColor,inkBlackLevel,inkSaturation].includes(input))syncInkInputs();
  const output=document.getElementById(input.id+'Value');
  if(input.type==='range'&&output)output.value=input.value;
  liveEpoch++;dots.replaceChildren();
@@ -776,6 +783,7 @@ function parseTransferredSettings(text){
 }
 
 function syncSettingsDisplay(){
+ syncInkInputs();
  for(const input of [strength,screenNoise,brightness,threshold,speckArea,speckThreshold]){
   const output=document.getElementById(input.id+'Value');if(output)output.value=input.value;
  }

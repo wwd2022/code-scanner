@@ -144,6 +144,10 @@ function prepareGpuPixels(image,settings){
 
 // 실패한 GPU 경로는 해제하고 변경되지 않은 입력을 CPU로 처리한다.
 function correctWorkerPixels(image,settings){
+ const inkFiltered=['black','nonblack'].includes(settings.inkColor);
+ if(inkFiltered){
+  filterInkColor(image,settings);settings={...settings,inkColor:'all'};
+ }
  let prepared=null,path='CPU 보정 워커';
  if(settings.acceleration==='cpu'){releaseGpuCorrection();gpuCorrectionFailure='';}
  else if(settings.screenNoise||settings.brightness||settings.strength||settings.mode==='print'){
@@ -154,5 +158,5 @@ function correctWorkerPixels(image,settings){
   if(!prepared)path+=' · WebGL2 대체: '+gpuCorrectionFailure;
  }else path+=' · GPU 처리 대상 없음';
  applyCorrection(image,settings,prepared);
- return path;
+ return (inkFiltered?'CPU 색상 선별 → ':'')+path;
 }

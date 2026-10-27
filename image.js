@@ -154,10 +154,24 @@ function printFilter(image,offset=16,cleanLines=true,pixelScale=1,preparedBlur=n
  for(let i=0;i<n;i++){const v=mask[i]?0:255;data[i*4]=data[i*4+1]=data[i*4+2]=v;}
 }
 
-// 모니터 노이즈·밝기·대비·인쇄물 보정을 차례로 적용한다. (어플라이 코렉션)
+// 색 정보가 사라지기 전에 글자 후보를 흑백 마스크로 바꾼다.
+function filterInkColor(image,settings){
+ if(!['black','nonblack'].includes(settings.inkColor))return;
+ const data=image.data,limit=settings.inkBlackLevel??110,saturation=settings.inkSaturation??25;
+ for(let i=0;i<data.length;i+=4){
+  const max=Math.max(data[i],data[i+1],data[i+2]),min=Math.min(data[i],data[i+1],data[i+2]);
+  const colored=(max-min)*100>max*saturation;
+  const keep=settings.inkColor==='black'?max<=limit&&!colored:colored;
+  const value=keep?0:255;
+  data[i]=data[i+1]=data[i+2]=value;
+ }
+}
+
+// 색상 선별·노이즈·밝기·대비·인쇄물 보정을 차례로 적용한다.
 // 미리보기와 모든 OCR 입력에서 같은 필터를 사용한다.
 function applyCorrection(image,settings,prepared=null){
  if(!prepared){
+  filterInkColor(image,settings);
   if(settings.screenNoise)reduceScreenNoise(image,settings.screenNoise);
   if(settings.brightness)for(let i=0;i<image.data.length;i+=4)for(let c=0;c<3;c++)image.data[i+c]+=settings.brightness;
   applyFilter(image.data,settings.strength);
@@ -224,7 +238,7 @@ function reduceScreenNoise(image,amount){
 // 모든 입력 모드에서 현재 보정값을 같은 형식으로 읽는다.
 // 미리보기·전체 인식·부분 재인식의 설정 누락을 막는다.
 function getCorrectionSettings(referenceEdge=0){
- return {referenceEdge,extraScanMode:extraScanMode.value,glyphMode:glyphMode.value,glyphMin:Math.min(readNumericSetting(glyphMin,4),readNumericSetting(glyphMax,120)),glyphMax:Math.max(readNumericSetting(glyphMin,4),readNumericSetting(glyphMax,120)),ocrMaxEdge:Math.round(readNumericSetting(ocrSize,1280)),correctionMaxEdge:Number(correctionSize.value),acceleration:preprocessAcceleration.value,ocrWorkers:Number(workerCount.value),removeSpecks:removeSpecks.checked,speckArea:Number(speckArea.value),speckThreshold:Number(speckThreshold.value),screenNoise:Number(screenNoise.value),mode:filterMode.value,brightness:Number(brightness.value),strength:Number(strength.value),threshold:Number(threshold.value),removeLines:removeLines.checked};
+ return {referenceEdge,inkColor:inkColor.value,inkBlackLevel:Number(inkBlackLevel.value),inkSaturation:Number(inkSaturation.value),extraScanMode:extraScanMode.value,glyphMode:glyphMode.value,glyphMin:Math.min(readNumericSetting(glyphMin,4),readNumericSetting(glyphMax,120)),glyphMax:Math.max(readNumericSetting(glyphMin,4),readNumericSetting(glyphMax,120)),ocrMaxEdge:Math.round(readNumericSetting(ocrSize,1280)),correctionMaxEdge:Number(correctionSize.value),acceleration:preprocessAcceleration.value,ocrWorkers:Number(workerCount.value),removeSpecks:removeSpecks.checked,speckArea:Number(speckArea.value),speckThreshold:Number(speckThreshold.value),screenNoise:Number(screenNoise.value),mode:filterMode.value,brightness:Number(brightness.value),strength:Number(strength.value),threshold:Number(threshold.value),removeLines:removeLines.checked};
 }
 
 // 대각선을 포함해 연결된 검은 영역 중 지정 면적 이하만 지운다.
@@ -287,7 +301,7 @@ function getCorrectionWorker(){
 }
 
 function hasImageCorrection(settings){
- return !!(settings.screenNoise||settings.brightness||settings.strength||settings.mode==='print'||settings.removeSpecks);
+ return !!(['black','nonblack'].includes(settings.inkColor)||settings.screenNoise||settings.brightness||settings.strength||settings.mode==='print'||settings.removeSpecks);
 }
 // 전송 실패 시 원본 픽셀을 다시 읽어 같은 필터로 처리한다.
 async function correctCanvas(canvas,settings){

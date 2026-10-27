@@ -156,6 +156,15 @@
 <details class="correction-settings"><summary>이미지 보정</summary>
 <label class="inline-label"><input id="previewCorrection" type="checkbox" role="switch" aria-describedby="previewCorrectionHint"> 보정 이미지 표시 <output id="previewCorrectionValue">OFF · 원본</output></label>
 <small id="previewCorrectionHint">ON: 현재 설정의 보정 이미지를 표시 · OFF: 원본 표시. OCR 설정은 유지됩니다.</small>
+<label for="inkColor">인식할 글자 색상</label>
+<select id="inkColor"><option value="all" selected>전체 · 색상 제한 없음</option><option value="black">검정 글자만</option><option value="nonblack">검정 아닌 글자 · 컬러만</option></select>
+<small>원래 색을 먼저 구분해 선택한 부분은 검정, 나머지는 흰색으로 바꿉니다. 검정은 어둡고 채도가 낮은 부분입니다. 컬러 모드는 흰 배경·회색도 제외합니다. 글자 외에 같은 색의 그림·배경도 남을 수 있습니다.</small>
+<label for="inkBlackLevel">검정 밝기 상한 <output id="inkBlackLevelValue">110</output></label>
+<input id="inkBlackLevel" type="range" min="20" max="220" step="5" value="110" disabled>
+<small>검정 모드 전용입니다. 높이면 밝은 회색 획도 남지만 그림자도 포함될 수 있습니다.</small>
+<label for="inkSaturation">검정·컬러 구분 채도 <output id="inkSaturationValue">25</output>%</label>
+<input id="inkSaturation" type="range" min="5" max="80" step="5" value="25" disabled>
+<small>기준 이하를 무채색, 초과를 컬러로 봅니다. 낮추면 흐린 컬러도 남지만 배경의 색 번짐이 포함될 수 있습니다. 색상 선별은 CPU로 수행하며 이후 보정은 기존 가속 설정을 사용합니다.</small>
 <label for="screenNoise">중간값 노이즈 완화 <output id="screenNoiseValue">0</output>%</label>
 <input id="screenNoise" type="range" min="0" max="100" step="10" value="0" aria-describedby="screenNoiseHint">
 <small id="screenNoiseHint">0% 끄기 · 색 점과 잔무늬를 줄입니다. 높이면 얇은 글자가 흐려질 수 있으며 굵은 줄무늬는 남을 수 있습니다.</small>
