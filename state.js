@@ -22,7 +22,6 @@ const threshold=document.getElementById('threshold'),removeLines=document.getEle
 const removeSpecks=document.getElementById('removeSpecks'),speckArea=document.getElementById('speckArea'),speckThreshold=document.getElementById('speckThreshold');
 const screenNoise=document.getElementById('screenNoise');
 const printCorrection=document.getElementById('printCorrection');
-const stripeReduce=document.getElementById('stripeReduce'),stripeWidth=document.getElementById('stripeWidth'),stripeThreshold=document.getElementById('stripeThreshold');
 const showGlyphGuide=document.getElementById('showGlyphGuide');
 let glyphGuideRange=null,glyphGuideFrame=0;
 let settingsAdjusting=false;
@@ -39,7 +38,7 @@ const presetButtons=[...document.querySelectorAll('[data-performance-preset]')];
 const cancelScan=document.getElementById('cancelScan');
 const scanStageInputs=[...document.querySelectorAll('[data-scan-stage]')];
 const performanceInputs=[ocrSize,correctionSize,preprocessAcceleration,glyphMode,glyphMin,glyphMax,liveOcr,liveInterval,liveSize,workerCount,deepScan,extraScanMode,...scanStageInputs,previewQuality];
-const correctionInputs=[...performanceInputs,stripeReduce,stripeWidth,stripeThreshold,removeSpecks,speckArea,speckThreshold,screenNoise,printCorrection,brightness,threshold,removeLines,previewCorrection];
+const correctionInputs=[...performanceInputs,removeSpecks,speckArea,speckThreshold,screenNoise,printCorrection,brightness,threshold,removeLines,previewCorrection];
 let scanEpoch=0,activeScan=null,imageRevision=0;
 let testExpectedCodes=[];
 const boxOpacity=document.getElementById("boxOpacity"),boxOpacityValue=document.getElementById("boxOpacityValue");

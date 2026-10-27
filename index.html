@@ -159,13 +159,6 @@
 <details class="correction-settings"><summary>이미지 보정</summary>
 <label class="inline-label"><input id="previewCorrection" type="checkbox" role="switch" aria-describedby="previewCorrectionHint"> 보정 이미지 표시 <output id="previewCorrectionValue">OFF · 원본</output></label>
 <small id="previewCorrectionHint">ON: 현재 설정의 보정 이미지를 표시 · OFF: 원본 표시. OCR 설정은 유지됩니다.</small>
-<div class="stripe-option-row"><label class="inline-label"><input id="stripeReduce" type="checkbox"> 세로 줄무늬 완화</label><figure id="stripePreview" aria-label="현재 이미지 중앙의 줄무늬 보정 비교"><div><canvas id="stripeBefore" width="96" height="64"></canvas><small>원본</small></div><div><canvas id="stripeAfter" width="96" height="64"></canvas><small>완화 예시</small></div></figure></div>
-<output id="stripePreviewStatus" class="performance-note">이미지를 준비하면 중앙 부분을 작게 비교합니다.</output>
-<label for="stripeWidth">가로 평균 폭 <output id="stripeWidthValue">11</output> 원본 px</label>
-<input id="stripeWidth" type="range" min="3" max="31" step="2" value="11" disabled>
-<label for="stripeThreshold">줄무늬 이진화 밝기 <output id="stripeThresholdValue">110</output></label>
-<input id="stripeThreshold" type="range" min="40" max="200" step="5" value="110" disabled>
-<small>켜면 CPU 워커의 가로 평균·이진화 보정으로 기존 노이즈·밝기·대비·인쇄물·작은 영역 제거를 대신합니다. 폭이 크면 얇은 글자가 뭉개질 수 있습니다. 심한 무늬는 OCR·보정 해상도를 높이고 글자 높이 상한도 확인하세요. 오른쪽 예시는 켜기 전에도 효과를 비교하며, 실제 OCR은 선택한 해상도에서 처리합니다.</small>
 <label for="screenNoise">중간값 노이즈 완화 <output id="screenNoiseValue">0</output>%</label>
 <input id="screenNoise" type="range" min="0" max="100" step="10" value="0" aria-describedby="screenNoiseHint">
 <small id="screenNoiseHint">0% 끄기 · 색 점과 잔무늬를 줄입니다. 높이면 얇은 글자가 흐려질 수 있으며 굵은 줄무늬는 남을 수 있습니다.</small>

@@ -144,7 +144,6 @@ function prepareGpuPixels(image,settings){
 
 // 실패한 GPU 경로는 해제하고 변경되지 않은 입력을 CPU로 처리한다.
 function correctWorkerPixels(image,settings){
- if(settings.stripeReduce){reduceVerticalStripes(image,settings);return 'CPU 보정 워커 · 세로 줄무늬 완화';}
  let prepared=null,path='CPU 보정 워커';
  if(settings.acceleration==='cpu'){releaseGpuCorrection();gpuCorrectionFailure='';}
  else if(settings.screenNoise||settings.brightness||settings.strength||settings.mode==='print'){

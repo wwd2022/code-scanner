@@ -164,11 +164,6 @@ button:disabled{opacity:.45;cursor:default}button:focus-visible,input:focus-visi
 .glyph-range-inputs{display:flex;gap:10px;flex-wrap:wrap}
 .glyph-range-inputs label{flex:1;min-width:110px}
 .glyph-range-inputs input{width:100%;min-height:38px;padding:6px}
-.stripe-option-row{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin:8px 0}
-.stripe-option-row>.inline-label{flex:1;min-width:130px}
-#stripePreview{display:flex;gap:4px;margin:0;flex-shrink:0}
-#stripePreview canvas{display:block;width:80px;height:54px;background:#e5e9ef;border:1px solid #cbd3dd;border-radius:5px}
-#stripePreview small{display:block;text-align:center;font-size:9px;color:#647182}
 #glyphGuide{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:160px;max-width:60%;box-sizing:content-box;pointer-events:none;border:1px dashed #b1e0ff99;background:linear-gradient(to bottom,#75c8ff20 0 calc(50% - var(--glyph-min-height)/2),#75c8ff66 calc(50% - var(--glyph-min-height)/2) calc(50% + var(--glyph-min-height)/2),#75c8ff20 calc(50% + var(--glyph-min-height)/2) 100%);z-index:2}
 #boxes .code-box{pointer-events:auto;cursor:pointer;touch-action:none}
 .review-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:10px}

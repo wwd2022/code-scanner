@@ -60,9 +60,7 @@ function renderLivePreview(){
   if(!corrected){drawCorrected(liveCanvas,0,2200);return;}
   if(!drawCorrected(livePreviewBuffer,0,getPreviewMaxSize()))return;
   const settings=getCorrectionSettings();
-  const crop=getCameraCrop();
-  const sourceEdge=Math.min(settings.ocrMaxEdge,crop?Math.max(crop.width,crop.height):settings.ocrMaxEdge);
-  await correctCanvas(livePreviewBuffer,{...settings,stripeScale:Math.max(livePreviewBuffer.width,livePreviewBuffer.height)/sourceEdge,pixelScale:Math.max(livePreviewBuffer.width,livePreviewBuffer.height)/correctionReferenceEdge});
+  await correctCanvas(livePreviewBuffer,{...settings,pixelScale:Math.max(livePreviewBuffer.width,livePreviewBuffer.height)/correctionReferenceEdge});
   if(!isCurrent())return;
   if(liveCanvas.width!==livePreviewBuffer.width)liveCanvas.width=livePreviewBuffer.width;
   if(liveCanvas.height!==livePreviewBuffer.height)liveCanvas.height=livePreviewBuffer.height;
@@ -88,7 +86,7 @@ function renderPreview(source,target){
   const ctx=previewBuffer.getContext('2d',{willReadFrequently:true});
   ctx.drawImage(source,0,0,w,h);
   const pixels=ctx.getImageData(0,0,w,h);
-  applyCorrection(pixels,{...getCorrectionSettings(),stripeScale:scale,pixelScale:Math.max(w,h)/correctionReferenceEdge});
+  applyCorrection(pixels,{...getCorrectionSettings(),pixelScale:Math.max(w,h)/correctionReferenceEdge});
   ctx.putImageData(pixels,0,0);
   image=previewBuffer;
  }
@@ -102,7 +100,7 @@ function renderPreview(source,target){
 // 표시 옵션과 보정 설정을 즉시 반영한다. (업데이트 프리뷰)
 // 확대·박스·인식 기록을 유지하며 화면 이미지만 다시 그린다.
 function updatePreview(){
- queueStripePreview();queueGlyphGuide();
+ queueGlyphGuide();
  document.getElementById('previewCorrectionValue').value=settingsAdjusting?'조절 중 · 보정':previewCorrection.checked?'ON · 보정':'OFF · 원본';
  if(activeTab==='camera'&&!frozenMode){
   renderLivePreview();
@@ -162,27 +160,8 @@ function printFilter(image,offset=16,cleanLines=true,pixelScale=1,preparedBlur=n
  for(let i=0;i<n;i++){const v=mask[i]?0:255;data[i*4]=data[i*4+1]=data[i*4+2]=v;}
 }
 
-// 가로 이동 합으로 세로 무늬를 완화하고 이진화한다.
-function reduceVerticalStripes(image,settings){
- const {width,height,data}=image;
- const radius=Math.min(width-1,Math.max(0,Math.floor(Math.round((settings.stripeWidth||11)*(settings.stripeScale??1))/2)));
- const size=radius*2+1,row=new Float64Array(width),threshold=settings.stripeThreshold??110;
- const index=x=>x<0?-x-1:x>=width?2*width-x-1:x;
- for(let y=0;y<height;y++){
-  const offset=y*width*4;
-  for(let x=0;x<width;x++){const i=offset+x*4;row[x]=data[i]*.299+data[i+1]*.587+data[i+2]*.114;}
-  let sum=0;for(let dx=-radius;dx<=radius;dx++)sum+=row[index(dx)];
-  for(let x=0;x<width;x++){
-   const i=offset+x*4,value=sum/size<threshold?0:255;
-   data[i]=data[i+1]=data[i+2]=value;
-   sum+=row[index(x+radius+1)]-row[index(x-radius)];
-  }
- }
-}
-
 // 미리보기와 모든 OCR 입력에서 같은 필터를 사용한다.
 function applyCorrection(image,settings,prepared=null){
- if(settings.stripeReduce){reduceVerticalStripes(image,settings);return;}
  if(!prepared){
   if(settings.screenNoise)reduceScreenNoise(image,settings.screenNoise);
   if(settings.brightness)for(let i=0;i<image.data.length;i+=4)for(let c=0;c<3;c++)image.data[i+c]+=settings.brightness;
@@ -208,7 +187,7 @@ async function renderScanPass(source,pass,settings){
  const actualScale=Math.min(image.width/pass.width,image.height/pass.height);
  const pixelScale=(settings.referenceEdge||Math.max(source.width,source.height))/correctionReferenceEdge*actualScale;
  let correctionPath;
- try{correctionPath=await correctCanvas(image,{...settings,stripeScale:actualScale,pixelScale});}
+ try{correctionPath=await correctCanvas(image,{...settings,pixelScale});}
  catch(error){image.width=image.height=1;throw error;}
  const correctionResolution=image.width+'×'+image.height;
  const targetWidth=Math.max(1,Math.round(pass.width*pass.scale)),targetHeight=Math.max(1,Math.round(pass.height*pass.scale));
@@ -250,7 +229,7 @@ function reduceScreenNoise(image,amount){
 // 모든 입력 모드에서 현재 보정값을 같은 형식으로 읽는다.
 // 미리보기·전체 인식·부분 재인식의 설정 누락을 막는다.
 function getCorrectionSettings(referenceEdge=0){
- return {referenceEdge,stripeReduce:stripeReduce.checked,stripeWidth:Number(stripeWidth.value),stripeThreshold:Number(stripeThreshold.value),extraScanMode:extraScanMode.value,glyphMode:glyphMode.value,glyphMin:Math.min(readNumericSetting(glyphMin,4),readNumericSetting(glyphMax,120)),glyphMax:Math.max(readNumericSetting(glyphMin,4),readNumericSetting(glyphMax,120)),ocrMaxEdge:Math.round(readNumericSetting(ocrSize,1280)),correctionMaxEdge:Number(correctionSize.value),acceleration:preprocessAcceleration.value,ocrWorkers:Number(workerCount.value),removeSpecks:removeSpecks.checked,speckArea:Number(speckArea.value),speckThreshold:Number(speckThreshold.value),screenNoise:Number(screenNoise.value),mode:filterMode.value,brightness:Number(brightness.value),strength:Number(strength.value),threshold:Number(threshold.value),removeLines:removeLines.checked};
+ return {referenceEdge,extraScanMode:extraScanMode.value,glyphMode:glyphMode.value,glyphMin:Math.min(readNumericSetting(glyphMin,4),readNumericSetting(glyphMax,120)),glyphMax:Math.max(readNumericSetting(glyphMin,4),readNumericSetting(glyphMax,120)),ocrMaxEdge:Math.round(readNumericSetting(ocrSize,1280)),correctionMaxEdge:Number(correctionSize.value),acceleration:preprocessAcceleration.value,ocrWorkers:Number(workerCount.value),removeSpecks:removeSpecks.checked,speckArea:Number(speckArea.value),speckThreshold:Number(speckThreshold.value),screenNoise:Number(screenNoise.value),mode:filterMode.value,brightness:Number(brightness.value),strength:Number(strength.value),threshold:Number(threshold.value),removeLines:removeLines.checked};
 }
 
 // 대각선을 포함해 연결된 검은 영역 중 지정 면적 이하만 지운다.
@@ -313,7 +292,7 @@ function getCorrectionWorker(){
 }
 
 function hasImageCorrection(settings){
- return !!(settings.stripeReduce||settings.screenNoise||settings.brightness||settings.strength||settings.mode==='print'||settings.removeSpecks);
+ return !!(settings.screenNoise||settings.brightness||settings.strength||settings.mode==='print'||settings.removeSpecks);
 }
 // 전송 실패 시 원본 픽셀을 다시 읽어 같은 필터로 처리한다.
 async function correctCanvas(canvas,settings){
@@ -345,58 +324,4 @@ async function correctCanvas(canvas,settings){
 function readNumericSetting(input,fallback){
  const value=input.valueAsNumber;
  return Number.isFinite(value)?Math.max(Number(input.min),Math.min(Number(input.max),value)):fallback;
-}
-
-const stripeSample=typeof document==='undefined'?null:document.createElement('canvas');
-const stripeWork=typeof document==='undefined'?null:document.createElement('canvas');
-let stripePreviewTimer=0,stripePreviewJob=null,stripePreviewQueued=false,stripePreviewTime=0;
-function stripePreviewVisible(){
- const figure=document.getElementById('stripePreview');
- return !busy&&document.getElementById('settingsDrawer').open&&!document.getElementById('performanceSettings').hidden&&figure.closest('details').open;
-}
-function queueStripePreview(){
- if(!stripePreviewVisible()||stripePreviewTimer)return;
- stripePreviewTimer=setTimeout(renderStripePreview,Math.max(0,400-(performance.now()-stripePreviewTime)));
-}
-async function renderStripePreview(){
- stripePreviewTimer=0;
- if(!stripePreviewVisible())return;
- if(stripePreviewJob){stripePreviewQueued=true;return;}
- stripePreviewTime=performance.now();
- const epoch=scanEpoch,live=liveEpoch,revision=imageRevision,tab=activeTab,settings=getCorrectionSettings();
- const key=JSON.stringify(settings),output=document.getElementById('stripePreviewStatus');
- let source,x=0,y=0,width,height;
- if(activeTab==='camera'&&!frozenMode){
-  const crop=getCameraCrop();if(!stream||!crop){output.value='카메라 또는 사진을 준비하세요.';return;}
-  source=camera;({x,y,width,height}=crop);
-  const captureScale=Math.min(1,settings.ocrMaxEdge/Math.max(width,height));
-  width*=captureScale;height*=captureScale;
-  // 촬영 후 원본과 같은 좌표 단위로 미리보기 폭을 계산한다.
-  settings.stripeScale=captureScale;
- }else{
-  if(activeTab!=='camera'&&!photoReady){output.value='사진 또는 테스트 이미지를 준비하세요.';return;}
-  source=activeTab==='camera'?originalFrame:photoSource;width=source.width;height=source.height;
-  settings.stripeScale=1;
- }
- const sourceScale=settings.stripeScale;
- const scale=Math.min(1,settings.ocrMaxEdge/Math.max(width,height),(settings.correctionMaxEdge||Infinity)/Math.max(width,height));
- const w=Math.max(1,Math.min(288,Math.round(width*scale))),h=Math.max(1,Math.min(192,Math.round(height*scale)));
- stripeSample.width=stripeWork.width=w;stripeSample.height=stripeWork.height=h;
- stripeSample.getContext('2d').drawImage(source,x+(width-w/scale)/sourceScale/2,y+(height-h/scale)/sourceScale/2,w/scale/sourceScale,h/scale/sourceScale,0,0,w,h);
- stripeWork.getContext('2d').drawImage(stripeSample,0,0);
- const valid=()=>stripePreviewVisible()&&epoch===scanEpoch&&live===liveEpoch&&revision===imageRevision&&tab===activeTab&&key===JSON.stringify(getCorrectionSettings());
- const job=correctCanvas(stripeWork,{...settings,stripeReduce:true,stripeScale:scale});stripePreviewJob=job;
- try{
-  await job;
-  if(!valid()){stripePreviewQueued=true;return;}
-  for(const [id,canvas] of [['stripeBefore',stripeSample],['stripeAfter',stripeWork]]){
-   const target=document.getElementById(id);target.getContext('2d').drawImage(canvas,0,0,target.width,target.height);
-  }
-  output.value='중앙 부분 비교 · '+(stripeReduce.checked?'OCR 적용 중':'예시만 표시 · 켜면 OCR 적용');
- }catch(error){output.value='비교 미리보기 준비 실패';}
- finally{
-  if(stripePreviewJob===job)stripePreviewJob=null;
-  const again=stripePreviewQueued;stripePreviewQueued=false;
-  if(again)queueStripePreview();
- }
 }

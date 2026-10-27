@@ -4,7 +4,6 @@ function lockInputs(locked){
  tabButtons.forEach(button=>button.disabled=locked);
  correctionInputs.forEach(input=>input.disabled=locked);
  syncPerformanceInputs(locked);
- syncStripeInputs(locked);
  presetButtons.forEach(button=>button.disabled=locked);
  document.querySelectorAll('[data-settings-action],#optimizeStart').forEach(input=>input.disabled=locked);
  document.getElementById('optimizeCancel').disabled=!locked||!activeScan?.optimization;
@@ -38,7 +37,7 @@ function switchTab(tab){
  readImage.disabled=true;
  liveView.hidden=tab!=='camera';liveStatus.hidden=tab!=='camera';
  imageViewport.hidden=true;frozen.hidden=true;
- strength.disabled=stripeReduce.checked;photoInput.value='';
+ strength.disabled=false;photoInput.value='';
  liveCanvas.getContext('2d').clearRect(0,0,liveCanvas.width,liveCanvas.height);
  status.textContent=tab==='camera'?'카메라를 켜고 코드 인식을 누르세요.':'사진을 선택해 주세요.';
  if(tab==='test')makeTestImage();
@@ -356,7 +355,7 @@ function showScanFailure(error){
 function showScanEnd(){
  cancelScan.hidden=true;cancelScan.disabled=false;
  lockInputs(false);excel.disabled=false;sheet.disabled=false;liveCanvas.setAttribute('aria-busy','false');
- strength.disabled=stripeReduce.checked;resume.disabled=!stream||!frozenMode;
+ strength.disabled=false;resume.disabled=!stream||!frozenMode;
  start.disabled=!!stream;readImage.textContent=activeTab==='camera'&&frozenMode?'다시 촬영':'코드 인식';
  updateReviewActions();
 }
@@ -466,7 +465,7 @@ function restoreSettings(){
   document.getElementById('testNoiseValue').value=document.getElementById('testNoise').value+'%';
   if(typeof values.printCorrection!=='boolean')printCorrection.checked=filterMode.value==='print';
   filterMode.value=printCorrection.checked?'print':'contrast';
-  syncStripeInputs();updateBoxStyle();updatePreview();
+  updateBoxStyle();updatePreview();
  }catch(error){
   console.warn('저장된 설정을 복원하지 못했습니다.',error);
  }
@@ -493,13 +492,7 @@ settingsPanelButtons.forEach(button=>button.addEventListener('click',()=>{
  settingsDrawer.querySelector('.drawer-body').scrollTop=0;
  updateDesignPreview();
 }));
-function syncStripeInputs(locked=busy||starting){
- stripeWidth.disabled=stripeThreshold.disabled=locked||!stripeReduce.checked;
- preprocessAcceleration.disabled=locked||stripeReduce.checked;
- for(const input of [strength,removeSpecks,speckArea,speckThreshold,screenNoise,printCorrection,brightness,threshold,removeLines])input.disabled=locked||stripeReduce.checked;
- for(const input of [stripeWidth,stripeThreshold])document.getElementById(input.id+'Value').value=input.value;
-}
-const previewInputs=new Set([strength,previewQuality,stripeReduce,stripeWidth,stripeThreshold,removeSpecks,speckArea,speckThreshold,screenNoise,printCorrection,brightness,threshold,removeLines,previewCorrection]);
+const previewInputs=new Set([strength,previewQuality,removeSpecks,speckArea,speckThreshold,screenNoise,printCorrection,brightness,threshold,removeLines,previewCorrection]);
 let adjustmentPointer=null,adjustmentTimer=0,adjustmentFrame=0;
 let adjustmentSlider=null,adjustmentLabel=null;
 function beginSettingsPreview(event){
@@ -538,7 +531,6 @@ function handleCorrectionInput(event){
  const input=event.target;
  if(!previewInputs.has(input))return;
  if(input===printCorrection)filterMode.value=printCorrection.checked?'print':'contrast';
- if(input===stripeReduce)syncStripeInputs();
  const output=document.getElementById(input.id+'Value');
  if(input.type==='range'&&output)output.value=input.value;
  liveEpoch++;dots.replaceChildren();
@@ -563,7 +555,7 @@ function endSettingsPreview(event){
 settingsDrawer.addEventListener('pointerdown',beginSettingsPreview);
 settingsDrawer.addEventListener('input',handleCorrectionInput);
 settingsDrawer.addEventListener('toggle',()=>{if(!settingsDrawer.open)endSettingsPreview();});
-settingsDrawer.addEventListener('toggle',()=>{queueStripePreview();queueGlyphGuide();},true);
+settingsDrawer.addEventListener('toggle',()=>{queueGlyphGuide();},true);
 settingsDrawer.addEventListener('input',event=>{if([glyphMode,glyphMin,glyphMax,showGlyphGuide,ocrSize].includes(event.target))queueGlyphGuide();});
 window.addEventListener('pointerup',endSettingsPreview);
 window.addEventListener('pointercancel',endSettingsPreview);
@@ -789,7 +781,7 @@ function parseTransferredSettings(text){
 }
 
 function syncSettingsDisplay(){
- syncStripeInputs();queueGlyphGuide();
+ queueGlyphGuide();
  for(const input of [strength,screenNoise,brightness,threshold,speckArea,speckThreshold]){
   const output=document.getElementById(input.id+'Value');if(output)output.value=input.value;
  }

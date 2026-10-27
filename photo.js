@@ -8,7 +8,7 @@ function previewPhoto(){
  renderPreview(photoSource,frame);
  detectedHits=[];boxes.replaceChildren();raw.textContent='';scanStats.textContent='';
  frozenMode=true;frozen.hidden=false;imageViewport.hidden=false;liveView.hidden=true;zoomLevel.hidden=false;zoomHint.hidden=false;
- readImage.disabled=false;strength.disabled=stripeReduce.checked;
+ readImage.disabled=false;strength.disabled=false;
  updateOcrInputSize();
  status.textContent='두 손가락 확대·이동 / 두 번 터치 또는 인식 버튼으로 검사';
 }
@@ -84,6 +84,6 @@ async function loadPhoto(){
   status.textContent='사진을 읽지 못했습니다. JPG 또는 PNG 사진으로 다시 선택하세요.';
  }finally{
   URL.revokeObjectURL(url);photoInput.value='';busy=false;lockInputs(false);
-  excel.disabled=false;sheet.disabled=false;strength.disabled=stripeReduce.checked;
+  excel.disabled=false;sheet.disabled=false;strength.disabled=false;
  }
 }
