@@ -407,7 +407,7 @@ async function recognizeReviewRegion(crop,onPrepared=null){
  const requestedScale=scaleInput.value.trim()?readNumericSetting(scaleInput,1):Math.max(1,Math.min(4,32/crop.glyphHeight));
  const scale=Math.min(requestedScale,maxEdge/Math.max(width,height));
  // 이미 보정된 픽셀은 확대만 하고 필터를 다시 적용하지 않는다.
- const settings={...base,ocrMaxEdge:maxEdge,correctionMaxEdge:0,inkColor:'all',mode:'contrast',strength:0,brightness:0,screenNoise:0,removeLines:false,removeSpecks:false,glyphMode:'manual',glyphMin:Math.max(1,crop.glyphHeight*.5),glyphMax:crop.glyphHeight*2};
+ const settings={...base,ocrMaxEdge:maxEdge,correctionMaxEdge:0,mode:'contrast',strength:0,brightness:0,screenNoise:0,removeLines:false,removeSpecks:false,glyphMode:'manual',glyphMin:Math.max(1,crop.glyphHeight*.5),glyphMax:crop.glyphHeight*2};
  const result=await recognizeCorrected(crop.image,settings,null,scale,onPrepared,null,'7');
  const hits=result.hits;
  const distance=hit=>Math.hypot(((hit.bbox.x0+hit.bbox.x1)/2-crop.centerX)/width,((hit.bbox.y0+hit.bbox.y1)/2-crop.centerY)/height);
@@ -422,7 +422,6 @@ async function recognizeReviewRegion(crop,onPrepared=null){
 function optimizationImageKey(settings,sourceEdge){
  const edge=Math.min(sourceEdge,settings.ocrMaxEdge);
  return JSON.stringify([edge,hasImageCorrection(settings)?Math.min(edge,settings.correctionMaxEdge||edge):edge,
-  settings.inkColor==='black'?[settings.inkColor,settings.inkBlackLevel,settings.inkSaturation]:settings.inkColor==='nonblack'?[settings.inkColor,settings.inkSaturation]:null,
   settings.screenNoise,settings.brightness,settings.strength,settings.mode,
   settings.mode==='print'?[settings.threshold,settings.removeLines]:null,
   settings.removeSpecks?[settings.speckArea,settings.speckThreshold]:null]);
@@ -502,7 +501,7 @@ async function optimizePerformance(){
  addFilter('현재 설정');
  addFilter('1280px · 현재 필터',{ocrMaxEdge:1280,correctionMaxEdge:1280});
  const neutral={ocrMaxEdge:1280,correctionMaxEdge:1280,mode:'contrast',strength:0,brightness:0,screenNoise:0,removeSpecks:false,removeLines:false};
- addFilter(base.inkColor==='all'?'1280px · 외부 보정 없음':'1280px · 색상 선별만',neutral);
+ addFilter('1280px · 외부 보정 없음',neutral);
  addFilter('1280px · 대비 20%',{...neutral,strength:20});
  for(const value of [8,16,24])addFilter('1280px · 인쇄 농도 '+value,{...neutral,mode:'print',threshold:value,removeLines:base.removeLines});
  addFilter('1280px · 인쇄 농도 16 · 노이즈 20%',{...neutral,mode:'print',threshold:16,removeLines:base.removeLines,screenNoise:20});
