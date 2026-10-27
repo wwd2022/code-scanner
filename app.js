@@ -5,7 +5,7 @@ function lockInputs(locked){
  correctionInputs.forEach(input=>input.disabled=locked);
  syncPerformanceInputs(locked);
  presetButtons.forEach(button=>button.disabled=locked);
- document.querySelectorAll('[data-settings-action],#optimizeStart,#optimizerExpected').forEach(input=>input.disabled=locked);
+ document.querySelectorAll('[data-settings-action],#optimizeStart').forEach(input=>input.disabled=locked);
  document.getElementById('optimizeCancel').disabled=!locked||!activeScan?.optimization;
  document.querySelectorAll('#testControls input,#testControls select,#testControls button').forEach(input=>input.disabled=locked);
  syncScanStageInputs(locked);

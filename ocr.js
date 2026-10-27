@@ -417,68 +417,142 @@ async function recognizeReviewRegion(crop,onPrepared=null){
 
 
 // 사용자가 실행할 때만 같은 정지 이미지로 설정 조합을 비교한다.
+// 워커·가속 경로는 같은 입력의 교차 확인 표로 중복 계산하지 않는다.
+function optimizationImageKey(settings,sourceEdge){
+ const edge=Math.min(sourceEdge,settings.ocrMaxEdge);
+ return JSON.stringify([edge,hasImageCorrection(settings)?Math.min(edge,settings.correctionMaxEdge||edge):edge,
+  settings.screenNoise,settings.brightness,settings.strength,settings.mode,
+  settings.mode==='print'?[settings.threshold,settings.removeLines]:null,
+  settings.removeSpecks?[settings.speckArea,settings.speckThreshold]:null]);
+}
+function optimizationOverlap(a,b){
+ const overlap=Math.max(0,Math.min(a.x1,b.x1)-Math.max(a.x0,b.x0))*Math.max(0,Math.min(a.y1,b.y1)-Math.max(a.y0,b.y0));
+ const smaller=Math.min((a.x1-a.x0)*(a.y1-a.y0),(b.x1-b.x0)*(b.y1-b.y0));
+ return smaller>0?overlap/smaller:0;
+}
+function buildOptimizationReference(entries){
+ const groups=[];
+ for(const entry of entries){
+  for(const hit of [...entry.hits].sort((a,b)=>(b.confidence||0)-(a.confidence||0))){
+   const nearby=groups.filter(group=>!group.sources.has(entry.key)&&optimizationOverlap(group.bbox,hit.bbox)>=.5);
+   nearby.sort((a,b)=>optimizationOverlap(b.bbox,hit.bbox)-optimizationOverlap(a.bbox,hit.bbox));
+   let group=nearby[0];
+   if(!group){group={bbox:{...hit.bbox},sources:new Set(),votes:new Map(),code:null};groups.push(group);}
+   group.sources.add(entry.key);
+   if(!hit.review&&(hit.confidence??0)>=60)group.votes.set(hit.code,(group.votes.get(hit.code)||0)+1);
+  }
+ }
+ for(const group of groups){
+  const ranked=[...group.votes].sort((a,b)=>b[1]-a[1]);
+  const total=ranked.reduce((sum,item)=>sum+item[1],0);
+  if(ranked[0]?.[1]>=2&&ranked[0][1]*2>total)group.code=ranked[0][0];
+ }
+ // 한 조건에서만 나타난 위치는 누락 기준으로 고정하지 않는다.
+ return groups.filter(group=>group.sources.size>=2).sort((a,b)=>Number(!!b.code)-Number(!!a.code));
+}
+function scoreOptimization(hits,reference,expectedCodes){
+ const matchedKeys=new Set();
+ let matched=0,miss=0,regionMiss=0,conflicts=0;
+ if(expectedCodes.length){
+  const expected=new Map(),counts=new Map();
+  for(const code of expectedCodes)expected.set(code,(expected.get(code)||0)+1);
+  for(const hit of hits)counts.set(hit.code,(counts.get(hit.code)||0)+1);
+  for(const [code,count] of expected){
+   const found=Math.min(count,counts.get(code)||0);matched+=found;miss+=count-found;
+   for(let i=0;i<found;i++)matchedKeys.add(code+':'+i);
+  }
+  for(const [code,count] of counts)conflicts+=Math.max(0,count-(expected.get(code)||0));
+ }else{
+  const used=new Set();
+  for(let i=0;i<reference.length;i++){
+   const group=reference[i];
+   const nearby=hits.map((hit,index)=>({hit,index,overlap:optimizationOverlap(group.bbox,hit.bbox)})).filter(item=>!used.has(item.index)&&item.overlap>=.5);
+   nearby.sort((a,b)=>Number(b.hit.code===group.code&&!b.hit.review)-Number(a.hit.code===group.code&&!a.hit.review)||b.overlap-a.overlap);
+   const found=nearby[0];
+   if(found)used.add(found.index);
+   if(group.code){
+    if(found&&found.hit.code===group.code&&!found.hit.review){matched++;matchedKeys.add(i);}
+    else miss++;
+    if(found&&found.hit.code!==group.code)conflicts++;
+   }else if(!found)regionMiss++;
+  }
+ }
+ return {matched,miss,regionMiss,conflicts,review:hits.filter(hit=>hit.review).length,matchedKeys};
+}
+
 async function optimizePerformance(){
  if(busy||starting)return;
- const output=document.getElementById('optimizationStatus');
+ const output=document.getElementById('optimizationStatus'),referenceOutput=document.getElementById('optimizationReference');
  const fail=message=>{output.value=message;status.textContent=message;};
- if(activeTab==='camera'&&(!frozenMode||!originalFrame.width||!detectedHits.length)){
-  fail('먼저 카메라 화면을 인식한 뒤 최적화를 실행하세요.');return;
+ if(activeTab==='camera'&&(!frozenMode||!originalFrame.width)){
+  fail('먼저 카메라 화면을 촬영한 뒤 최적화를 실행하세요.');return;
  }
  if(activeTab!=='camera'&&!photoReady){fail('사진 또는 테스트 이미지를 준비하세요.');return;}
  const stages=scanStageInputs.filter(input=>input.checked&&(deepScan.checked||input.dataset.scanStage==='corrected')).map(input=>input.dataset.scanStage);
  if(!stages.length){fail('검사 단계를 하나 이상 선택하세요.');return;}
- const typed=document.getElementById('optimizerExpected').value.trim();
- const reference=new Map();
- let known=false,referenceLabel='기존의 확실한 인식 코드';
- let codes=[];
- if(typed){
-  codes=typed.split(/[\s,;]+/).map(normalizeCode);
-  if(codes.some(code=>!/^[A-Z0-9]{4}-[A-Z0-9]{6}$/.test(code))){fail('기준 코드를 4자리-6자리 형식으로 입력하세요.');return;}
-  known=true;referenceLabel='직접 입력한 기준 코드';
- }else if(activeTab==='test'&&testExpectedCodes.length){codes=[...testExpectedCodes];known=true;referenceLabel='테스트 이미지의 생성 코드';}
- else codes=detectedHits.filter(hit=>!hit.review).map(hit=>hit.code);
- for(const code of codes)reference.set(code,(reference.get(code)||0)+1);
- if(!reference.size){fail('확실한 기준 코드가 없습니다. 먼저 인식하거나 기준 코드를 입력하세요.');return;}
- const strictExpected=activeTab==='test'&&!typed&&testExpectedCodes.length>0;
- const expected=codes.length,base=getCorrectionSettings();
- const candidates=[],keys=new Set();
+ const base=getCorrectionSettings(),expectedCodes=activeTab==='test'?[...testExpectedCodes]:[];
  const sourceEdge=activeTab==='camera'?Math.max(originalFrame.width,originalFrame.height):Math.max(photoSource.width,photoSource.height);
- const add=(name,changes={})=>{
-  const settings={...base,...changes};
-  const effectiveEdge=Math.min(settings.ocrMaxEdge,sourceEdge);
-  const key=JSON.stringify([effectiveEdge,settings.ocrWorkers,settings.acceleration,Math.min(settings.correctionMaxEdge||effectiveEdge,effectiveEdge)]);
-  if(keys.has(key))return;keys.add(key);
-  candidates.push({name,settings});
+ const filters=[],keys=new Set();
+ const addFilter=(name,changes={})=>{
+  const settings={...base,...changes},key=optimizationImageKey(settings,sourceEdge);
+  if(keys.has(key))return;keys.add(key);filters.push({name,settings,key});
  };
- add('현재 설정');
- for(const count of [1,2,4])add('1280px · '+count+'워커 · 가속 자동',{ocrMaxEdge:1280,ocrWorkers:count,acceleration:'auto'});
- add('1280px · 2워커 · CPU',{ocrMaxEdge:1280,ocrWorkers:2,acceleration:'cpu'});
- add('960px · 2워커 · 가속 자동',{ocrMaxEdge:960,ocrWorkers:2,acceleration:'auto'});
- add('1920px · 2워커 · 가속 자동',{ocrMaxEdge:1920,ocrWorkers:2,acceleration:'auto'});
- add('1280px · 2워커 · 입력 크기 보정',{ocrMaxEdge:1280,ocrWorkers:2,acceleration:'auto',correctionMaxEdge:0});
- const score=result=>{
-  const counts=new Map(),allCounts=new Map();
-  for(const hit of result.hits){
-   allCounts.set(hit.code,(allCounts.get(hit.code)||0)+1);
-   if(known||!hit.review)counts.set(hit.code,(counts.get(hit.code)||0)+1);
-  }
-  let matched=0,extra=0;
-  for(const [code,count] of reference)matched+=Math.min(count,counts.get(code)||0);
-  if(strictExpected)for(const [code,count] of allCounts)extra+=Math.max(0,count-(reference.get(code)||0));
-  return {matched,miss:expected-matched,extra:strictExpected?extra:null,review:result.hits.filter(hit=>hit.review).length};
- };
- const originalQuality=score({hits:detectedHits});
- const compareQuality=(a,b)=>a.miss-b.miss||(a.extra||0)-(b.extra||0)||a.review-b.review;
+ addFilter('현재 설정');
+ addFilter('1280px · 현재 필터',{ocrMaxEdge:1280,correctionMaxEdge:1280});
+ const neutral={ocrMaxEdge:1280,correctionMaxEdge:1280,mode:'contrast',strength:0,brightness:0,screenNoise:0,removeSpecks:false,removeLines:false};
+ addFilter('1280px · 외부 보정 없음',neutral);
+ addFilter('1280px · 대비 20%',{...neutral,strength:20});
+ for(const value of [8,16,24])addFilter('1280px · 인쇄 농도 '+value,{...neutral,mode:'print',threshold:value,removeLines:base.removeLines});
+ addFilter('1280px · 인쇄 농도 16 · 노이즈 20%',{...neutral,mode:'print',threshold:16,removeLines:base.removeLines,screenNoise:20});
+ const compareQuality=(a,b)=>a.miss-b.miss||a.regionMiss-b.regionMiss||a.conflicts-b.conflicts||a.review-b.review;
  const previousSourceValid=reviewSourceArea&&reviewSourceEpoch===scanEpoch;
- const run={epoch:++scanEpoch,cancelled:false,running:0,phase:'최적화 준비',optimization:true};activeScan=run;
+ const run={epoch:++scanEpoch,cancelled:false,running:0,phase:'필터 탐색',optimization:true};activeScan=run;
  const isCurrent=()=>activeScan===run&&!run.cancelled&&scanEpoch===run.epoch;
- const prepared=document.createElement('canvas');
- const started=performance.now();
- let applied=false,best=null;
+ const prepared=document.createElement('canvas'),started=performance.now();
+ let applied=false,best=null,reference=[],expected=expectedCodes.length,baselineQuality=null;
  busy=true;showScanStart(stages);
  document.getElementById('optimizationPanel').open=true;
+ document.getElementById('optimizationConflictLabel').textContent=expectedCodes.length?'추가 오인식':'충돌';
+ referenceOutput.value='1/3 · 필터별 인식에서 위치별 비교 기준을 찾는 중';
  const rows=document.getElementById('optimizationRows');rows.replaceChildren();
  liveEpoch++;clearTimeout(liveTimer);cancelAnimationFrame(animationId);
+ const showEntry=entry=>{
+  const q=entry.quality;
+  entry.cells[1].textContent=q?q.matched+'/'+expected:'기준 수집 중';
+  entry.cells[2].textContent=q?(q.miss+q.regionMiss)+'곳':'—';
+  entry.cells[3].textContent=q?q.conflicts+'곳':'—';
+  entry.cells[4].textContent=q?q.review+'곳':entry.hits.filter(hit=>hit.review).length+'곳';
+ };
+ const evaluate=async(candidate,label,measure=false)=>{
+  assertOcrCurrent(isCurrent);
+  const row=document.createElement('tr'),cells=[];rows.append(row);
+  for(const value of [label+' · '+candidate.name,'준비 중','—','—','—','—']){
+   const cell=document.createElement('td');cell.textContent=value;row.append(cell);cells.push(cell);
+  }
+  try{
+   if(measure){
+    output.value=label+' · '+candidate.name+' · 준비 인식';
+    const warm=await recognizeCorrected(originalFrame,candidate.settings,null,1,null,stages,'11',{isCurrent,run});
+    assertOcrCurrent(isCurrent);
+    if(warm.errors.length||warm.warning)throw new Error('준비 인식 중 일부 영역 또는 워커 실패');
+   }
+   output.value=label+' · '+candidate.name+(measure?' · 시간 측정':' · 인식 중');
+   const began=performance.now();
+   const result=await recognizeCorrected(originalFrame,candidate.settings,null,1,null,stages,'11',{isCurrent,run});
+   const ms=performance.now()-began;
+   assertOcrCurrent(isCurrent);
+   if(result.errors.length||result.warning)throw new Error('일부 영역 또는 워커 준비 실패');
+   const entry={candidate,key:candidate.key,hits:result.hits,attempts:result.attempts,ms,row,cells,quality:null};
+   cells[0].textContent=label+' · '+candidate.name+' · 보정 '+result.correctionResolution+' → OCR '+result.resolution+' · 실제 '+result.usedWorkers+'워커 · '+result.correctionPath;
+   cells[5].textContent=(measure?'측정 ':'탐색 ')+(ms/1000).toFixed(2)+'초';
+   if(reference.length||expectedCodes.length)entry.quality=scoreOptimization(entry.hits,reference,expectedCodes);
+   showEntry(entry);return entry;
+  }catch(error){
+   if(!isCurrent())throw error;
+   cells[1].textContent='비교 제외';cells[5].textContent=error.message||String(error);return null;
+  }
+ };
+ const preservesBaseline=entry=>[...baselineQuality.matchedKeys].every(key=>entry.quality.matchedKeys.has(key));
  try{
   if(activeTab!=='camera'){
    originalFrame.width=photoSource.width;originalFrame.height=photoSource.height;
@@ -486,40 +560,53 @@ async function optimizePerformance(){
   }
   setPhotoZoom(1);imageViewport.scrollLeft=imageViewport.scrollTop=0;
   if(liveJob)await liveJob.catch(()=>{});
-  assertOcrCurrent(isCurrent);
-  for(let i=0;i<candidates.length;i++){
-   assertOcrCurrent(isCurrent);
-   const candidate=candidates[i],row=document.createElement('tr');rows.append(row);
-   const rowCells=[];
-   for(const value of [candidate.name,'준비 중','—','—','—']){
-    const cell=document.createElement('td');cell.textContent=value;row.append(cell);rowCells.push(cell);
-   }
-   const prefix=(i+1)+'/'+candidates.length+' · '+candidate.name;
-   try{
-    output.value=prefix+' · 준비 인식 중 · 기준: '+referenceLabel+' '+expected+'개';
-    await recognizeCorrected(originalFrame,candidate.settings,null,1,null,stages,'11',{isCurrent,run});
-    assertOcrCurrent(isCurrent);
-    output.value=prefix+' · 시간 측정 중';
-    const measured=performance.now();
-    const result=await recognizeCorrected(originalFrame,candidate.settings,null,1,null,stages,'11',{isCurrent,run});
-    const ms=performance.now()-measured;
-    assertOcrCurrent(isCurrent);
-    if(result.errors.length||result.warning)throw new Error('일부 영역 또는 워커 준비 실패');
-    const quality=score(result);
-    rowCells[0].textContent=candidate.name+' · 입력 '+result.resolution+' · 실제 '+result.usedWorkers+'워커 · '+result.correctionPath;
-    rowCells[1].textContent=quality.matched+'/'+expected;
-    rowCells[2].textContent=strictExpected?quality.extra+'개':'정답 미상';
-    rowCells[3].textContent=quality.review+'개';rowCells[4].textContent=(ms/1000).toFixed(2)+'초';
-    const entry={candidate,quality,ms,row};
-    if(!best||compareQuality(quality,best.quality)<0||(compareQuality(quality,best.quality)===0&&ms<best.ms))best=entry;
-   }catch(error){
-    if(!isCurrent())throw error;
-    rowCells[1].textContent='비교 제외';rowCells[4].textContent=error.message||String(error);
-   }
+  const entries=[];
+  for(let i=0;i<filters.length;i++){
+   const entry=await evaluate(filters[i],'1/3 필터 '+(i+1)+'/'+filters.length);
+   if(entry)entries.push(entry);
+   else if(i===0)throw new Error('현재 설정의 비교 인식에 실패해 기존 설정을 유지합니다.');
+  }
+  reference=buildOptimizationReference(entries);
+  if(!expectedCodes.length)expected=reference.filter(group=>group.code).length;
+  referenceOutput.value=expectedCodes.length?'생성 코드 '+expected+'개 · 오인식 비교 가능':
+   '교차 일치 '+expected+'곳 · 미확정 위치 '+reference.filter(group=>!group.code).length+'곳 · 서로 다른 입력 '+entries.length+'개 · 이후 비교 기준 고정';
+  if(!expected)throw new Error('서로 다른 조건에서 일치한 코드가 부족합니다. 이미지나 필터를 조정한 뒤 다시 실행하세요. 기존 설정을 유지합니다.');
+  for(const entry of entries){entry.quality=scoreOptimization(entry.hits,reference,expectedCodes);showEntry(entry);}
+  baselineQuality=entries[0].quality;
+  // 같은 품질이면 1280px에 가까운 후보를 먼저 유지하고 속도는 마지막에 비교한다.
+  const ordered=entries.filter(preservesBaseline).sort((a,b)=>compareQuality(a.quality,b.quality)||Math.abs(a.candidate.settings.ocrMaxEdge-1280)-Math.abs(b.candidate.settings.ocrMaxEdge-1280));
+  let qualityBest=ordered[0];
+  if(!qualityBest?.quality.matched)throw new Error('기준 코드를 보존하는 필터를 찾지 못해 기존 설정을 유지합니다.');
+  const resolutionBase=qualityBest.candidate;
+  const resolutionCandidates=[];
+  for(const edge of [960,1920]){
+   const settings={...resolutionBase.settings,ocrMaxEdge:edge,correctionMaxEdge:0},key=optimizationImageKey(settings,sourceEdge);
+   if(keys.has(key))continue;keys.add(key);
+   resolutionCandidates.push({name:resolutionBase.name+' → '+edge+'px · 입력 크기 보정',settings,key});
+  }
+  for(let i=0;i<resolutionCandidates.length;i++){
+   const entry=await evaluate(resolutionCandidates[i],'2/3 해상도 '+(i+1)+'/'+resolutionCandidates.length);
+   if(entry&&preservesBaseline(entry)&&compareQuality(entry.quality,qualityBest.quality)<0)qualityBest=entry;
   }
   assertOcrCurrent(isCurrent);
-  if(!best||!best.quality.matched)throw new Error('기준 코드를 인식하는 조합을 찾지 못해 기존 설정을 유지합니다.');
-  if(compareQuality(best.quality,originalQuality)>0)throw new Error('기존 인식 결과를 유지하는 조합이 없어 설정을 유지합니다.');
+  const targetQuality=qualityBest.quality,speedCandidates=[],speedKeys=new Set();
+  const addSpeed=(candidate,count,acceleration)=>{
+   const settings={...candidate.settings,ocrWorkers:count,acceleration};
+   const key=JSON.stringify([optimizationImageKey(settings,sourceEdge),count,acceleration]);
+   if(speedKeys.has(key))return;speedKeys.add(key);
+   speedCandidates.push({name:candidate.name+' · '+count+'워커 · '+(acceleration==='auto'?'가속 자동':'CPU'),settings});
+  };
+  for(const count of qualityBest.attempts>1?[1,2,4]:[1])addSpeed(qualityBest.candidate,count,'auto');
+  addSpeed(qualityBest.candidate,qualityBest.attempts>1?2:1,'cpu');
+  if(compareQuality(baselineQuality,targetQuality)===0)addSpeed(entries[0].candidate,base.ocrWorkers,base.acceleration);
+  for(let i=0;i<speedCandidates.length;i++){
+   const entry=await evaluate(speedCandidates[i],'3/3 실행 '+(i+1)+'/'+speedCandidates.length,true);
+   if(!entry)continue;
+   if(!preservesBaseline(entry)||compareQuality(entry.quality,targetQuality)>0){entry.cells[1].textContent+=' · 품질 미달';continue;}
+   if(!best||compareQuality(entry.quality,best.quality)<0||(compareQuality(entry.quality,best.quality)===0&&entry.ms<best.ms))best=entry;
+  }
+  assertOcrCurrent(isCurrent);
+  if(!best)throw new Error('실행 비교에서 인식 결과를 유지하지 못해 기존 설정을 유지합니다.');
   output.value='추천 조합으로 최종 인식 중 · '+best.candidate.name;
   const finalStart=performance.now();
   const result=await recognizeCorrected(originalFrame,best.candidate.settings,null,1,image=>{
@@ -528,11 +615,15 @@ async function optimizePerformance(){
   },stages,'11',{isCurrent,run});
   const totalMs=performance.now()-finalStart;
   assertOcrCurrent(isCurrent);
-  if(result.errors.length||compareQuality(score(result),best.quality)>0)throw new Error('최종 인식에서 비교 결과를 유지하지 못해 기존 설정을 유지합니다.');
+  const finalQuality=scoreOptimization(result.hits,reference,expectedCodes);
+  if(result.errors.length||result.warning||!preservesBaseline({quality:finalQuality})||compareQuality(finalQuality,best.quality)>0)throw new Error('최종 인식에서 비교 결과를 유지하지 못해 기존 설정을 유지합니다.');
   run.committed=true;cancelScan.disabled=true;document.getElementById('optimizeCancel').disabled=true;
   const selected=best.candidate.settings;
   ocrSize.value=selected.ocrMaxEdge;workerCount.value=selected.ocrWorkers;
   preprocessAcceleration.value=selected.acceleration;correctionSize.value=selected.correctionMaxEdge;
+  printCorrection.checked=selected.mode==='print';
+  for(const [input,value] of [[strength,selected.strength],[brightness,selected.brightness],[screenNoise,selected.screenNoise],[threshold,selected.threshold]])input.value=value;
+  removeLines.checked=selected.removeLines;removeSpecks.checked=selected.removeSpecks;
   performancePreset.value='custom';syncSettingsDisplay();
   clearReviewSource();reviewSource.width=prepared.width;reviewSource.height=prepared.height;
   reviewSource.getContext('2d').drawImage(prepared,0,0);
@@ -545,8 +636,8 @@ async function optimizePerformance(){
   showPerformanceResult({...result,totalMs,captureMs:0,liveWaitMs:0,preset:'custom',source:activeTab,imageRevision,area:null});
   document.getElementById('scanSingleCount').value=detectedHits.length+'곳 · 추천 설정 적용';
   queueSettingsSave();const saved=saveSettings();applied=true;best.row.classList.add('optimizer-best');
-  output.value='추천 적용: '+best.candidate.name+' · 기준 '+best.quality.matched+'/'+expected+'개 · 비교 측정 '+(best.ms/1000).toFixed(2)+'초 · 전체 비교 '+((performance.now()-started)/1000).toFixed(1)+'초';
-  status.textContent=saved?'자동 최적화 완료 · 추천 설정 저장':'추천 설정 적용 · 브라우저 저장 실패';
+  output.value='추천 적용: '+best.candidate.name+' · 기준 '+finalQuality.matched+'/'+expected+'곳 · 측정 '+(best.ms/1000).toFixed(2)+'초 · 전체 탐색 '+((performance.now()-started)/1000).toFixed(1)+'초';
+  status.textContent=saved?'자동 최적화 완료 · 필터·성능 설정 저장':'추천 설정 적용 · 브라우저 저장 실패';
  }catch(error){
   const message=!isCurrent()?'최적화 취소 · 실행 중 작업 완료 후 폐기 · 기존 설정 유지':'최적화 중단: '+(error.message||String(error));
   output.value=message;status.textContent=message;
