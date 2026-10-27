@@ -837,7 +837,7 @@ function queueGlyphGuide(){
 }
 function updateGlyphGuide(){
  glyphGuideFrame=0;
- const guide=document.getElementById('glyphGuide'),caption=document.getElementById('glyphGuideCaption');
+ const guide=document.getElementById('glyphGuide');
  const live=activeTab==='camera'&&!frozenMode;
  if(!showGlyphGuide.checked||(live?!stream:imageViewport.hidden||!frozenMode)){guide.hidden=true;return;}
  let sourceHeight,displayHeight;
@@ -851,16 +851,11 @@ function updateGlyphGuide(){
  let high=Math.max(readNumericSetting(glyphMin,4),readNumericSetting(glyphMax,120));
  const automatic=glyphMode.value==='auto';
  const valid=glyphGuideRange&&glyphGuideRange.mode==='auto'&&glyphGuideRange.live===live&&glyphGuideRange.epoch===(live?liveEpoch:scanEpoch);
- guide.hidden=false;
- const samples=guide.querySelector('.glyph-guide-boxes');
- samples.hidden=automatic&&!valid;
- if(automatic&&!valid){caption.textContent='글자 크기 자동 · 인식 후 예시 표시';return;}
+ guide.hidden=automatic&&!valid;
+ if(guide.hidden)return;
  if(automatic){low=glyphGuideRange.min;high=glyphGuideRange.max;sourceHeight=glyphGuideRange.sourceHeight;}
- caption.textContent=(automatic?'최근 자동':'수동')+' 글자 높이 '+Math.round(low)+'~'+Math.round(high)+'px · 원본 기준';
- for(const [id,value] of [['glyphGuideMin',low],['glyphGuideMax',high]]){
-  const box=document.getElementById(id),height=value*displayHeight/sourceHeight;
-  box.style.height=height+'px';box.style.width=height*.65+'px';box.style.fontSize=height+'px';
- }
+ guide.style.height=high*displayHeight/sourceHeight+'px';
+ guide.style.setProperty('--glyph-min-height',low*displayHeight/sourceHeight+'px');
 }
 imageViewport.addEventListener('scroll',queueGlyphGuide,{passive:true});
 window.addEventListener('resize',queueGlyphGuide);

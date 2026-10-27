@@ -51,7 +51,7 @@
 <div id="boxVisibility" class="box-visibility" hidden>박스 표시</div>
 <div id="zoomLevel" hidden>100%</div>
 <div id="zoomHint" hidden>두 손가락 확대 · 두 번 터치 인식</div>
-<div id="glyphGuide" hidden aria-hidden="true"><div id="glyphGuideCaption"></div><div class="glyph-guide-boxes"><div><span id="glyphGuideMin" class="glyph-guide-box">A</span><small>최소</small></div><div><span id="glyphGuideMax" class="glyph-guide-box">A</span><small>최대</small></div></div></div>
+<div id="glyphGuide" hidden aria-hidden="true"></div>
 <button id="cancelScan" type="button" hidden>대기 취소</button>
 </section>
 <div id="status" role="status" aria-live="polite">카메라를 켜거나 사진을 선택하세요.</div>
@@ -116,7 +116,7 @@
 <small>현재 원본 이미지에서 영문·숫자 한 글자의 높이 기준입니다. 자동은 인식된 코드 크기로 범위를 계산합니다. 수동 범위 밖의 결과는 제외하며, OCR 연산량을 줄이는 설정은 아닙니다. 분할 확대 좌표는 원본 크기로 환산합니다. 단계별 발견 수는 크기 필터 적용 전이며 최종 개수는 적용 후입니다.</small>
 <output id="glyphRangeStatus" class="performance-note">최근 크기 범위: 인식 후 표시</output>
 <label class="inline-label"><input id="showGlyphGuide" type="checkbox" checked> 화면 중앙에 글자 크기 예시</label>
-<small>원본 픽셀 높이를 화면 배율로 환산한 반투명 예시입니다. 글자를 찾는 영역을 제한하지 않습니다. 자동 범위는 최근 인식 후 표시합니다.</small>
+<small>막대 바깥 높이는 최대, 중앙의 진한 띠 높이는 최소 크기입니다. 원본 픽셀을 화면 배율로 환산하며 인식 영역을 제한하지 않습니다. 자동 범위는 인식 후 표시합니다.</small>
 <label for="correctionSize">보정 처리 해상도</label>
 <select id="correctionSize"><option value="1280" selected>1280px 기준</option><option value="1920">1920px 기준</option><option value="0">OCR 입력 기준 · 기존 방식</option></select>
 <small>보정을 이 크기 이하에서 수행한 뒤 OCR 설정 크기로 맞춥니다. 높은 OCR 해상도로 되돌려도 축소한 세부 정보가 복구되지는 않습니다. 필터를 모두 끄면 원본 픽셀을 유지합니다.</small>
