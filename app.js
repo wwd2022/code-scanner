@@ -4,6 +4,7 @@ function lockInputs(locked){
  tabButtons.forEach(button=>button.disabled=locked);
  correctionInputs.forEach(input=>input.disabled=locked);
  syncPerformanceInputs(locked);
+ syncCorrectionUi(locked);
  presetButtons.forEach(button=>button.disabled=locked);
  document.querySelectorAll('[data-settings-action],#optimizeStart').forEach(input=>input.disabled=locked);
  document.getElementById('optimizeCancel').disabled=!locked||!activeScan?.optimization;
@@ -465,7 +466,7 @@ function restoreSettings(){
   document.getElementById('testNoiseValue').value=document.getElementById('testNoise').value+'%';
   if(typeof values.printCorrection!=='boolean')printCorrection.checked=filterMode.value==='print';
   filterMode.value=printCorrection.checked?'print':'contrast';
-  updateBoxStyle();updatePreview();
+  syncCorrectionUi();updateBoxStyle();updatePreview();
  }catch(error){
   console.warn('저장된 설정을 복원하지 못했습니다.',error);
  }
@@ -492,6 +493,24 @@ settingsPanelButtons.forEach(button=>button.addEventListener('click',()=>{
  settingsDrawer.querySelector('.drawer-body').scrollTop=0;
  updateDesignPreview();
 }));
+function syncCorrectionUi(locked=busy||starting){
+ for(const button of document.querySelectorAll('[data-preview-mode]')){
+  button.disabled=locked;
+  button.setAttribute('aria-pressed',String((button.dataset.previewMode==='corrected')===previewCorrection.checked));
+ }
+ document.getElementById('printControls').hidden=!printCorrection.checked;
+ threshold.disabled=removeLines.disabled=locked||!printCorrection.checked;
+ document.getElementById('speckControls').hidden=!removeSpecks.checked;
+ speckArea.disabled=speckThreshold.disabled=locked||!removeSpecks.checked;
+ document.getElementById('correctionNoiseSummary').value='잔무늬 '+screenNoise.value+'% · 잡티 '+(removeSpecks.checked?'켬':'끔');
+}
+for(const button of document.querySelectorAll('[data-preview-mode]'))button.addEventListener('click',()=>{
+ if(busy||starting)return;
+ previewCorrection.checked=button.dataset.previewMode==='corrected';
+ previewCorrection.dispatchEvent(new Event('input',{bubbles:true}));
+ previewCorrection.dispatchEvent(new Event('change',{bubbles:true}));
+});
+syncCorrectionUi();
 const previewInputs=new Set([strength,previewQuality,removeSpecks,speckArea,speckThreshold,screenNoise,printCorrection,brightness,threshold,removeLines,previewCorrection]);
 let adjustmentPointer=null,adjustmentTimer=0,adjustmentFrame=0;
 let adjustmentSlider=null,adjustmentLabel=null;
@@ -531,6 +550,7 @@ function handleCorrectionInput(event){
  const input=event.target;
  if(!previewInputs.has(input))return;
  if(input===printCorrection)filterMode.value=printCorrection.checked?'print':'contrast';
+ if([previewCorrection,printCorrection,removeSpecks,screenNoise].includes(input))syncCorrectionUi();
  const output=document.getElementById(input.id+'Value');
  if(input.type==='range'&&output)output.value=input.value;
  liveEpoch++;dots.replaceChildren();
@@ -781,6 +801,7 @@ function parseTransferredSettings(text){
 }
 
 function syncSettingsDisplay(){
+ syncCorrectionUi();
  queueGlyphGuide();
  for(const input of [strength,screenNoise,brightness,threshold,speckArea,speckThreshold]){
   const output=document.getElementById(input.id+'Value');if(output)output.value=input.value;

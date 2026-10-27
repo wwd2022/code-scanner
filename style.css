@@ -135,6 +135,18 @@ button:disabled{opacity:.45;cursor:default}button:focus-visible,input:focus-visi
 .performance-presets button[aria-pressed=true]{background:#273950;color:#fff;border-color:#273950}
 .performance-advanced>summary,.correction-settings>summary{cursor:pointer;font-weight:600;padding:10px 0}
 .correction-settings{border-top:1px solid #dce3ec;margin-top:12px}
+.correction-toolbar{position:sticky;top:0;z-index:3;background:#fff;padding:6px 0 8px;border-bottom:1px solid #e3e8ef}
+.correction-view-buttons{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.correction-view-buttons button{min-height:40px;font-size:12px}
+.correction-view-buttons button[aria-pressed=true]{background:#273950;color:#fff;border-color:#273950}
+.correction-group{padding:10px 0;border-bottom:1px solid #e3e8ef}
+.correction-group h3,.correction-section-label{font-size:12px;font-weight:600;margin:0 0 8px}
+.correction-noise{padding:6px 0}
+.correction-noise>summary{display:flex;justify-content:space-between;align-items:center;gap:6px;cursor:pointer;padding:7px 0;font-size:12px;font-weight:600}
+.correction-noise>summary::before{content:'▸';font-size:10px;color:#647182}
+.correction-noise[open]>summary::before{content:'▾'}
+.correction-noise>summary output{margin-left:auto;font-size:10px;font-weight:400;color:#647182}
+.correction-scale-note{margin-top:6px}
 .performance-note{display:block;font-size:11px;line-height:1.45;color:#526275;overflow-wrap:anywhere}
 .test-performance{max-height:46px;overflow:auto;flex-shrink:0;white-space:pre-line}
 .scan-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
