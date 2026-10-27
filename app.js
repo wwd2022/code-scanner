@@ -4,6 +4,7 @@ function lockInputs(locked){
  tabButtons.forEach(button=>button.disabled=locked);
  correctionInputs.forEach(input=>input.disabled=locked);
  syncPerformanceInputs(locked);
+ syncStripeInputs(locked);
  presetButtons.forEach(button=>button.disabled=locked);
  document.querySelectorAll('[data-settings-action],#optimizeStart').forEach(input=>input.disabled=locked);
  document.getElementById('optimizeCancel').disabled=!locked||!activeScan?.optimization;
@@ -37,7 +38,7 @@ function switchTab(tab){
  readImage.disabled=true;
  liveView.hidden=tab!=='camera';liveStatus.hidden=tab!=='camera';
  imageViewport.hidden=true;frozen.hidden=true;
- strength.disabled=false;photoInput.value='';
+ strength.disabled=stripeReduce.checked;photoInput.value='';
  liveCanvas.getContext('2d').clearRect(0,0,liveCanvas.width,liveCanvas.height);
  status.textContent=tab==='camera'?'카메라를 켜고 코드 인식을 누르세요.':'사진을 선택해 주세요.';
  if(tab==='test')makeTestImage();
@@ -305,6 +306,7 @@ function showScanCameraRequired(){
 // OCR 실행 중 설정 변경을 방지한다.
 function showScanStart(stages){
  clearPhotoTap();
+ queueGlyphGuide();
  lockInputs(true);excel.disabled=true;sheet.disabled=true;resume.disabled=true;strength.disabled=true;
  liveCanvas.setAttribute('aria-busy','true');
  cancelScan.hidden=false;cancelScan.disabled=false;
@@ -354,7 +356,7 @@ function showScanFailure(error){
 function showScanEnd(){
  cancelScan.hidden=true;cancelScan.disabled=false;
  lockInputs(false);excel.disabled=false;sheet.disabled=false;liveCanvas.setAttribute('aria-busy','false');
- strength.disabled=false;resume.disabled=!stream||!frozenMode;
+ strength.disabled=stripeReduce.checked;resume.disabled=!stream||!frozenMode;
  start.disabled=!!stream;readImage.textContent=activeTab==='camera'&&frozenMode?'다시 촬영':'코드 인식';
  updateReviewActions();
 }
@@ -464,7 +466,7 @@ function restoreSettings(){
   document.getElementById('testNoiseValue').value=document.getElementById('testNoise').value+'%';
   if(typeof values.printCorrection!=='boolean')printCorrection.checked=filterMode.value==='print';
   filterMode.value=printCorrection.checked?'print':'contrast';
-  updateBoxStyle();updatePreview();
+  syncStripeInputs();updateBoxStyle();updatePreview();
  }catch(error){
   console.warn('저장된 설정을 복원하지 못했습니다.',error);
  }
@@ -491,7 +493,13 @@ settingsPanelButtons.forEach(button=>button.addEventListener('click',()=>{
  settingsDrawer.querySelector('.drawer-body').scrollTop=0;
  updateDesignPreview();
 }));
-const previewInputs=new Set([strength,previewQuality,removeSpecks,speckArea,speckThreshold,screenNoise,printCorrection,brightness,threshold,removeLines,previewCorrection]);
+function syncStripeInputs(locked=busy||starting){
+ stripeWidth.disabled=stripeThreshold.disabled=locked||!stripeReduce.checked;
+ preprocessAcceleration.disabled=locked||stripeReduce.checked;
+ for(const input of [strength,removeSpecks,speckArea,speckThreshold,screenNoise,printCorrection,brightness,threshold,removeLines])input.disabled=locked||stripeReduce.checked;
+ for(const input of [stripeWidth,stripeThreshold])document.getElementById(input.id+'Value').value=input.value;
+}
+const previewInputs=new Set([strength,previewQuality,stripeReduce,stripeWidth,stripeThreshold,removeSpecks,speckArea,speckThreshold,screenNoise,printCorrection,brightness,threshold,removeLines,previewCorrection]);
 let adjustmentPointer=null,adjustmentTimer=0,adjustmentFrame=0;
 let adjustmentSlider=null,adjustmentLabel=null;
 function beginSettingsPreview(event){
@@ -530,6 +538,7 @@ function handleCorrectionInput(event){
  const input=event.target;
  if(!previewInputs.has(input))return;
  if(input===printCorrection)filterMode.value=printCorrection.checked?'print':'contrast';
+ if(input===stripeReduce)syncStripeInputs();
  const output=document.getElementById(input.id+'Value');
  if(input.type==='range'&&output)output.value=input.value;
  liveEpoch++;dots.replaceChildren();
@@ -554,6 +563,8 @@ function endSettingsPreview(event){
 settingsDrawer.addEventListener('pointerdown',beginSettingsPreview);
 settingsDrawer.addEventListener('input',handleCorrectionInput);
 settingsDrawer.addEventListener('toggle',()=>{if(!settingsDrawer.open)endSettingsPreview();});
+settingsDrawer.addEventListener('toggle',()=>{queueStripePreview();queueGlyphGuide();},true);
+settingsDrawer.addEventListener('input',event=>{if([glyphMode,glyphMin,glyphMax,showGlyphGuide,ocrSize].includes(event.target))queueGlyphGuide();});
 window.addEventListener('pointerup',endSettingsPreview);
 window.addEventListener('pointercancel',endSettingsPreview);
 window.addEventListener('blur',endSettingsPreview);
@@ -652,6 +663,7 @@ settingsDrawer.addEventListener('change',event=>{
 
 // 다음 입력 예상 크기와 최근 인식의 실제 입력 크기를 구분한다.
 function updateOcrInputSize(){
+ queueGlyphGuide();
  let width=0,height=0;
  if(activeTab==='camera'){
   if(frozenMode){width=originalFrame.width;height=originalFrame.height;}
@@ -675,6 +687,7 @@ function updateOcrInputSize(){
 // 벽시계 경과와 병렬 영역 시간을 나누고 같은 이미지의 최근 두 회만 보관한다.
 let recentPerformance=[];
 function showPerformanceResult(result){
+ setGlyphGuideRange(result.glyphRange,frame.height,false);
  const seconds=ms=>(ms/1000).toFixed(2)+'초';
  const unique=new Set(result.hits.map(hit=>hit.code)).size;
  const inputSizes=[...new Set(result.stageStats.filter(stage=>!stage.skipped).map(stage=>stage.width+'×'+stage.height))].join(' / ');
@@ -776,6 +789,7 @@ function parseTransferredSettings(text){
 }
 
 function syncSettingsDisplay(){
+ syncStripeInputs();queueGlyphGuide();
  for(const input of [strength,screenNoise,brightness,threshold,speckArea,speckThreshold]){
   const output=document.getElementById(input.id+'Value');if(output)output.value=input.value;
  }
@@ -812,3 +826,43 @@ document.getElementById('importSettings').addEventListener('click',()=>{
 document.getElementById('optimizeStart').addEventListener('click',optimizePerformance);
 document.getElementById('testOptimize').addEventListener('click',optimizePerformance);
 document.getElementById('optimizeCancel').addEventListener('click',cancelActiveScan);
+
+// 표시 높이를 원본 좌표로 환산하며 인식 영역과는 독립적이다.
+function setGlyphGuideRange(range,sourceHeight,live){
+ glyphGuideRange=range?{...range,sourceHeight,live,mode:glyphMode.value,epoch:live?liveEpoch:scanEpoch}:null;
+ queueGlyphGuide();
+}
+function queueGlyphGuide(){
+ if(!glyphGuideFrame)glyphGuideFrame=requestAnimationFrame(updateGlyphGuide);
+}
+function updateGlyphGuide(){
+ glyphGuideFrame=0;
+ const guide=document.getElementById('glyphGuide'),caption=document.getElementById('glyphGuideCaption');
+ const live=activeTab==='camera'&&!frozenMode;
+ if(!showGlyphGuide.checked||(live?!stream:imageViewport.hidden||!frozenMode)){guide.hidden=true;return;}
+ let sourceHeight,displayHeight;
+ if(live){
+  const crop=getCameraCrop();if(!crop){guide.hidden=true;return;}
+  sourceHeight=Math.round(crop.height*Math.min(1,readNumericSetting(ocrSize,1280)/Math.max(crop.width,crop.height)));
+  displayHeight=liveCanvas.getBoundingClientRect().height;
+ }else{sourceHeight=frame.height;displayHeight=frame.getBoundingClientRect().height;}
+ if(!sourceHeight||!displayHeight){guide.hidden=true;return;}
+ let low=Math.min(readNumericSetting(glyphMin,4),readNumericSetting(glyphMax,120));
+ let high=Math.max(readNumericSetting(glyphMin,4),readNumericSetting(glyphMax,120));
+ const automatic=glyphMode.value==='auto';
+ const valid=glyphGuideRange&&glyphGuideRange.mode==='auto'&&glyphGuideRange.live===live&&glyphGuideRange.epoch===(live?liveEpoch:scanEpoch);
+ guide.hidden=false;
+ const samples=guide.querySelector('.glyph-guide-boxes');
+ samples.hidden=automatic&&!valid;
+ if(automatic&&!valid){caption.textContent='글자 크기 자동 · 인식 후 예시 표시';return;}
+ if(automatic){low=glyphGuideRange.min;high=glyphGuideRange.max;sourceHeight=glyphGuideRange.sourceHeight;}
+ caption.textContent=(automatic?'최근 자동':'수동')+' 글자 높이 '+Math.round(low)+'~'+Math.round(high)+'px · 원본 기준';
+ for(const [id,value] of [['glyphGuideMin',low],['glyphGuideMax',high]]){
+  const box=document.getElementById(id),height=value*displayHeight/sourceHeight;
+  box.style.height=height+'px';box.style.width=height*.65+'px';box.style.fontSize=height+'px';
+ }
+}
+imageViewport.addEventListener('scroll',queueGlyphGuide,{passive:true});
+window.addEventListener('resize',queueGlyphGuide);
+if(typeof ResizeObserver!=='undefined')new ResizeObserver(queueGlyphGuide).observe(document.getElementById('workspace'));
+queueGlyphGuide();

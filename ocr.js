@@ -360,7 +360,7 @@ async function recognizeCorrected(source,settings,area=null,scale=1,onPrepared=n
    if(!groups.some(Boolean))throw new Error(errors.join(' / ')||'검사할 영역이 없습니다.');
    const mergeStart=performance.now(),sized=selectGlyphSizes(mergeHits(groups.filter(Boolean)),settings),hits=sized.hits,mergeMs=performance.now()-mergeStart;
    const completed=stageStats.filter(Boolean);
-   return {hits,glyphSummary:sized.summary,text:texts.filter(Boolean).join('\n\n'),stats:completed.map(item=>item.skipped?item.name+' 자동 생략':item.name+' '+item.width+'×'+item.height+' · '+item.count+'곳').concat(selectionSummary?[selectionSummary]:[]),errors,attempts,resolution,stageStats:completed,queueMs,prepMs,workersMs,ocrMs,mergeMs,usedWorkers:peakJobs,warning:pool.warning,correctionPath:rendered.correctionPath,correctionResolution:rendered.correctionResolution};
+   return {hits,glyphRange:sized.range,glyphSummary:sized.summary,text:texts.filter(Boolean).join('\n\n'),stats:completed.map(item=>item.skipped?item.name+' 자동 생략':item.name+' '+item.width+'×'+item.height+' · '+item.count+'곳').concat(selectionSummary?[selectionSummary]:[]),errors,attempts,resolution,stageStats:completed,queueMs,prepMs,workersMs,ocrMs,mergeMs,usedWorkers:peakJobs,warning:pool.warning,correctionPath:rendered.correctionPath,correctionResolution:rendered.correctionResolution};
   }finally{
    if(rendered)rendered.image.width=rendered.image.height=1;
    for(const entry of entries){
@@ -407,7 +407,7 @@ async function recognizeReviewRegion(crop,onPrepared=null){
  const requestedScale=scaleInput.value.trim()?readNumericSetting(scaleInput,1):Math.max(1,Math.min(4,32/crop.glyphHeight));
  const scale=Math.min(requestedScale,maxEdge/Math.max(width,height));
  // 이미 보정된 픽셀은 확대만 하고 필터를 다시 적용하지 않는다.
- const settings={...base,ocrMaxEdge:maxEdge,correctionMaxEdge:0,mode:'contrast',strength:0,brightness:0,screenNoise:0,removeLines:false,removeSpecks:false,glyphMode:'manual',glyphMin:Math.max(1,crop.glyphHeight*.5),glyphMax:crop.glyphHeight*2};
+ const settings={...base,ocrMaxEdge:maxEdge,correctionMaxEdge:0,stripeReduce:false,mode:'contrast',strength:0,brightness:0,screenNoise:0,removeLines:false,removeSpecks:false,glyphMode:'manual',glyphMin:Math.max(1,crop.glyphHeight*.5),glyphMax:crop.glyphHeight*2};
  const result=await recognizeCorrected(crop.image,settings,null,scale,onPrepared,null,'7');
  const hits=result.hits;
  const distance=hit=>Math.hypot(((hit.bbox.x0+hit.bbox.x1)/2-crop.centerX)/width,((hit.bbox.y0+hit.bbox.y1)/2-crop.centerY)/height);
@@ -421,6 +421,11 @@ async function recognizeReviewRegion(crop,onPrepared=null){
 // 워커·가속 경로는 같은 입력의 교차 확인 표로 중복 계산하지 않는다.
 function optimizationImageKey(settings,sourceEdge){
  const edge=Math.min(sourceEdge,settings.ocrMaxEdge);
+ if(settings.stripeReduce){
+  const workingEdge=Math.min(edge,settings.correctionMaxEdge||edge);
+  const kernel=Math.floor(Math.round(settings.stripeWidth*workingEdge/sourceEdge)/2)*2+1;
+  return JSON.stringify([edge,workingEdge,'stripe',kernel,settings.stripeThreshold]);
+ }
  return JSON.stringify([edge,hasImageCorrection(settings)?Math.min(edge,settings.correctionMaxEdge||edge):edge,
   settings.screenNoise,settings.brightness,settings.strength,settings.mode,
   settings.mode==='print'?[settings.threshold,settings.removeLines]:null,
@@ -500,11 +505,16 @@ async function optimizePerformance(){
  };
  addFilter('현재 설정');
  addFilter('1280px · 현재 필터',{ocrMaxEdge:1280,correctionMaxEdge:1280});
- const neutral={ocrMaxEdge:1280,correctionMaxEdge:1280,mode:'contrast',strength:0,brightness:0,screenNoise:0,removeSpecks:false,removeLines:false};
- addFilter('1280px · 외부 보정 없음',neutral);
- addFilter('1280px · 대비 20%',{...neutral,strength:20});
- for(const value of [8,16,24])addFilter('1280px · 인쇄 농도 '+value,{...neutral,mode:'print',threshold:value,removeLines:base.removeLines});
- addFilter('1280px · 인쇄 농도 16 · 노이즈 20%',{...neutral,mode:'print',threshold:16,removeLines:base.removeLines,screenNoise:20});
+ if(base.stripeReduce){
+  for(const width of [Math.max(3,base.stripeWidth-2),Math.min(31,base.stripeWidth+2)])addFilter('줄무늬 평균 폭 '+width,{stripeWidth:width});
+  for(const value of [Math.max(40,base.stripeThreshold-10),Math.min(200,base.stripeThreshold+10)])addFilter('줄무늬 이진화 '+value,{stripeThreshold:value});
+ }else{
+  const neutral={ocrMaxEdge:1280,correctionMaxEdge:1280,mode:'contrast',strength:0,brightness:0,screenNoise:0,removeSpecks:false,removeLines:false};
+  addFilter('1280px · 외부 보정 없음',neutral);
+  addFilter('1280px · 대비 20%',{...neutral,strength:20});
+  for(const value of [8,16,24])addFilter('1280px · 인쇄 농도 '+value,{...neutral,mode:'print',threshold:value,removeLines:base.removeLines});
+  addFilter('1280px · 인쇄 농도 16 · 노이즈 20%',{...neutral,mode:'print',threshold:16,removeLines:base.removeLines,screenNoise:20});
+ }
  const compareQuality=(a,b)=>a.miss-b.miss||a.regionMiss-b.regionMiss||a.conflicts-b.conflicts||a.review-b.review;
  const previousSourceValid=reviewSourceArea&&reviewSourceEpoch===scanEpoch;
  const run={epoch:++scanEpoch,cancelled:false,running:0,phase:'필터 탐색',optimization:true};activeScan=run;
@@ -598,7 +608,7 @@ async function optimizePerformance(){
    speedCandidates.push({name:candidate.name+' · '+count+'워커 · '+(acceleration==='auto'?'가속 자동':'CPU'),settings});
   };
   for(const count of qualityBest.attempts>1?[1,2,4]:[1])addSpeed(qualityBest.candidate,count,'auto');
-  addSpeed(qualityBest.candidate,qualityBest.attempts>1?2:1,'cpu');
+  if(!base.stripeReduce)addSpeed(qualityBest.candidate,qualityBest.attempts>1?2:1,'cpu');
   if(compareQuality(baselineQuality,targetQuality)===0)addSpeed(entries[0].candidate,base.ocrWorkers,base.acceleration);
   for(let i=0;i<speedCandidates.length;i++){
    const entry=await evaluate(speedCandidates[i],'3/3 실행 '+(i+1)+'/'+speedCandidates.length,true);
@@ -623,6 +633,7 @@ async function optimizePerformance(){
   ocrSize.value=selected.ocrMaxEdge;workerCount.value=selected.ocrWorkers;
   preprocessAcceleration.value=selected.acceleration;correctionSize.value=selected.correctionMaxEdge;
   printCorrection.checked=selected.mode==='print';
+  stripeWidth.value=selected.stripeWidth;stripeThreshold.value=selected.stripeThreshold;
   for(const [input,value] of [[strength,selected.strength],[brightness,selected.brightness],[screenNoise,selected.screenNoise],[threshold,selected.threshold]])input.value=value;
   removeLines.checked=selected.removeLines;removeSpecks.checked=selected.removeSpecks;
   performancePreset.value='custom';syncSettingsDisplay();
@@ -658,13 +669,13 @@ function selectGlyphSizes(hits,settings){
  if(!manual){
   const reliable=hits.filter(hit=>!hit.review&&hit.confidence>=60);
   const sizes=(reliable.length>=5?reliable:hits).map(height).filter(value=>Number.isFinite(value)&&value>0).sort((a,b)=>a-b);
-  if(!sizes.length)return {hits,summary:'글자 크기 자동 · 기준 코드 없음'};
+  if(!sizes.length)return {hits,range:null,summary:'글자 크기 자동 · 기준 코드 없음'};
   const first=sizes.length>=5?sizes[Math.floor((sizes.length-1)*.1)]:sizes[0];
   const last=sizes.length>=5?sizes[Math.ceil((sizes.length-1)*.9)]:sizes[sizes.length-1];
   low=Math.max(1,Math.floor(first*.5));high=Math.min(3200,Math.ceil(last*2));
  }
  const selected=hits.filter(hit=>height(hit)>=low&&height(hit)<=high);
- return {hits:selected,summary:'글자 높이 '+(manual?'수동':'자동')+' '+Math.round(low)+'~'+Math.round(high)+'px · 범위 밖 '+(hits.length-selected.length)+'곳 제외'};
+ return {hits:selected,range:{min:low,max:high},summary:'글자 높이 '+(manual?'수동':'자동')+' '+Math.round(low)+'~'+Math.round(high)+'px · 범위 밖 '+(hits.length-selected.length)+'곳 제외'};
 }
 
 // 부분 문자열과 불확실 코드의 좌표로 필요한 확대 구역을 고른다.

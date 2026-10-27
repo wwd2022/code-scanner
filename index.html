@@ -51,6 +51,7 @@
 <div id="boxVisibility" class="box-visibility" hidden>박스 표시</div>
 <div id="zoomLevel" hidden>100%</div>
 <div id="zoomHint" hidden>두 손가락 확대 · 두 번 터치 인식</div>
+<div id="glyphGuide" hidden aria-hidden="true"><div id="glyphGuideCaption"></div><div class="glyph-guide-boxes"><div><span id="glyphGuideMin" class="glyph-guide-box">A</span><small>최소</small></div><div><span id="glyphGuideMax" class="glyph-guide-box">A</span><small>최대</small></div></div></div>
 <button id="cancelScan" type="button" hidden>대기 취소</button>
 </section>
 <div id="status" role="status" aria-live="polite">카메라를 켜거나 사진을 선택하세요.</div>
@@ -114,6 +115,8 @@
 </div>
 <small>현재 원본 이미지에서 영문·숫자 한 글자의 높이 기준입니다. 자동은 인식된 코드 크기로 범위를 계산합니다. 수동 범위 밖의 결과는 제외하며, OCR 연산량을 줄이는 설정은 아닙니다. 분할 확대 좌표는 원본 크기로 환산합니다. 단계별 발견 수는 크기 필터 적용 전이며 최종 개수는 적용 후입니다.</small>
 <output id="glyphRangeStatus" class="performance-note">최근 크기 범위: 인식 후 표시</output>
+<label class="inline-label"><input id="showGlyphGuide" type="checkbox" checked> 화면 중앙에 글자 크기 예시</label>
+<small>원본 픽셀 높이를 화면 배율로 환산한 반투명 예시입니다. 글자를 찾는 영역을 제한하지 않습니다. 자동 범위는 최근 인식 후 표시합니다.</small>
 <label for="correctionSize">보정 처리 해상도</label>
 <select id="correctionSize"><option value="1280" selected>1280px 기준</option><option value="1920">1920px 기준</option><option value="0">OCR 입력 기준 · 기존 방식</option></select>
 <small>보정을 이 크기 이하에서 수행한 뒤 OCR 설정 크기로 맞춥니다. 높은 OCR 해상도로 되돌려도 축소한 세부 정보가 복구되지는 않습니다. 필터를 모두 끄면 원본 픽셀을 유지합니다.</small>
@@ -156,6 +159,13 @@
 <details class="correction-settings"><summary>이미지 보정</summary>
 <label class="inline-label"><input id="previewCorrection" type="checkbox" role="switch" aria-describedby="previewCorrectionHint"> 보정 이미지 표시 <output id="previewCorrectionValue">OFF · 원본</output></label>
 <small id="previewCorrectionHint">ON: 현재 설정의 보정 이미지를 표시 · OFF: 원본 표시. OCR 설정은 유지됩니다.</small>
+<div class="stripe-option-row"><label class="inline-label"><input id="stripeReduce" type="checkbox"> 세로 줄무늬 완화</label><figure id="stripePreview" aria-label="현재 이미지 중앙의 줄무늬 보정 비교"><div><canvas id="stripeBefore" width="96" height="64"></canvas><small>원본</small></div><div><canvas id="stripeAfter" width="96" height="64"></canvas><small>완화 예시</small></div></figure></div>
+<output id="stripePreviewStatus" class="performance-note">이미지를 준비하면 중앙 부분을 작게 비교합니다.</output>
+<label for="stripeWidth">가로 평균 폭 <output id="stripeWidthValue">11</output> 원본 px</label>
+<input id="stripeWidth" type="range" min="3" max="31" step="2" value="11" disabled>
+<label for="stripeThreshold">줄무늬 이진화 밝기 <output id="stripeThresholdValue">110</output></label>
+<input id="stripeThreshold" type="range" min="40" max="200" step="5" value="110" disabled>
+<small>켜면 CPU 워커의 가로 평균·이진화 보정으로 기존 노이즈·밝기·대비·인쇄물·작은 영역 제거를 대신합니다. 폭이 크면 얇은 글자가 뭉개질 수 있습니다. 심한 무늬는 OCR·보정 해상도를 높이고 글자 높이 상한도 확인하세요. 오른쪽 예시는 켜기 전에도 효과를 비교하며, 실제 OCR은 선택한 해상도에서 처리합니다.</small>
 <label for="screenNoise">중간값 노이즈 완화 <output id="screenNoiseValue">0</output>%</label>
 <input id="screenNoise" type="range" min="0" max="100" step="10" value="0" aria-describedby="screenNoiseHint">
 <small id="screenNoiseHint">0% 끄기 · 색 점과 잔무늬를 줄입니다. 높이면 얇은 글자가 흐려질 수 있으며 굵은 줄무늬는 남을 수 있습니다.</small>
