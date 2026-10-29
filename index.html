@@ -40,7 +40,7 @@
 <label>글자 크기 <input id="testFont" type="number" min="8" max="100" value="32"></label><label>가로 간격 <input id="testGapX" type="number" min="0" max="500" value="0"></label><label>세로 간격 <input id="testGapY" type="number" min="0" max="500" value="0"></label>
 <label>표 <select id="testTable"><option value="on">표시</option><option value="off">숨김</option></select></label>
 <label>주변 문자 <select id="testText"><option value="none">없음</option><option value="near">품목명·수량</option><option value="other">다른 코드</option><option value="attached">뒤에 문자 붙이기</option></select></label>
-</div><small>간격 0은 글자를 가까이 붙여 배치합니다. 여백·간격·글자 크기는 254 PPI 기준 px입니다. PPI를 바꾸면 함께 비례하여 변합니다.</small><button type="button" id="testOptionsApply">닫기</button></div></details>
+</div><small>간격 0은 글자를 가까이 붙여 배치합니다. 여백·간격·글자 크기는 254 PPI 기준 px입니다. PPI를 바꾸면 함께 비례하여 변합니다.</small><details id="testLog" class="test-log" hidden><summary>테스트 코드 · 위치 목록</summary><pre id="testLogText"></pre></details><button type="button" id="testOptionsApply">닫기</button></div></details>
 <button id="testGenerate" type="button">이미지 생성</button>
 <button id="testExport" type="button">코드 새로 추출</button>
 <button id="testRescan" type="button">보이는 화면 인식</button>
@@ -49,7 +49,7 @@
 <button id="testBatchReview" type="button">불확실 일괄 재인식</button>
 <button id="testOptimize" type="button">자동 최적화</button>
 <details id="testCompare" class="test-log" hidden><summary>인식 비교 결과</summary><pre id="testCompareText">인식 후 표시됩니다.</pre></details>
-<details id="testLog" class="test-log" hidden><summary>테스트 코드 · 위치 목록</summary><pre id="testLogText"></pre></details>
+
 <output id="testPerformance" class="performance-note test-performance" hidden>같은 이미지를 유지하고 성능 설정을 바꿔 재인식하세요.</output></div></details>
 </div>
 <video id="camera" autoplay muted playsinline aria-hidden="true"></video>
