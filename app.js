@@ -26,6 +26,7 @@ function closeTools(except=null){
 // 이전 인식 결과와 사진 확대 상태를 초기화한다.
 function switchTab(tab){
  if(busy||starting||activeTab===tab)return;
+ closeTestEditor();
  clearPhotoTap();
  stopCamera();clearReviewSource();scanEpoch++;activeTab=tab;photoReady=false;frozenMode=false;
  setPhotoZoom(1);imageViewport.classList.remove('camera-shot');imageViewport.scrollLeft=0;imageViewport.scrollTop=0;closeTools();zoomLevel.hidden=true;zoomHint.hidden=true;
@@ -43,6 +44,7 @@ function switchTab(tab){
  strength.disabled=false;photoInput.value='';
  liveCanvas.getContext('2d').clearRect(0,0,liveCanvas.width,liveCanvas.height);
  status.textContent=tab==='camera'?'카메라를 켜고 코드 인식을 누르세요.':'사진을 선택해 주세요.';
+ document.getElementById('testEditButton').hidden=true;
  if(tab==='test'){testCodesNeedRefresh=true;document.getElementById('testLogText').textContent='이미지를 생성하면 표시됩니다.';document.getElementById('testCompareText').textContent='인식 후 표시됩니다.';status.textContent='설정을 선택하고 이미지 생성을 누르세요.';}
  else if(workbook){locations=buildLocations(workbook.sheets[workbook.selected]);excelStatus.textContent=workbook.name+' · '+workbook.selected+' · '+locations.size+'개 코드';}
  else{locations=new Map();excelStatus.textContent='엑셀을 선택해 주세요.';}
@@ -282,9 +284,71 @@ stop.addEventListener('click',stopCamera);
 resume.addEventListener('click',resumeCamera);
 tabButtons.forEach(button=>button.addEventListener('click',()=>switchTab(button.dataset.tab)));
 photoInput.addEventListener('change',loadPhoto);
-document.getElementById('testGenerate').addEventListener('click',()=>makeTestImage());
+// 테스트 이미지 위에서 표의 위치와 크기를 편집한다.
+// 변경은 적용할 때만 이미지와 설정에 반영한다.
+let testEditing=false,editRect=null,editPointers=new Map(),editGesture=null;
+const editFrame=document.getElementById('testEditFrame'),editPanel=document.getElementById('testEditPanel');
+function closeTestEditor(){
+ testEditing=false;editFrame.hidden=true;editPanel.hidden=true;editPointers.clear();editGesture=null;
+}
+function drawTestEditor(){
+ const l=testImageLayout,r=editRect;
+ editFrame.style.left=(r.x/l.width*100)+'%';editFrame.style.top=(r.y/l.height*100)+'%';
+ editFrame.style.width=(r.w/l.width*100)+'%';editFrame.style.height=(r.h/l.height*100)+'%';
+ const grid=document.getElementById('testEditGrid'),cols=Number(l.values.testCols),rows=Number(l.values.testRows);
+ const gx=Number(document.getElementById('editGapX').value)*l.scale,gy=Number(document.getElementById('editGapY').value)*l.scale;
+ const cw=(r.w-gx*(cols-1))/cols,ch=(r.h-gy*(rows-1))/rows;grid.setAttribute('viewBox','0 0 '+r.w+' '+r.h);grid.replaceChildren();
+ if(cw>0&&ch>0)for(let y=0;y<rows;y++)for(let x=0;x<cols;x++){
+  const cell=document.createElementNS('http://www.w3.org/2000/svg','rect');cell.setAttribute('x',x*(cw+gx));cell.setAttribute('y',y*(ch+gy));cell.setAttribute('width',cw);cell.setAttribute('height',ch);grid.append(cell);
+ }
+}
+function beginEditGesture(){
+ const points=[...editPointers.values()];if(!points.length){editGesture=null;return;}
+ editGesture={rect:{...editRect},points:points.map(p=>({...p})),resize:points[0].resize};
+}
+document.getElementById('testEditButton').addEventListener('click',()=>{
+ if(!photoReady||!testImageLayout||busy)return;
+ setPhotoZoom(1);imageViewport.scrollLeft=0;imageViewport.scrollTop=0;
+ const l=testImageLayout;editRect={x:l.left,y:l.top,w:l.width-l.left-l.right,h:l.height-l.top-l.bottom};
+ for(const [id,key] of [['editGapX','testGapX'],['editGapY','testGapY'],['editFont','testFont']]){document.getElementById(id).value=l.values[key];document.getElementById(id+'Value').value=l.values[key];}
+ testEditing=true;editFrame.hidden=false;editPanel.hidden=false;drawTestEditor();
+ status.textContent='테두리를 움직이거나 크기를 조절한 후 이미지 적용을 누르세요.';
+});
+for(const id of ['editGapX','editGapY','editFont'])document.getElementById(id).addEventListener('input',()=>{document.getElementById(id+'Value').value=document.getElementById(id).value;drawTestEditor();});
+editFrame.addEventListener('pointerdown',event=>{
+ if(!testEditing)return;event.preventDefault();event.stopPropagation();
+ editPointers.set(event.pointerId,{x:event.clientX,y:event.clientY,resize:event.target.id==='testEditHandle'});
+ editFrame.setPointerCapture(event.pointerId);beginEditGesture();
+});
+editFrame.addEventListener('pointermove',event=>{
+ if(!editPointers.has(event.pointerId))return;event.preventDefault();event.stopPropagation();
+ const p=editPointers.get(event.pointerId);p.x=event.clientX;p.y=event.clientY;
+ const points=[...editPointers.values()],base=editGesture,box=frozen.getBoundingClientRect(),l=testImageLayout;
+ const sx=l.width/box.width,sy=l.height/box.height,r=base.rect;
+ if(points.length>=2&&base.points.length>=2){
+  const a=base.points,b=points,old=Math.hypot(a[1].x-a[0].x,a[1].y-a[0].y),now=Math.hypot(b[1].x-b[0].x,b[1].y-b[0].y);
+  const factor=old>0?now/old:1,w=Math.max(1,Math.min(l.width,r.w*factor)),h=Math.max(1,Math.min(l.height,r.h*factor));
+  editRect={x:Math.max(0,Math.min(l.width-w,r.x+(r.w-w)/2+((b[0].x+b[1].x-a[0].x-a[1].x)/2)*sx)),y:Math.max(0,Math.min(l.height-h,r.y+(r.h-h)/2+((b[0].y+b[1].y-a[0].y-a[1].y)/2)*sy)),w,h};
+ }else{
+  const dx=(p.x-base.points[0].x)*sx,dy=(p.y-base.points[0].y)*sy;
+  if(base.resize)editRect={...r,w:Math.max(1,Math.min(l.width-r.x,r.w+dx)),h:Math.max(1,Math.min(l.height-r.y,r.h+dy))};
+  else editRect={...r,x:Math.max(0,Math.min(l.width-r.w,r.x+dx)),y:Math.max(0,Math.min(l.height-r.h,r.y+dy))};
+ }
+ drawTestEditor();
+});
+for(const type of ['pointerup','pointercancel','lostpointercapture'])editFrame.addEventListener(type,event=>{
+ if(!editPointers.has(event.pointerId))return;event.stopPropagation();editPointers.delete(event.pointerId);beginEditGesture();
+});
+document.getElementById('testEditCancel').addEventListener('click',()=>{closeTestEditor();status.textContent='이미지 편집을 취소했습니다.';});
+document.getElementById('testEditApply').addEventListener('click',()=>{
+ const l=testImageLayout,r=editRect,values={...l.values,testLeft:String(r.x/l.scale),testRight:String((l.width-r.x-r.w)/l.scale),testTop:String(r.y/l.scale),testBottom:String((l.height-r.y-r.h)/l.scale),testGapX:document.getElementById('editGapX').value,testGapY:document.getElementById('editGapY').value,testFont:document.getElementById('editFont').value};
+ const previous={};for(const [id,value] of Object.entries(values)){const input=document.getElementById(id);previous[id]=input.value;input.value=value;}
+ if(makeTestImage()){closeTestEditor();queueSettingsSave();updateTestPixelSize();}
+ else for(const [id,value] of Object.entries(previous))document.getElementById(id).value=value;
+});
+document.getElementById('testGenerate').addEventListener('click',()=>{if(makeTestImage()){closeTestEditor();document.getElementById('testEditButton').hidden=false;}});
 document.getElementById('testOptionsApply').addEventListener('click',()=>{document.querySelector('.test-options').open=false;status.textContent='설정을 변경했습니다. 이미지 생성을 눌러 적용하세요.';});
-document.getElementById('testExport').addEventListener('click',exportTestExcel);
+document.getElementById('testExport').addEventListener('click',()=>{if(makeTestImage(true)){closeTestEditor();document.getElementById('testEditButton').hidden=false;}});
 document.getElementById('testNoise').addEventListener('input',()=>{document.getElementById('testNoiseValue').value=document.getElementById('testNoise').value+'%';});
 // 카메라 정지 상태에서는 재촬영, 그 외에는 코드 인식을 실행한다. (핸들 스캔 버튼)
 // 기존 OCR과 카메라 재개 기능을 변경하지 않고 연결한다.
@@ -306,6 +370,7 @@ function showScanCameraRequired(){
 // 인식 시작 시 입력과 결과 화면을 잠근다. (쇼 스캔 스타트)
 // OCR 실행 중 설정 변경을 방지한다.
 function showScanStart(stages){
+ closeTestEditor();document.getElementById('testEditButton').hidden=true;
  clearPhotoTap();
  queueGlyphGuide();
  lockInputs(true);excel.disabled=true;sheet.disabled=true;resume.disabled=true;strength.disabled=true;
@@ -356,6 +421,7 @@ function showScanFailure(error){
 // 인식 완료 후 입력과 버튼 상태를 복원한다. (쇼 스캔 엔드)
 // 다시 촬영 기능 및 사진 모드를 유지한다.
 function showScanEnd(){
+ document.getElementById('testEditButton').hidden=!(activeTab==='test'&&photoReady&&testImageLayout);
  cancelScan.hidden=true;cancelScan.disabled=false;
  lockInputs(false);excel.disabled=false;sheet.disabled=false;liveCanvas.setAttribute('aria-busy','false');
  strength.disabled=false;resume.disabled=!stream||!frozenMode;
@@ -770,7 +836,7 @@ function collectSettings(){
  const values={};
  for(const input of settingsFields){
   if(input.type==='checkbox')values[input.id]=input.checked;
-  else if(input.type==='number'&&['testWidthCm','testHeightCm','testPpi'].includes(input.id))values[input.id]=input.value;
+  else if(input.type==='number'&&['testWidthCm','testHeightCm','testPpi','testLeft','testRight','testTop','testBottom'].includes(input.id))values[input.id]=input.value;
   else if(input.type==='number'&&!(input.id==='reviewScale'&&!input.value.trim())){
    const value=readNumericSetting(input,Number(input.defaultValue)||Number(input.min));
    values[input.id]=String(input.id==='reviewScale'?value:Math.round(value));
