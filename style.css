@@ -196,3 +196,17 @@ button:disabled{opacity:.45;cursor:default}button:focus-visible,input:focus-visi
 .test-option-panel{position:absolute;z-index:15;left:10px;right:10px;bottom:76px;max-height:65dvh;overflow:auto;padding:12px;background:#fff;border:1px solid #cbd3dd;border-radius:12px;box-shadow:0 4px 24px #0004}.test-option-panel button{width:100%;margin-top:8px;background:#273950;color:#fff;min-height:44px}.test-extra>div{display:flex;flex-wrap:wrap;gap:4px}.test-extra>div button{min-height:40px}
 .test-option-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;padding:5px}
 .test-option-grid label{justify-content:space-between;min-height:40px}.test-option-grid input[type=number]{width:80px}.test-option-grid select{max-width:150px}
+
+/* 화면 공간을 확보하면서 터치 영역은 유지한다. */
+body{font-size:13px}
+main{gap:7px;padding-left:max(9px,env(safe-area-inset-left));padding-right:max(9px,env(safe-area-inset-right))}
+h1{font-size:16px}h2{font-size:15px}
+button,.file-button{min-height:36px;padding:7px 10px}
+.tabs,.tool-menu{gap:5px}.tool-drawer>summary{min-height:36px}
+.mode-controls{min-height:36px}#readImage{min-height:54px}
+.test-controls{gap:4px;min-height:0}.test-controls button{min-height:32px}.test-options>summary,.test-extra>summary{min-height:36px;padding:7px}
+.test-extra>div button{min-height:36px}.test-extra .test-log,.test-extra .test-performance{flex:1 1 100%}
+.test-extra .test-log{padding:5px 2px}.test-extra .test-performance{max-height:46px}
+@media(max-height:600px){#readImage{min-height:42px}}
+
+.test-extra>div{max-height:25dvh;overflow:auto}

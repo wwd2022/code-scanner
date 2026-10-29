@@ -47,7 +47,8 @@ function makeTestImage(newCodes=false){
  const gapX=number('testGapX',0,500),gapY=number('testGapY',0,500),font=number('testFont',8,100);
  const cellW=(width-left-right-gapX*(cols-1))/cols,cellH=(height-top-bottom-gapY*(rowCount-1))/rowCount;
  const textMode=document.getElementById('testText').value,table=document.getElementById('testTable').value==='on';
- if(rows.length>rowCount*cols||cellW<font*7||cellH<font*2||(textMode!=='none'&&cellW<font*10)){
+ if(rows.length>rowCount*cols){status.textContent='코드 '+rows.length+'개를 넣을 표가 부족합니다. 행 또는 열을 늘려주세요. (현재 '+(rowCount*cols)+'칸)';return;}
+ if(cellW<font*7||cellH<font*2||(textMode!=='none'&&cellW<font*10)){
   status.textContent='표의 칸 수나 공간이 부족합니다. 행·열·이미지 크기를 늘리거나 여백·글자 크기를 줄이세요.';return;
  }
  testRows=rows;testExpectedCodes=rows.map(row=>row[0]);document.getElementById('testCompareText').textContent='인식 후 표시됩니다.';
