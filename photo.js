@@ -32,10 +32,10 @@ function getTestRows(){
 
 // 종이 문서 또는 모니터 환경의 테스트 이미지를 만든다.
 // 생성한 코드와 위치를 조회표와 목록에 반영한다.
-let testRows=[];
+let testRows=[],testCodesNeedRefresh=true;
 function makeTestImage(newCodes=false){
  if(busy||starting)return;
- const rows=newCodes||!testRows.length?getTestRows():testRows;
+ const rows=newCodes||testCodesNeedRefresh||!testRows.length?getTestRows():testRows;
  if(!rows.length){photoReady=false;readImage.disabled=true;imageViewport.hidden=true;frozen.hidden=true;document.getElementById('testLogText').textContent='사용 가능한 엑셀 코드가 없습니다.';status.textContent='엑셀에 유효한 코드가 없습니다.';return;}
  const layout=document.getElementById('testLayout').value,noise=Number(document.getElementById('testNoise').value);
  const scene=document.getElementById('testScene').value,ink=document.getElementById('testInk').value;
@@ -53,7 +53,7 @@ function makeTestImage(newCodes=false){
  if(cellW<font*7||cellH<font*2||(textMode!=='none'&&cellW<font*10)){
   status.textContent='표의 칸 수나 공간이 부족합니다. 행·열·이미지 크기를 늘리거나 여백·글자 크기를 줄이세요.';return;
  }
- testRows=rows;testExpectedCodes=rows.map(row=>row[0]);document.getElementById('testCompareText').textContent='인식 후 표시됩니다.';
+ if(!confirm(width+' × '+height+' px 이미지를 생성하시겠습니까?'))return;
  try{
  photoSource.width=width;photoSource.height=height;
  const ctx=photoSource.getContext('2d',{willReadFrequently:true});
@@ -95,6 +95,7 @@ function makeTestImage(newCodes=false){
   for(let i=0;i<Math.floor(noise/10);i++){ctx.fillStyle=random()<.5?'#777':'#fff';ctx.fillRect(random()*width,random()*height,5+random()*130,2+random()*7);}
   ctx.globalAlpha=1;
  }
+ testRows=rows;testCodesNeedRefresh=false;testExpectedCodes=rows.map(row=>row[0]);document.getElementById('testCompareText').textContent='인식 후 표시됩니다.';
  locations=workbook?buildLocations(workbook.sheets[workbook.selected]):new Map(rows);
  excelStatus.textContent=workbook?workbook.name+' · '+workbook.selected+' · '+locations.size+'개 코드':'테스트용 임시 코드 · 위치';
  document.getElementById('testLogText').textContent=(workbook?'엑셀에서 선택한 코드':'임시 코드 · 임시 위치')+'\n'+rows.map(([code,place])=>code+' → '+(place.length?place.join(', '):'없음')).join('\n');
