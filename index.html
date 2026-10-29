@@ -30,6 +30,8 @@
 <div class="mode-controls test-controls" id="testControls" hidden>
 <label>코드 <input id="testCount" type="number" min="1" max="12" value="3"></label>
 <label>배치 <select id="testLayout"><option value="grid">격자</option><option value="random">무작위</option><option value="column">세로</option></select></label>
+<label>환경 <select id="testScene"><option value="paper">종이 문서</option><option value="screen">모니터</option><option value="plain">기본</option></select></label>
+<label>인쇄 <select id="testInk"><option value="normal">보통</option><option value="light">흐림</option><option value="faint">많이 흐림</option></select></label>
 <label>노이즈 <input id="testNoise" type="range" min="0" max="100" step="10" value="0"><output id="testNoiseValue">0%</output></label>
 <button id="testGenerate" type="button">이미지 생성</button>
 <button id="testExport" type="button">엑셀에서 추출</button>
@@ -38,6 +40,7 @@
 <button id="testBatchReview" type="button">불확실 일괄 재인식</button>
 <button id="testOptimize" type="button">자동 최적화</button>
 </div>
+<details id="testLog" class="test-log" hidden><summary>테스트 코드 · 위치 목록</summary><pre id="testLogText"></pre></details>
 <output id="testPerformance" class="performance-note test-performance" hidden>같은 이미지를 유지하고 성능 설정을 바꿔 재인식하세요.</output>
 <video id="camera" autoplay muted playsinline aria-hidden="true"></video>
 <section id="workspace" aria-label="인식 이미지">

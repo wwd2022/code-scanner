@@ -13,50 +13,68 @@ function previewPhoto(){
  status.textContent='두 손가락 확대·이동 / 두 번 터치 또는 인식 버튼으로 검사';
 }
 
-// 불러온 엑셀 시트에서 중복 없이 무작위 코드를 고른다. (겟 테스트 로우스)
-// 실제 엑셀 조회표와 같은 유효 코드만 사용하며 원본 파일은 수정하지 않는다.
+// 엑셀 코드 또는 임시 코드와 위치를 선택한다.
+// 임시 데이터는 테스트 화면에서만 사용한다.
 function getTestRows(){
- if(!workbook)return [];
+ const count=Math.max(1,Math.min(12,Number(document.getElementById('testCount').value)||3));
+ if(!workbook){
+  const rows=[];
+  while(rows.length<count){
+   const code=String(1000+Math.floor(Math.random()*9000))+'-'+String(Math.floor(Math.random()*1000000)).padStart(6,'0');
+   if(!rows.some(row=>row[0]===code))rows.push([code,['T'+String(rows.length+1).padStart(2,'0')]]);
+  }
+  return rows;
+ }
  const rows=[...buildLocations(workbook.sheets[workbook.selected]).entries()];
  for(let i=rows.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[rows[i],rows[j]]=[rows[j],rows[i]];}
- const count=Math.max(1,Math.min(12,Number(document.getElementById('testCount').value)||3));
  return rows.slice(0,count);
 }
 
-// 등록된 엑셀에서 고른 코드로 OCR 테스트 이미지를 만든다. (메이크 테스트 이미지)
-// 노이즈·배치는 조절하고 원본 엑셀과 OCR 인식 경로는 변경하지 않는다.
+// 종이 문서 또는 모니터 환경의 테스트 이미지를 만든다.
+// 생성한 코드와 위치를 조회표와 목록에 반영한다.
 function makeTestImage(){
  if(busy||starting)return;
  const rows=getTestRows();
  testExpectedCodes=rows.map(row=>row[0]);
- if(!rows.length){photoReady=false;readImage.disabled=true;imageViewport.hidden=true;frozen.hidden=true;status.textContent='먼저 엑셀 탭에서 파일을 등록하세요.';return;}
+ if(!rows.length){photoReady=false;readImage.disabled=true;imageViewport.hidden=true;frozen.hidden=true;document.getElementById('testLogText').textContent='사용 가능한 엑셀 코드가 없습니다.';status.textContent='엑셀에 유효한 코드가 없습니다.';return;}
  const layout=document.getElementById('testLayout').value,noise=Number(document.getElementById('testNoise').value);
+ const scene=document.getElementById('testScene').value,ink=document.getElementById('testInk').value;
  document.getElementById('testNoiseValue').value=noise+'%';
  const cols=layout==='column'?1:layout==='random'?3:2;
- const width=1200,cellW=width/cols,cellH=145,height=Math.max(530,Math.ceil(rows.length/cols)*cellH+80);
+ const width=1200,cellW=width/cols,cellH=145,height=Math.max(530,Math.ceil(rows.length/cols)*cellH+120);
  photoSource.width=width;photoSource.height=height;
- const ctx=photoSource.getContext('2d',{willReadFrequently:true});ctx.fillStyle='#fff';ctx.fillRect(0,0,width,height);
+ const ctx=photoSource.getContext('2d',{willReadFrequently:true});
  let seed=8392;const random=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
- ctx.fillStyle='#111';ctx.font='bold '+(cols===3?39:cols===1?62:50)+'px monospace';
+ ctx.fillStyle=scene==='paper'?'#e8e6df':scene==='screen'?'#dfe5e4':'#fff';ctx.fillRect(0,0,width,height);
+ if(scene!=='plain'){
+  const shade=ctx.createLinearGradient(0,0,width,height);
+  shade.addColorStop(0,'rgba(255,255,255,.16)');shade.addColorStop(1,'rgba(40,40,40,.12)');ctx.fillStyle=shade;ctx.fillRect(0,0,width,height);
+  ctx.strokeStyle=scene==='paper'?'rgba(35,35,35,.4)':'rgba(60,70,70,.28)';ctx.lineWidth=1;
+  for(let x=0;x<=width;x+=cellW){ctx.beginPath();ctx.moveTo(x,35);ctx.lineTo(x,height-20);ctx.stroke();}
+  for(let y=35;y<height;y+=cellH){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(width,y);ctx.stroke();}
+ }
+ ctx.fillStyle=ink==='normal'?'#191919':ink==='light'?'#777773':'#a5a59e';
+ ctx.font=(scene==='plain'?'bold ':'')+(cols===3?35:cols===1?50:42)+'px monospace';
  for(let i=0;i<rows.length;i++){
-  const x=cols===1?105:(i%cols)*cellW+35;
-  const y=Math.floor(i/cols)*cellH+112;
-  const dx=layout==='random'?(random()-.5)*55:0,dy=layout==='random'?(random()-.5)*48:0;
+  const x=cols===1?105:(i%cols)*cellW+35,y=Math.floor(i/cols)*cellH+112;
+  const dx=layout==='random'?(random()-.5)*45:0,dy=layout==='random'?(random()-.5)*35:0;
   ctx.fillText(rows[i][0],x+dx,y+dy);
  }
+ if(scene==='screen'&&noise){
+  ctx.lineWidth=2;
+  for(let x=0;x<width;x+=8){ctx.strokeStyle=x%24===0?'rgba(215,70,110,'+(noise/500)+')':'rgba(65,120,190,'+(noise/650)+')';ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x+height*.09,height);ctx.stroke();}
+ }
  if(noise){
-  const image=ctx.getImageData(0,0,width,height),pixels=image.data;
-  const chance=noise/100*.17;
-  for(let i=0;i<pixels.length;i+=4){
-   if(random()<chance){const value=random()<.5?0:255;pixels[i]=pixels[i+1]=pixels[i+2]=value;}
-  }
+  const image=ctx.getImageData(0,0,width,height),pixels=image.data,chance=noise/100*.12;
+  for(let i=0;i<pixels.length;i+=4)if(random()<chance){const value=random()<.5?35:240;pixels[i]=pixels[i+1]=pixels[i+2]=value;}
   ctx.putImageData(image,0,0);
-  ctx.globalAlpha=noise/250;
-  for(let i=0;i<Math.floor(noise/8);i++){ctx.fillStyle=random()<.5?'#888':'#fff';ctx.fillRect(random()*width,random()*height,5+random()*130,2+random()*7);}
+  ctx.globalAlpha=noise/300;
+  for(let i=0;i<Math.floor(noise/10);i++){ctx.fillStyle=random()<.5?'#777':'#fff';ctx.fillRect(random()*width,random()*height,5+random()*130,2+random()*7);}
   ctx.globalAlpha=1;
  }
- locations=buildLocations(workbook.sheets[workbook.selected]);
- excelStatus.textContent=workbook.name+' · '+workbook.selected+' · '+locations.size+'개 코드';
+ locations=workbook?buildLocations(workbook.sheets[workbook.selected]):new Map(rows);
+ excelStatus.textContent=workbook?workbook.name+' · '+workbook.selected+' · '+locations.size+'개 코드':'테스트용 임시 코드 · 위치';
+ document.getElementById('testLogText').textContent=(workbook?'엑셀에서 선택한 코드':'임시 코드 · 임시 위치')+'\n'+rows.map(([code,place])=>code+' → '+(place.length?place.join(', '):'없음')).join('\n');
  photoReady=true;previewPhoto();setPhotoZoom(1);imageViewport.scrollLeft=0;imageViewport.scrollTop=0;
  status.textContent='테스트 이미지 '+rows.length+'개 생성 · 코드 인식으로 OCR 검사';
 }

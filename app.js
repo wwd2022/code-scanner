@@ -35,6 +35,7 @@ function switchTab(tab){
  document.getElementById('photoControls').hidden=tab!=='photo';
  document.getElementById('testControls').hidden=tab!=='test';
  document.getElementById('testPerformance').hidden=tab!=='test';
+ document.getElementById('testLog').hidden=tab!=='test';
  readImage.disabled=true;
  liveView.hidden=tab!=='camera';liveStatus.hidden=tab!=='camera';
  imageViewport.hidden=true;frozen.hidden=true;
@@ -285,6 +286,8 @@ document.getElementById('testExport').addEventListener('click',exportTestExcel);
 document.getElementById('testCount').addEventListener('change',makeTestImage);
 document.getElementById('testLayout').addEventListener('change',makeTestImage);
 document.getElementById('testNoise').addEventListener('change',makeTestImage);
+document.getElementById('testScene').addEventListener('change',makeTestImage);
+document.getElementById('testInk').addEventListener('change',makeTestImage);
 // 카메라 정지 상태에서는 재촬영, 그 외에는 코드 인식을 실행한다. (핸들 스캔 버튼)
 // 기존 OCR과 카메라 재개 기능을 변경하지 않고 연결한다.
 function handleScanButton(){

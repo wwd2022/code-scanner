@@ -186,3 +186,7 @@ button:disabled{opacity:.45;cursor:default}button:focus-visible,input:focus-visi
 .review-navigation output{font-size:12px}
 #reviewForm .review-actions{position:sticky;bottom:-18px;padding:10px 0;background:#fff;z-index:2}
 #reviewStop{min-height:42px;border-color:#b86725;color:#87440f}
+
+.test-log{flex-shrink:0;font-size:12px;color:#526275}
+.test-log summary{cursor:pointer;font-weight:600}
+.test-log pre{max-height:120px;overflow:auto;margin:5px 0;padding:8px;background:#f1f4f8;border-radius:6px;line-height:1.5}
