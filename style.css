@@ -243,7 +243,7 @@ button,.file-button{min-height:36px;padding:7px 10px}
 .compare-panel details{flex-shrink:0}
 .compare-panel details>summary .compare-summary{display:inline;padding:0;background:transparent;font-size:10px}
 .comparison-focus{max-width:none;padding:4px}
-.comparison-focus .app-header,.comparison-focus .mode-tabs,.comparison-focus .tool-menu,.comparison-focus #status,.comparison-focus #scanSummary{display:none}
+.comparison-focus .app-header,.comparison-focus .mode-tabs,.comparison-focus .tool-menu,.comparison-focus #scanSummary{display:none}
 .comparison-focus #testControls{flex-shrink:0}
 @media(max-width:600px){
  .comparison-active{gap:4px}
@@ -256,3 +256,5 @@ button,.file-button{min-height:36px;padding:7px 10px}
  .compare-panel .compare-zoom{padding:0 4px}
  .compare-panel .compare-zoom input{height:14px;margin:0}
 }
+
+.comparison-focus #status{font-size:10px;min-height:14px;max-height:28px}
