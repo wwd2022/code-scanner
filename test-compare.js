@@ -19,6 +19,7 @@ function drawTestView(view){
  const source=view.id==='corrected'?testCorrectedPreview:photoSource;
  if(source)ctx.drawImage(source,g.dx,g.dy,photoSource.width*g.scale,photoSource.height*g.scale);
  if(view.input&&view.inputArea){const a=view.inputArea;ctx.drawImage(view.input,g.dx+a.x*g.scale,g.dy+a.y*g.scale,a.width*g.scale,a.height*g.scale);}
+ if(view.inputArea){const a=view.inputArea;ctx.strokeStyle='#e9aa24';ctx.lineWidth=1;ctx.strokeRect(g.dx+a.x*g.scale,g.dy+a.y*g.scale,a.width*g.scale,a.height*g.scale);}
  ctx.lineWidth=1.5;ctx.strokeStyle='#16bd73';
  for(const hit of view.hits){const b=hit.bbox;ctx.strokeRect(g.dx+b.x0*g.scale,g.dy+b.y0*g.scale,(b.x1-b.x0)*g.scale,(b.y1-b.y0)*g.scale);}
  document.getElementById('compare-zoom-'+view.id).value=Math.round(view.zoom*100)+'%';
@@ -31,7 +32,7 @@ function setTestCompareMode(mode){
  if(busy)return;testCompareMode=mode;
  for(const view of testViews)document.getElementById('compare-panel-'+view.id).hidden=mode!=='both'&&mode!==view.id;
  document.querySelectorAll('[data-compare-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.compareMode===mode)));
- for(const view of testViews){clearTestView(view);drawTestView(view);}
+ for(const view of testViews)drawTestView(view);
 }
 // 실제 OCR 입력 생성 함수를 사용해 보정본을 표시한다.
 // 생성·설정 변경 중 오래된 미리보기는 버린다.
@@ -74,8 +75,8 @@ async function scanTestComparison(id=null){
    const expected=testExpectedRegions.filter(item=>item.bbox.x0>=area.x&&item.bbox.y0>=area.y&&item.bbox.x1<=area.x+area.width&&item.bbox.y1<=area.y+area.height);
    const found=new Set(result.hits.map(hit=>hit.code)),missing=expected.filter(item=>!found.has(item.code));
    const allExpected=new Set(testExpectedCodes),extra=[...found].filter(code=>!allExpected.has(code));
-   document.getElementById('compare-result-'+view.id).textContent='발견 '+result.hits.length+' · 영역 내 정답 '+(expected.length-missing.length)+'/'+expected.length+' · 누락 '+missing.length+' · 오인식 '+extra.length+' · '+((performance.now()-started)/1000).toFixed(2)+'초\n입력 '+result.resolution+' · '+(result.errors.length?'일부 검사 실패 · ':'')+'경계에 걸린 코드는 누락 계산 제외\n누락: '+(missing.map(item=>item.code).join(', ')||'없음')+'\n오인식: '+(extra.join(', ')||'없음');
-   document.getElementById('compare-summary-'+view.id).value='발견 '+result.hits.length+' · 누락 '+missing.length+' · 오인식 '+extra.length+' · '+((performance.now()-started)/1000).toFixed(2)+'초'+(result.errors.length?' · 일부 실패':'');
+   document.getElementById('compare-result-'+view.id).textContent='발견 '+result.hits.length+' · 영역 내 정답 '+(expected.length-missing.length)+'/'+expected.length+' · 누락 '+missing.length+' · 오인식 '+extra.length+' · '+((performance.now()-started)/1000).toFixed(2)+'초\n입력 '+result.resolution+' · '+(result.errors.length?'일부 검사 실패 · ':'')+'경계에 걸린 코드는 누락 계산 제외\n검사 영역: '+Math.round(area.x)+','+Math.round(area.y)+' / '+Math.round(area.width)+'×'+Math.round(area.height)+' px\n누락: '+(missing.map(item=>item.code).join(', ')||'없음')+'\n오인식: '+(extra.join(', ')||'없음');
+   document.getElementById('compare-summary-'+view.id).value='최근 검사 · 발견 '+result.hits.length+' · 누락 '+missing.length+' · 오인식 '+extra.length+' · '+((performance.now()-started)/1000).toFixed(2)+'초'+(result.errors.length?' · 일부 실패':'');
    drawTestView(view);
   }
   status.textContent='비교 인식 완료 · 각 화면의 보이는 영역 기준';
