@@ -15,19 +15,20 @@ function previewPhoto(){
 
 // 엑셀 코드 또는 임시 코드와 위치를 선택한다.
 // 임시 데이터는 테스트 화면에서만 사용한다.
-function getTestRows(){
- const count=Math.max(1,Math.min(12,Number(document.getElementById('testCount').value)||3));
+function getTestRows(count,existing=[]){
  if(!workbook){
-  const rows=[];
+  const rows=existing.slice(0,count);
   while(rows.length<count){
    const code=String(1000+Math.floor(Math.random()*9000))+'-'+String(Math.floor(Math.random()*1000000)).padStart(6,'0');
    if(!rows.some(row=>row[0]===code))rows.push([code,['T'+String(rows.length+1).padStart(2,'0')]]);
   }
   return rows;
  }
- const rows=[...buildLocations(workbook.sheets[workbook.selected]).entries()];
- for(let i=rows.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[rows[i],rows[j]]=[rows[j],rows[i]];}
- return rows.slice(0,count);
+ const available=buildLocations(workbook.sheets[workbook.selected]);
+ const rows=existing.filter(([code])=>available.has(code)).slice(0,count).map(([code])=>[code,available.get(code)]);
+ const remaining=[...available.entries()].filter(([code])=>!rows.some(row=>row[0]===code));
+ for(let i=remaining.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[remaining[i],remaining[j]]=[remaining[j],remaining[i]];}
+ return rows.concat(remaining.slice(0,count-rows.length));
 }
 
 // 종이 문서 또는 모니터 환경의 테스트 이미지를 만든다.
@@ -35,14 +36,15 @@ function getTestRows(){
 let testRows=[],testCodesNeedRefresh=true;
 function makeTestImage(newCodes=false){
  if(busy||starting)return;
- const rows=newCodes||testCodesNeedRefresh||!testRows.length?getTestRows():testRows;
+ const cols=Math.max(1,Math.min(4,Math.floor(Number(document.getElementById('testCols').value)||1))),rowCount=Math.max(1,Math.min(12,Math.floor(Number(document.getElementById('testRows').value)||1)));
+ const rows=getTestRows(cols*rowCount,newCodes||testCodesNeedRefresh?[]:testRows);
  if(!rows.length){photoReady=false;readImage.disabled=true;imageViewport.hidden=true;frozen.hidden=true;document.getElementById('testLogText').textContent='사용 가능한 엑셀 코드가 없습니다.';status.textContent='엑셀에 유효한 코드가 없습니다.';return;}
- const layout=document.getElementById('testLayout').value,noise=Number(document.getElementById('testNoise').value);
+ const noise=Number(document.getElementById('testNoise').value);
  const scene=document.getElementById('testScene').value,ink=document.getElementById('testInk').value;
  document.getElementById('testNoiseValue').value=noise+'%';
  const number=(id,min,max)=>Math.max(min,Math.min(max,Number(document.getElementById(id).value)||min));
  const widthCm=Number(document.getElementById('testWidthCm').value),heightCm=Number(document.getElementById('testHeightCm').value),ppi=Number(document.getElementById('testPpi').value);
- const width=Math.round(widthCm*ppi/2.54),height=Math.round(heightCm*ppi/2.54),cols=number('testCols',1,4),rowCount=number('testRows',1,12);
+ const width=Math.round(widthCm*ppi/2.54),height=Math.round(heightCm*ppi/2.54);
  if(!Number.isFinite(ppi)||ppi<1||!Number.isFinite(widthCm)||!Number.isFinite(heightCm)||widthCm<=0||heightCm<=0||!Number.isSafeInteger(width)||!Number.isSafeInteger(height)||width<1||height<1){status.textContent='이미지 크기와 PPI에 올바른 값을 입력하세요.';return;}
  const scale=ppi/254;
  const left=number('testLeft',0,3000)*scale,right=number('testRight',0,3000)*scale,top=number('testTop',0,3000)*scale,bottom=number('testBottom',0,3000)*scale;
@@ -100,7 +102,7 @@ function makeTestImage(newCodes=false){
  excelStatus.textContent=workbook?workbook.name+' · '+workbook.selected+' · '+locations.size+'개 코드':'테스트용 임시 코드 · 위치';
  document.getElementById('testLogText').textContent=(workbook?'엑셀에서 선택한 코드':'임시 코드 · 임시 위치')+'\n'+rows.map(([code,place])=>code+' → '+(place.length?place.join(', '):'없음')).join('\n');
  photoReady=true;previewPhoto();setPhotoZoom(1);imageViewport.scrollLeft=0;imageViewport.scrollTop=0;
- status.textContent='테스트 이미지 '+rows.length+'개 생성 · 코드 인식으로 OCR 검사';
+ status.textContent='테스트 이미지 '+rows.length+'개 생성'+(rows.length<cols*rowCount?' · 엑셀 코드 부족으로 일부 칸 비움':'')+' · 코드 인식으로 OCR 검사';
  return true;
  }catch(error){photoReady=false;readImage.disabled=true;imageViewport.hidden=true;frozen.hidden=true;status.textContent='이미지를 만들 수 없습니다. 브라우저가 처리할 수 있는 크기로 줄여주세요.';}
 }

@@ -283,9 +283,8 @@ resume.addEventListener('click',resumeCamera);
 tabButtons.forEach(button=>button.addEventListener('click',()=>switchTab(button.dataset.tab)));
 photoInput.addEventListener('change',loadPhoto);
 document.getElementById('testGenerate').addEventListener('click',()=>makeTestImage());
-document.getElementById('testOptionsApply').addEventListener('click',()=>{if(makeTestImage())document.querySelector('.test-options').open=false;});
+document.getElementById('testOptionsApply').addEventListener('click',()=>{document.querySelector('.test-options').open=false;status.textContent='설정을 변경했습니다. 이미지 생성을 눌러 적용하세요.';});
 document.getElementById('testExport').addEventListener('click',exportTestExcel);
-document.getElementById('testCount').addEventListener('change',()=>{testCodesNeedRefresh=true;});
 document.getElementById('testNoise').addEventListener('input',()=>{document.getElementById('testNoiseValue').value=document.getElementById('testNoise').value+'%';});
 // 카메라 정지 상태에서는 재촬영, 그 외에는 코드 인식을 실행한다. (핸들 스캔 버튼)
 // 기존 OCR과 카메라 재개 기능을 변경하지 않고 연결한다.
