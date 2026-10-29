@@ -451,12 +451,14 @@ function restoreSettings(){
     if(input.id==='filterMode'&&!['print','contrast'].includes(value))continue;
     if(input.type==='range'||input.type==='number'){
      const number=Number(value);
-     if(!value.trim()||!Number.isFinite(number)||number<Number(input.min)||number>Number(input.max))continue;
+     if(!value.trim()||!Number.isFinite(number)||(input.min!==''&&number<Number(input.min))||(input.max!==''&&number>Number(input.max)))continue;
     }
     if(input.type==='color'&&!/^#[0-9a-f]{6}$/i.test(value))continue;
     input.value=value;
    }
   }
+  if(values.testWidthCm===undefined&&Number(values.testWidth)>0)document.getElementById('testWidthCm').value=String(Number(values.testWidth)/100);
+  if(values.testHeightCm===undefined&&Number(values.testHeight)>0)document.getElementById('testHeightCm').value=String(Number(values.testHeight)/100);
   // 이전 전체 투명도는 글자·배경에 함께 복원한다.
   for(const type of ['code','place']){
    if(values[type+'BgOpacity']===undefined&&typeof values[type+'Opacity']==='string')document.getElementById(type+'BgOpacity').value=document.getElementById(type+'Opacity').value;
@@ -484,6 +486,14 @@ settingsFields.forEach(input=>{
 window.addEventListener('pagehide',saveSettings);
 setLocationDirection(locationDirectionIndex,false);
 restoreSettings();
+// 실제 크기와 PPI에 따른 픽셀 크기를 표시한다.
+// 설정 변경 시 생성 전에도 확인할 수 있다.
+function updateTestPixelSize(){
+ const w=Number(document.getElementById('testWidthCm').value),h=Number(document.getElementById('testHeightCm').value),ppi=Number(document.getElementById('testPpi').value);
+ document.getElementById('testPixelSize').value=w>0&&h>0&&ppi>0&&Number.isFinite(w*h*ppi)?Math.round(w*ppi/2.54)+' × '+Math.round(h*ppi/2.54)+' px':'크기 입력 필요';
+}
+for(const id of ['testWidthCm','testHeightCm','testPpi'])document.getElementById(id).addEventListener('input',updateTestPixelSize);
+updateTestPixelSize();
 
 // 조절하는 슬라이더와 제목만 하단에 표시한다.
 // 설정창은 투명하게 만들고 원본 표시 선택은 유지한다.
@@ -764,6 +774,7 @@ function collectSettings(){
  const values={};
  for(const input of settingsFields){
   if(input.type==='checkbox')values[input.id]=input.checked;
+  else if(input.type==='number'&&['testWidthCm','testHeightCm','testPpi'].includes(input.id))values[input.id]=input.value;
   else if(input.type==='number'&&!(input.id==='reviewScale'&&!input.value.trim())){
    const value=readNumericSetting(input,Number(input.defaultValue)||Number(input.min));
    values[input.id]=String(input.id==='reviewScale'?value:Math.round(value));
@@ -786,7 +797,7 @@ function parseTransferredSettings(text){
   if(input.type==='checkbox')valid=typeof value==='boolean';
   else if(valid){
    if(input.tagName==='SELECT')valid=[...input.options].some(option=>option.value===value);
-   if(input.type==='number'||input.type==='range')valid=(input.id==='reviewScale'&&value==='')||(value.trim()!==''&&Number.isFinite(Number(value))&&Number(value)>=Number(input.min)&&Number(value)<=Number(input.max));
+   if(input.type==='number'||input.type==='range')valid=(input.id==='reviewScale'&&value==='')||(value.trim()!==''&&Number.isFinite(Number(value))&&(input.min===''||Number(value)>=Number(input.min))&&(input.max===''||Number(value)<=Number(input.max)));
    if(input.type==='color')valid=/^#[0-9a-f]{6}$/i.test(value);
    if(input.id==='filterMode')valid=['contrast','print'].includes(value);
    if(input.id==='performancePreset')valid=['power','balanced','fast','custom'].includes(value);
@@ -807,6 +818,7 @@ function parseTransferredSettings(text){
 }
 
 function syncSettingsDisplay(){
+ updateTestPixelSize();
  syncCorrectionUi();
  queueGlyphGuide();
  for(const input of [strength,screenNoise,brightness,threshold,speckArea,speckThreshold]){

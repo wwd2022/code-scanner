@@ -41,10 +41,12 @@ function makeTestImage(newCodes=false){
  const scene=document.getElementById('testScene').value,ink=document.getElementById('testInk').value;
  document.getElementById('testNoiseValue').value=noise+'%';
  const number=(id,min,max)=>Math.max(min,Math.min(max,Number(document.getElementById(id).value)||min));
- const width=Number(document.getElementById('testWidth').value),height=Number(document.getElementById('testHeight').value),cols=number('testCols',1,4),rowCount=number('testRows',1,12);
- if(!Number.isSafeInteger(width)||!Number.isSafeInteger(height)||width<1||height<1){status.textContent='이미지 크기는 1 이상의 정수로 입력하세요.';return;}
- const left=number('testLeft',0,3000),right=number('testRight',0,3000),top=number('testTop',0,3000),bottom=number('testBottom',0,3000);
- const gapX=number('testGapX',0,500),gapY=number('testGapY',0,500),font=number('testFont',8,100);
+ const widthCm=Number(document.getElementById('testWidthCm').value),heightCm=Number(document.getElementById('testHeightCm').value),ppi=Number(document.getElementById('testPpi').value);
+ const width=Math.round(widthCm*ppi/2.54),height=Math.round(heightCm*ppi/2.54),cols=number('testCols',1,4),rowCount=number('testRows',1,12);
+ if(!Number.isFinite(ppi)||ppi<1||!Number.isFinite(widthCm)||!Number.isFinite(heightCm)||widthCm<=0||heightCm<=0||!Number.isSafeInteger(width)||!Number.isSafeInteger(height)||width<1||height<1){status.textContent='이미지 크기와 PPI에 올바른 값을 입력하세요.';return;}
+ const scale=ppi/254;
+ const left=number('testLeft',0,3000)*scale,right=number('testRight',0,3000)*scale,top=number('testTop',0,3000)*scale,bottom=number('testBottom',0,3000)*scale;
+ const gapX=number('testGapX',0,500)*scale,gapY=number('testGapY',0,500)*scale,font=number('testFont',8,100)*scale;
  const cellW=(width-left-right-gapX*(cols-1))/cols,cellH=(height-top-bottom-gapY*(rowCount-1))/rowCount;
  const textMode=document.getElementById('testText').value,table=document.getElementById('testTable').value==='on';
  if(rows.length>rowCount*cols){status.textContent='코드 '+rows.length+'개를 넣을 표가 부족합니다. 행 또는 열을 늘려주세요. (현재 '+(rowCount*cols)+'칸)';return;}
