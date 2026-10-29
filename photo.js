@@ -10,6 +10,7 @@ function previewPhoto(){
  frozenMode=true;frozen.hidden=false;imageViewport.hidden=false;liveView.hidden=true;zoomLevel.hidden=false;zoomHint.hidden=false;
  readImage.disabled=false;strength.disabled=false;
  updateOcrInputSize();
+ if(activeTab==='test')refreshTestComparison(true);
  status.textContent='두 손가락 확대·이동 / 두 번 터치 또는 인식 버튼으로 검사';
 }
 
@@ -43,7 +44,7 @@ function getTestGrid(width,height,font,gapX,gapY,textMode){
 
 // 종이 문서 또는 모니터 환경의 테스트 이미지를 만든다.
 // 생성한 코드와 위치를 조회표와 목록에 반영한다.
-let testRows=[],testCodesNeedRefresh=true,testImageLayout=null;
+let testRows=[],testCodesNeedRefresh=true,testImageLayout=null,testExpectedRegions=[];
 function makeTestImage(newCodes=false){
  if(busy||starting)return;
  const noise=Number(document.getElementById('testNoise').value);
@@ -104,6 +105,7 @@ function makeTestImage(newCodes=false){
   for(let i=0;i<Math.floor(noise/10);i++){ctx.fillStyle=random()<.5?'#777':'#fff';ctx.fillRect(random()*width,random()*height,5+random()*130,2+random()*7);}
   ctx.globalAlpha=1;
  }
+ testExpectedRegions=rows.map(([code],i)=>({code,bbox:{x0:left+(i%cols)*(cellW+gapX),y0:top+Math.floor(i/cols)*(cellH+gapY),x1:left+(i%cols)*(cellW+gapX)+cellW,y1:top+Math.floor(i/cols)*(cellH+gapY)+cellH}}));
  testRows=rows;testCodesNeedRefresh=false;testExpectedCodes=rows.map(row=>row[0]);document.getElementById('testCompareText').textContent='인식 후 표시됩니다.';
  locations=workbook?buildLocations(workbook.sheets[workbook.selected]):new Map(rows);
  excelStatus.textContent=workbook?workbook.name+' · '+workbook.selected+' · '+locations.size+'개 코드':'테스트용 임시 코드 · 위치';

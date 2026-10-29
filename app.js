@@ -27,6 +27,8 @@ function closeTools(except=null){
 function switchTab(tab){
  if(busy||starting||activeTab===tab)return;
  closeTestEditor();
+ document.getElementById('workspace').classList.toggle('compare-mode',tab==='test');
+ document.getElementById('testComparison').hidden=tab!=='test';
  clearPhotoTap();
  stopCamera();clearReviewSource();scanEpoch++;activeTab=tab;photoReady=false;frozenMode=false;
  setPhotoZoom(1);imageViewport.classList.remove('camera-shot');imageViewport.scrollLeft=0;imageViewport.scrollTop=0;closeTools();zoomLevel.hidden=true;zoomHint.hidden=true;
@@ -45,7 +47,7 @@ function switchTab(tab){
  liveCanvas.getContext('2d').clearRect(0,0,liveCanvas.width,liveCanvas.height);
  status.textContent=tab==='camera'?'카메라를 켜고 코드 인식을 누르세요.':'사진을 선택해 주세요.';
  document.getElementById('testEditButton').hidden=true;
- if(tab==='test'){testCodesNeedRefresh=true;document.getElementById('testLogText').textContent='이미지를 생성하면 표시됩니다.';document.getElementById('testCompareText').textContent='인식 후 표시됩니다.';status.textContent='설정을 선택하고 이미지 생성을 누르세요.';}
+ if(tab==='test'){resetTestComparison();testCodesNeedRefresh=true;document.getElementById('testLogText').textContent='이미지를 생성하면 표시됩니다.';document.getElementById('testCompareText').textContent='인식 후 표시됩니다.';status.textContent='설정을 선택하고 이미지 생성을 누르세요.';}
  else if(workbook){locations=buildLocations(workbook.sheets[workbook.selected]);excelStatus.textContent=workbook.name+' · '+workbook.selected+' · '+locations.size+'개 코드';}
  else{locations=new Map();excelStatus.textContent='엑셀을 선택해 주세요.';}
 }
@@ -361,6 +363,7 @@ document.getElementById('testNoise').addEventListener('input',()=>{document.getE
 // 기존 OCR과 카메라 재개 기능을 변경하지 않고 연결한다.
 function handleScanButton(){
  closeTools();
+ if(activeTab==='test'){scanTestComparison();return;}
  if(activeTab==='camera'&&frozenMode)resumeCamera();
  else scanCamera();
 }
@@ -815,7 +818,7 @@ function showPerformanceResult(result){
 }
 cancelScan.addEventListener('click',cancelActiveScan);
 document.getElementById('testRescan').addEventListener('click',()=>{
- if(activeTab==='test'&&photoReady){closeTools();scanCamera();}
+ if(activeTab==='test'&&photoReady)scanTestComparison();
 });
 window.addEventListener('pagehide',()=>{
  cancelActiveScan();
@@ -961,3 +964,7 @@ imageViewport.addEventListener('scroll',queueGlyphGuide,{passive:true});
 window.addEventListener('resize',queueGlyphGuide);
 if(typeof ResizeObserver!=='undefined')new ResizeObserver(queueGlyphGuide).observe(document.getElementById('workspace'));
 queueGlyphGuide();
+
+for(const input of document.querySelectorAll('#performanceSettings input,#performanceSettings select')){input.addEventListener('change',scheduleTestComparison);input.addEventListener('input',scheduleTestComparison);}
+
+for(const button of document.querySelectorAll('[data-performance-preset]'))button.addEventListener('click',scheduleTestComparison);

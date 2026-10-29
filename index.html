@@ -43,7 +43,8 @@
 </div><small>간격 0은 글자를 가까이 붙여 배치합니다. 여백·간격·글자 크기는 254 PPI 기준 px입니다. PPI를 바꾸면 함께 비례하여 변합니다.</small><button type="button" id="testOptionsApply">닫기</button></div></details>
 <button id="testGenerate" type="button">이미지 생성</button>
 <button id="testExport" type="button">코드 새로 추출</button>
-<button id="testRescan" type="button">같은 이미지 재인식</button>
+<button id="testRescan" type="button">보이는 화면 인식</button>
+<div class="compare-tools"><div class="tabs"><button type="button" data-compare-mode="both" aria-pressed="true">함께 보기</button><button type="button" data-compare-mode="original" aria-pressed="false">원본만</button><button type="button" data-compare-mode="corrected" aria-pressed="false">보정본만</button></div><button type="button" id="compare-refresh">보정본 갱신</button><button type="button" id="compare-align">화면 위치 맞추기</button></div>
 <details class="test-extra"><summary>추가 기능 · 테스트 결과</summary><div><button id="testReview" type="button">코드 확인 UI</button>
 <button id="testBatchReview" type="button">불확실 일괄 재인식</button>
 <button id="testOptimize" type="button">자동 최적화</button>
@@ -52,7 +53,7 @@
 <output id="testPerformance" class="performance-note test-performance" hidden>같은 이미지를 유지하고 성능 설정을 바꿔 재인식하세요.</output></div></details>
 </div>
 <video id="camera" autoplay muted playsinline aria-hidden="true"></video>
-<section id="workspace" aria-label="인식 이미지">
+<section id="workspace" aria-label="인식 이미지"><section id="testComparison" hidden aria-label="원본과 보정본 비교"><article id="compare-panel-original" class="compare-panel"><header><strong>원본 · 이미지 보정 끔</strong><button type="button" id="compare-scan-original">이 화면 인식</button></header><div class="compare-zoom"><input type="range" id="compare-range-original" min="1" max="8" step="0.1" value="1" aria-label="원본 · 이미지 보정 끔 확대"><output id="compare-zoom-original">100%</output></div><canvas id="compare-original" aria-label="원본 · 이미지 보정 끔 · 드래그 이동·두 손가락 확대"></canvas><output class="compare-summary" id="compare-summary-original">인식 전</output><details><summary>상세 결과</summary><pre id="compare-result-original">이미지 생성 후 인식하세요.</pre></details></article><article id="compare-panel-corrected" class="compare-panel"><header><strong>보정본 · 현재 인식 설정</strong><button type="button" id="compare-scan-corrected">이 화면 인식</button></header><div class="compare-zoom"><input type="range" id="compare-range-corrected" min="1" max="8" step="0.1" value="1" aria-label="보정본 · 현재 인식 설정 확대"><output id="compare-zoom-corrected">100%</output></div><canvas id="compare-corrected" aria-label="보정본 · 현재 인식 설정 · 드래그 이동·두 손가락 확대"></canvas><output class="compare-summary" id="compare-summary-corrected">인식 전</output><details><summary>상세 결과</summary><pre id="compare-result-corrected">이미지 생성 후 인식하세요.</pre></details></article></section>
 <div id="liveView">
 <div id="liveSurface"><canvas id="liveCanvas" aria-busy="false"></canvas><div id="dots"></div></div>
 <div id="liveStatus" role="status">카메라를 켜서 코드를 찾으세요.</div>
@@ -328,6 +329,7 @@
 <script src="photo.js"></script>
 <script src="excel.js"></script>
 <script src="records.js"></script>
+<script src="test-compare.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
