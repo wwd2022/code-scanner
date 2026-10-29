@@ -191,8 +191,8 @@ button:disabled{opacity:.45;cursor:default}button:focus-visible,input:focus-visi
 .test-log summary{cursor:pointer;font-weight:600}
 .test-log pre{max-height:120px;overflow:auto;margin:5px 0;padding:8px;background:#f1f4f8;border-radius:6px;line-height:1.5}
 
-.test-options{flex:1 1 100%;position:relative;font-size:12px}
-.test-options>summary{cursor:pointer;padding:5px;background:#eef2f7;border-radius:6px}
-.test-options[open]{max-height:30dvh;overflow:auto;background:#fff}
+.test-options,.test-extra{flex:1 1 100%;font-size:12px}
+.test-options>summary,.test-extra>summary{cursor:pointer;padding:8px;background:#eef2f7;border-radius:6px;text-align:center;min-height:40px}
+.test-option-panel{position:absolute;z-index:15;left:10px;right:10px;bottom:76px;max-height:65dvh;overflow:auto;padding:12px;background:#fff;border:1px solid #cbd3dd;border-radius:12px;box-shadow:0 4px 24px #0004}.test-option-panel button{width:100%;margin-top:8px;background:#273950;color:#fff;min-height:44px}.test-extra>div{display:flex;flex-wrap:wrap;gap:4px}.test-extra>div button{min-height:40px}
 .test-option-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;padding:5px}
-.test-option-grid label{justify-content:space-between}.test-option-grid input[type=number]{width:80px}.test-option-grid select{max-width:150px}
+.test-option-grid label{justify-content:space-between;min-height:40px}.test-option-grid input[type=number]{width:80px}.test-option-grid select{max-width:150px}

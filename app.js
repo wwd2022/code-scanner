@@ -283,6 +283,7 @@ resume.addEventListener('click',resumeCamera);
 tabButtons.forEach(button=>button.addEventListener('click',()=>switchTab(button.dataset.tab)));
 photoInput.addEventListener('change',loadPhoto);
 document.getElementById('testGenerate').addEventListener('click',()=>makeTestImage());
+document.getElementById('testOptionsApply').addEventListener('click',()=>{if(makeTestImage())document.querySelector('.test-options').open=false;});
 document.getElementById('testExport').addEventListener('click',exportTestExcel);
 document.getElementById('testCount').addEventListener('change',()=>makeTestImage(true));
 document.getElementById('testLayout').addEventListener('change',()=>makeTestImage());

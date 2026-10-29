@@ -41,7 +41,8 @@ function makeTestImage(newCodes=false){
  const scene=document.getElementById('testScene').value,ink=document.getElementById('testInk').value;
  document.getElementById('testNoiseValue').value=noise+'%';
  const number=(id,min,max)=>Math.max(min,Math.min(max,Number(document.getElementById(id).value)||min));
- const width=number('testWidth',400,3200),height=number('testHeight',400,3200),cols=number('testCols',1,4),rowCount=number('testRows',1,12);
+ const width=Number(document.getElementById('testWidth').value),height=Number(document.getElementById('testHeight').value),cols=number('testCols',1,4),rowCount=number('testRows',1,12);
+ if(!Number.isSafeInteger(width)||!Number.isSafeInteger(height)||width<1||height<1){status.textContent='이미지 크기는 1 이상의 정수로 입력하세요.';return;}
  const left=number('testLeft',0,3000),right=number('testRight',0,3000),top=number('testTop',0,3000),bottom=number('testBottom',0,3000);
  const gapX=number('testGapX',0,500),gapY=number('testGapY',0,500),font=number('testFont',8,100);
  const cellW=(width-left-right-gapX*(cols-1))/cols,cellH=(height-top-bottom-gapY*(rowCount-1))/rowCount;
@@ -50,8 +51,11 @@ function makeTestImage(newCodes=false){
   status.textContent='표의 칸 수나 공간이 부족합니다. 행·열·이미지 크기를 늘리거나 여백·글자 크기를 줄이세요.';return;
  }
  testRows=rows;testExpectedCodes=rows.map(row=>row[0]);document.getElementById('testCompareText').textContent='인식 후 표시됩니다.';
+ try{
  photoSource.width=width;photoSource.height=height;
  const ctx=photoSource.getContext('2d',{willReadFrequently:true});
+ if(!ctx||photoSource.width!==width||photoSource.height!==height)throw new Error('이미지 생성 실패');
+ ctx.getImageData(0,0,1,1);
  let seed=8392;const random=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
  ctx.fillStyle=scene==='paper'?'#e8e6df':scene==='screen'?'#dfe5e4':'#fff';ctx.fillRect(0,0,width,height);
  if(scene!=='plain'){
@@ -93,6 +97,8 @@ function makeTestImage(newCodes=false){
  document.getElementById('testLogText').textContent=(workbook?'엑셀에서 선택한 코드':'임시 코드 · 임시 위치')+'\n'+rows.map(([code,place])=>code+' → '+(place.length?place.join(', '):'없음')).join('\n');
  photoReady=true;previewPhoto();setPhotoZoom(1);imageViewport.scrollLeft=0;imageViewport.scrollTop=0;
  status.textContent='테스트 이미지 '+rows.length+'개 생성 · 코드 인식으로 OCR 검사';
+ return true;
+ }catch(error){photoReady=false;readImage.disabled=true;imageViewport.hidden=true;frozen.hidden=true;status.textContent='이미지를 만들 수 없습니다. 브라우저가 처리할 수 있는 크기로 줄여주세요.';}
 }
 
 // 생성 코드와 전체 이미지 인식 결과를 비교한다.
