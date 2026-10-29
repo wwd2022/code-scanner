@@ -31,14 +31,21 @@ function getTestRows(count,existing=[]){
  return rows.concat(remaining.slice(0,count-rows.length));
 }
 
+// 글자 크기와 간격으로 표에 들어갈 행·열을 계산한다.
+// 간격 0은 최소 여유만 남긴 밀집 배치다.
+function getTestGrid(width,height,font,gapX,gapY,textMode){
+ const ctx=document.createElement('canvas').getContext('2d');ctx.font=font+'px monospace';
+ const pad=Math.max(.5,font*.025),cellW=Math.ceil(ctx.measureText(textMode==='attached'?'MMMM-MMMMMMM':'MMMM-MMMMMM').width+pad*2);
+ const cellH=Math.ceil(font*((textMode==='near'||textMode==='other')?1.9:1.1));
+ const cols=Math.max(0,Math.floor((width+gapX)/(cellW+gapX))),rows=Math.max(0,Math.floor((height+gapY)/(cellH+gapY)));
+ return {cols,rows,cellW,cellH,pad};
+}
+
 // 종이 문서 또는 모니터 환경의 테스트 이미지를 만든다.
 // 생성한 코드와 위치를 조회표와 목록에 반영한다.
 let testRows=[],testCodesNeedRefresh=true,testImageLayout=null;
 function makeTestImage(newCodes=false){
  if(busy||starting)return;
- const cols=Math.max(1,Math.min(4,Math.floor(Number(document.getElementById('testCols').value)||1))),rowCount=Math.max(1,Math.min(12,Math.floor(Number(document.getElementById('testRows').value)||1)));
- const rows=getTestRows(cols*rowCount,newCodes||testCodesNeedRefresh?[]:testRows);
- if(!rows.length){photoReady=false;readImage.disabled=true;imageViewport.hidden=true;frozen.hidden=true;document.getElementById('testLogText').textContent='사용 가능한 엑셀 코드가 없습니다.';status.textContent='엑셀에 유효한 코드가 없습니다.';return;}
  const noise=Number(document.getElementById('testNoise').value);
  const scene=document.getElementById('testScene').value,ink=document.getElementById('testInk').value;
  document.getElementById('testNoiseValue').value=noise+'%';
@@ -50,12 +57,11 @@ function makeTestImage(newCodes=false){
  const margin=id=>Math.max(0,Number(document.getElementById(id).value)||0)*scale;
  const left=margin('testLeft'),right=margin('testRight'),top=margin('testTop'),bottom=margin('testBottom');
  const gapX=number('testGapX',0,500)*scale,gapY=number('testGapY',0,500)*scale,font=number('testFont',8,100)*scale;
- const cellW=(width-left-right-gapX*(cols-1))/cols,cellH=(height-top-bottom-gapY*(rowCount-1))/rowCount;
  const textMode=document.getElementById('testText').value,table=document.getElementById('testTable').value==='on';
- if(rows.length>rowCount*cols){status.textContent='코드 '+rows.length+'개를 넣을 표가 부족합니다. 행 또는 열을 늘려주세요. (현재 '+(rowCount*cols)+'칸)';return;}
- if(cellW<font*7||cellH<font*2||(textMode!=='none'&&cellW<font*10)){
-  status.textContent='표의 칸 수나 공간이 부족합니다. 행·열·이미지 크기를 늘리거나 여백·글자 크기를 줄이세요.';return;
- }
+ const {cols,rows:rowCount,cellW,cellH,pad}=getTestGrid(width-left-right,height-top-bottom,font,gapX,gapY,textMode);
+ if(!cols||!rowCount){status.textContent='코드를 넣을 공간이 부족합니다. 표를 늘리거나 글자 크기를 줄여주세요.';return;}
+ const rows=getTestRows(cols*rowCount,newCodes||testCodesNeedRefresh?[]:testRows);
+ if(!rows.length){status.textContent='엑셀에 유효한 코드가 없습니다.';return;}
  if(!confirm(width+' × '+height+' px 이미지를 생성하시겠습니까?'))return;
  try{
  photoSource.width=width;photoSource.height=height;
@@ -76,7 +82,7 @@ function makeTestImage(newCodes=false){
  }
  const labels=['RESISTOR','PART','DIODE','QTY 12','MODEL'];
  for(let i=0;i<rows.length;i++){
-  const x=left+(i%cols)*(cellW+gapX)+font*.3,y=top+Math.floor(i/cols)*(cellH+gapY)+cellH/2;
+  const x=left+(i%cols)*(cellW+gapX)+pad,y=top+Math.floor(i/cols)*(cellH+gapY)+font*.55;
   let code=rows[i][0];
   if(textMode==='attached')code+=String.fromCharCode(65+Math.floor(random()*26));
   ctx.fillText(code,x,y);
@@ -102,7 +108,7 @@ function makeTestImage(newCodes=false){
  locations=workbook?buildLocations(workbook.sheets[workbook.selected]):new Map(rows);
  excelStatus.textContent=workbook?workbook.name+' · '+workbook.selected+' · '+locations.size+'개 코드':'테스트용 임시 코드 · 위치';
  document.getElementById('testLogText').textContent=(workbook?'엑셀에서 선택한 코드':'임시 코드 · 임시 위치')+'\n'+rows.map(([code,place])=>code+' → '+(place.length?place.join(', '):'없음')).join('\n');
- testImageLayout={width,height,scale,left,top,right,bottom,values:Object.fromEntries(['testWidthCm','testHeightCm','testPpi','testRows','testCols','testGapX','testGapY','testFont'].map(id=>[id,document.getElementById(id).value]))};
+ testImageLayout={width,height,scale,left,top,right,bottom,textMode,values:Object.fromEntries(['testWidthCm','testHeightCm','testPpi','testGapX','testGapY','testFont'].map(id=>[id,document.getElementById(id).value]))};
  photoReady=true;previewPhoto();setPhotoZoom(1);imageViewport.scrollLeft=0;imageViewport.scrollTop=0;
  status.textContent='테스트 이미지 '+rows.length+'개 생성'+(rows.length<cols*rowCount?' · 엑셀 코드 부족으로 일부 칸 비움':'')+' · 코드 인식으로 OCR 검사';
  return true;

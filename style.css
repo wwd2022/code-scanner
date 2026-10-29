@@ -219,3 +219,7 @@ button,.file-button{min-height:36px;padding:7px 10px}
 #testEditPanel label{display:flex;gap:6px;align-items:center;font-size:11px}#testEditPanel input{flex:1;min-width:0}#testEditPanel output{width:28px;text-align:right}#testEditPanel>div{display:flex;gap:6px}#testEditPanel button{flex:1;min-height:36px}#testEditApply{background:#273950;color:#fff}
 
 #testEditGrid{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}#testEditGrid rect{fill:none;stroke:#1685ff;stroke-width:1;vector-effect:non-scaling-stroke}
+
+#testEditGrid{background:#eef2f0f5}#testEditGrid text{fill:#172d48}#testEditFrame span{transform:translateY(-100%)}
+
+#imageViewport.test-editing{display:flex;justify-content:center;align-items:flex-start;padding-top:22px;overflow:hidden}

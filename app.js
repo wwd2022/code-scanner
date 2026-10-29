@@ -290,17 +290,22 @@ let testEditing=false,editRect=null,editPointers=new Map(),editGesture=null;
 const editFrame=document.getElementById('testEditFrame'),editPanel=document.getElementById('testEditPanel');
 function closeTestEditor(){
  testEditing=false;editFrame.hidden=true;editPanel.hidden=true;editPointers.clear();editGesture=null;
+ imageViewport.classList.remove('test-editing');frozen.style.width=(photoZoom*100)+'%';
 }
 function drawTestEditor(){
  const l=testImageLayout,r=editRect;
  editFrame.style.left=(r.x/l.width*100)+'%';editFrame.style.top=(r.y/l.height*100)+'%';
  editFrame.style.width=(r.w/l.width*100)+'%';editFrame.style.height=(r.h/l.height*100)+'%';
- const grid=document.getElementById('testEditGrid'),cols=Number(l.values.testCols),rows=Number(l.values.testRows);
- const gx=Number(document.getElementById('editGapX').value)*l.scale,gy=Number(document.getElementById('editGapY').value)*l.scale;
- const cw=(r.w-gx*(cols-1))/cols,ch=(r.h-gy*(rows-1))/rows;grid.setAttribute('viewBox','0 0 '+r.w+' '+r.h);grid.replaceChildren();
- if(cw>0&&ch>0)for(let y=0;y<rows;y++)for(let x=0;x<cols;x++){
+ const grid=document.getElementById('testEditGrid');
+ const gx=Number(document.getElementById('editGapX').value)*l.scale,gy=Number(document.getElementById('editGapY').value)*l.scale,font=Number(document.getElementById('editFont').value)*l.scale;
+ const {cols,rows,cellW:cw,cellH:ch,pad}=getTestGrid(r.w,r.h,font,gx,gy,l.textMode);
+ grid.setAttribute('viewBox','0 0 '+r.w+' '+r.h);grid.replaceChildren();
+ for(let y=0;y<rows;y++)for(let x=0;x<cols;x++){
   const cell=document.createElementNS('http://www.w3.org/2000/svg','rect');cell.setAttribute('x',x*(cw+gx));cell.setAttribute('y',y*(ch+gy));cell.setAttribute('width',cw);cell.setAttribute('height',ch);grid.append(cell);
+  const index=y*cols+x,code=testRows[index]?.[0]||'0000-000000',text=document.createElementNS('http://www.w3.org/2000/svg','text');
+  text.setAttribute('x',x*(cw+gx)+pad);text.setAttribute('y',y*(ch+gy)+font*.55);text.setAttribute('font-size',font);text.setAttribute('font-family','monospace');text.setAttribute('dominant-baseline','central');text.textContent=code;grid.append(text);
  }
+ editFrame.querySelector('span').textContent='자동 '+cols+'열 × '+rows+'행 · 최대 '+(cols*rows)+'개 · 드래그로 이동/크기 조절';
 }
 function beginEditGesture(){
  const points=[...editPointers.values()];if(!points.length){editGesture=null;return;}
@@ -311,7 +316,9 @@ document.getElementById('testEditButton').addEventListener('click',()=>{
  setPhotoZoom(1);imageViewport.scrollLeft=0;imageViewport.scrollTop=0;
  const l=testImageLayout;editRect={x:l.left,y:l.top,w:l.width-l.left-l.right,h:l.height-l.top-l.bottom};
  for(const [id,key] of [['editGapX','testGapX'],['editGapY','testGapY'],['editFont','testFont']]){document.getElementById(id).value=l.values[key];document.getElementById(id+'Value').value=l.values[key];}
- testEditing=true;editFrame.hidden=false;editPanel.hidden=false;drawTestEditor();
+ testEditing=true;editFrame.hidden=false;editPanel.hidden=false;imageViewport.classList.add('test-editing');
+ const workspace=document.getElementById('workspace');frozen.style.width=Math.max(1,Math.min(workspace.clientWidth-24,(workspace.clientHeight-editPanel.offsetHeight-75)*l.width/l.height))+'px';
+ drawTestEditor();
  status.textContent='테두리를 움직이거나 크기를 조절한 후 이미지 적용을 누르세요.';
 });
 for(const id of ['editGapX','editGapY','editFont'])document.getElementById(id).addEventListener('input',()=>{document.getElementById(id+'Value').value=document.getElementById(id).value;drawTestEditor();});
