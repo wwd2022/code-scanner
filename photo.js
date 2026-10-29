@@ -32,16 +32,24 @@ function getTestRows(){
 
 // 종이 문서 또는 모니터 환경의 테스트 이미지를 만든다.
 // 생성한 코드와 위치를 조회표와 목록에 반영한다.
-function makeTestImage(){
+let testRows=[];
+function makeTestImage(newCodes=false){
  if(busy||starting)return;
- const rows=getTestRows();
- testExpectedCodes=rows.map(row=>row[0]);
+ const rows=newCodes||!testRows.length?getTestRows():testRows;
  if(!rows.length){photoReady=false;readImage.disabled=true;imageViewport.hidden=true;frozen.hidden=true;document.getElementById('testLogText').textContent='사용 가능한 엑셀 코드가 없습니다.';status.textContent='엑셀에 유효한 코드가 없습니다.';return;}
  const layout=document.getElementById('testLayout').value,noise=Number(document.getElementById('testNoise').value);
  const scene=document.getElementById('testScene').value,ink=document.getElementById('testInk').value;
  document.getElementById('testNoiseValue').value=noise+'%';
- const cols=layout==='column'?1:layout==='random'?3:2;
- const width=1200,cellW=width/cols,cellH=145,height=Math.max(530,Math.ceil(rows.length/cols)*cellH+120);
+ const number=(id,min,max)=>Math.max(min,Math.min(max,Number(document.getElementById(id).value)||min));
+ const width=number('testWidth',400,3200),height=number('testHeight',400,3200),cols=number('testCols',1,4),rowCount=number('testRows',1,12);
+ const left=number('testLeft',0,3000),right=number('testRight',0,3000),top=number('testTop',0,3000),bottom=number('testBottom',0,3000);
+ const gapX=number('testGapX',0,500),gapY=number('testGapY',0,500),font=number('testFont',8,100);
+ const cellW=(width-left-right-gapX*(cols-1))/cols,cellH=(height-top-bottom-gapY*(rowCount-1))/rowCount;
+ const textMode=document.getElementById('testText').value,table=document.getElementById('testTable').value==='on';
+ if(rows.length>rowCount*cols||cellW<font*7||cellH<font*2||(textMode!=='none'&&cellW<font*10)){
+  status.textContent='표의 칸 수나 공간이 부족합니다. 행·열·이미지 크기를 늘리거나 여백·글자 크기를 줄이세요.';return;
+ }
+ testRows=rows;testExpectedCodes=rows.map(row=>row[0]);document.getElementById('testCompareText').textContent='인식 후 표시됩니다.';
  photoSource.width=width;photoSource.height=height;
  const ctx=photoSource.getContext('2d',{willReadFrequently:true});
  let seed=8392;const random=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
@@ -49,16 +57,24 @@ function makeTestImage(){
  if(scene!=='plain'){
   const shade=ctx.createLinearGradient(0,0,width,height);
   shade.addColorStop(0,'rgba(255,255,255,.16)');shade.addColorStop(1,'rgba(40,40,40,.12)');ctx.fillStyle=shade;ctx.fillRect(0,0,width,height);
-  ctx.strokeStyle=scene==='paper'?'rgba(35,35,35,.4)':'rgba(60,70,70,.28)';ctx.lineWidth=1;
-  for(let x=0;x<=width;x+=cellW){ctx.beginPath();ctx.moveTo(x,35);ctx.lineTo(x,height-20);ctx.stroke();}
-  for(let y=35;y<height;y+=cellH){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(width,y);ctx.stroke();}
  }
  ctx.fillStyle=ink==='normal'?'#191919':ink==='light'?'#777773':'#a5a59e';
- ctx.font=(scene==='plain'?'bold ':'')+(cols===3?35:cols===1?50:42)+'px monospace';
+ ctx.font=font+'px monospace';ctx.textBaseline='middle';
+ if(table){
+  ctx.strokeStyle='rgba(35,35,35,.45)';ctx.lineWidth=1;
+  for(let row=0;row<rowCount;row++)for(let col=0;col<cols;col++)ctx.strokeRect(left+col*(cellW+gapX),top+row*(cellH+gapY),cellW,cellH);
+ }
+ const labels=['RESISTOR','PART','DIODE','QTY 12','MODEL'];
  for(let i=0;i<rows.length;i++){
-  const x=cols===1?105:(i%cols)*cellW+35,y=Math.floor(i/cols)*cellH+112;
-  const dx=layout==='random'?(random()-.5)*45:0,dy=layout==='random'?(random()-.5)*35:0;
-  ctx.fillText(rows[i][0],x+dx,y+dy);
+  const x=left+(i%cols)*(cellW+gapX)+font*.3,y=top+Math.floor(i/cols)*(cellH+gapY)+cellH/2;
+  let code=rows[i][0];
+  if(textMode==='attached')code+=String.fromCharCode(65+Math.floor(random()*26));
+  ctx.fillText(code,x,y);
+  if(textMode==='near'||textMode==='other'){
+   ctx.font=Math.max(8,font*.48)+'px monospace';
+   ctx.fillText(textMode==='near'?labels[Math.floor(random()*labels.length)]:'B'+String(100+Math.floor(random()*900))+'-0'+String(Math.floor(random()*1000)).padStart(3,'0'),x,y+font*.8);
+   ctx.font=font+'px monospace';
+  }
  }
  if(scene==='screen'&&noise){
   ctx.lineWidth=2;
@@ -79,9 +95,19 @@ function makeTestImage(){
  status.textContent='테스트 이미지 '+rows.length+'개 생성 · 코드 인식으로 OCR 검사';
 }
 
+// 생성 코드와 전체 이미지 인식 결과를 비교한다.
+// 확대 영역과 일부 실패는 전체 정확도로 표시하지 않는다.
+function showTestComparison(hits,area,errorCount){
+ const out=document.getElementById('testCompareText');
+ if(area||errorCount){out.textContent='전체 이미지가 아니거나 일부 검사가 실패해 비교하지 않았습니다.';return;}
+ const expected=new Set(testExpectedCodes),found=new Set(hits.map(hit=>hit.code));
+ const matched=[...expected].filter(code=>found.has(code)),missing=[...expected].filter(code=>!found.has(code)),extra=[...found].filter(code=>!expected.has(code));
+ out.textContent='일치 '+matched.length+' / '+expected.size+' · 누락 '+missing.length+' · 오인식 '+extra.length+'\n누락: '+(missing.join(', ')||'없음')+'\n오인식: '+(extra.join(', ')||'없음');
+}
+
 // 엑셀에서 새로운 무작위 코드들을 가져온다. (익스포트 테스트 엑셀)
 // 기존 이미지의 코드만 교체하고 엑셀 파일을 생성하지 않는다.
-function exportTestExcel(){makeTestImage();}
+function exportTestExcel(){makeTestImage(true);}
 
 // 선택한 사진을 읽고 크기를 줄여 미리 보여준다. (로드 포토)
 // 큰 사진은 긴 변 3200픽셀로 줄이고 임시 주소를 해제한다.

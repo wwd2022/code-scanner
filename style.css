@@ -190,3 +190,9 @@ button:disabled{opacity:.45;cursor:default}button:focus-visible,input:focus-visi
 .test-log{flex-shrink:0;font-size:12px;color:#526275}
 .test-log summary{cursor:pointer;font-weight:600}
 .test-log pre{max-height:120px;overflow:auto;margin:5px 0;padding:8px;background:#f1f4f8;border-radius:6px;line-height:1.5}
+
+.test-options{flex:1 1 100%;position:relative;font-size:12px}
+.test-options>summary{cursor:pointer;padding:5px;background:#eef2f7;border-radius:6px}
+.test-options[open]{max-height:30dvh;overflow:auto;background:#fff}
+.test-option-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;padding:5px}
+.test-option-grid label{justify-content:space-between}.test-option-grid input[type=number]{width:80px}.test-option-grid select{max-width:150px}

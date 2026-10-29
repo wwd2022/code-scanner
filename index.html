@@ -29,17 +29,27 @@
 </div>
 <div class="mode-controls test-controls" id="testControls" hidden>
 <label>코드 <input id="testCount" type="number" min="1" max="12" value="3"></label>
-<label>배치 <select id="testLayout"><option value="grid">격자</option><option value="random">무작위</option><option value="column">세로</option></select></label>
+<label hidden>배치 <select id="testLayout"><option value="grid">격자</option><option value="random">무작위</option><option value="column">세로</option></select></label>
 <label>환경 <select id="testScene"><option value="paper">종이 문서</option><option value="screen">모니터</option><option value="plain">기본</option></select></label>
 <label>인쇄 <select id="testInk"><option value="normal">보통</option><option value="light">흐림</option><option value="faint">많이 흐림</option></select></label>
 <label>노이즈 <input id="testNoise" type="range" min="0" max="100" step="10" value="0"><output id="testNoiseValue">0%</output></label>
+<details class="test-options"><summary>표 · 배치 · 주변 문자</summary>
+<div class="test-option-grid">
+<label>가로 px <input id="testWidth" type="number" min="400" max="3200" value="1200"></label><label>세로 px <input id="testHeight" type="number" min="400" max="3200" value="1000"></label>
+<label>행 <input id="testRows" type="number" min="1" max="12" value="4"></label><label>열 <input id="testCols" type="number" min="1" max="4" value="2"></label>
+<label>위 여백 <input id="testTop" type="number" min="0" max="3000" value="100"></label><label>아래 여백 <input id="testBottom" type="number" min="0" max="3000" value="100"></label><label>왼쪽 여백 <input id="testLeft" type="number" min="0" max="3000" value="80"></label><label>오른쪽 여백 <input id="testRight" type="number" min="0" max="3000" value="80"></label>
+<label>글자 크기 <input id="testFont" type="number" min="8" max="100" value="32"></label><label>가로 간격 <input id="testGapX" type="number" min="0" max="500" value="0"></label><label>세로 간격 <input id="testGapY" type="number" min="0" max="500" value="0"></label>
+<label>표 <select id="testTable"><option value="on">표시</option><option value="off">숨김</option></select></label>
+<label>주변 문자 <select id="testText"><option value="none">없음</option><option value="near">품목명·수량</option><option value="other">다른 코드</option><option value="attached">뒤에 문자 붙이기</option></select></label>
+</div><small>간격은 칸 사이의 여백이며 모든 크기는 이미지 픽셀 기준입니다.</small></details>
 <button id="testGenerate" type="button">이미지 생성</button>
-<button id="testExport" type="button">엑셀에서 추출</button>
+<button id="testExport" type="button">코드 새로 추출</button>
 <button id="testRescan" type="button">같은 이미지 재인식</button>
 <button id="testReview" type="button">코드 확인 UI</button>
 <button id="testBatchReview" type="button">불확실 일괄 재인식</button>
 <button id="testOptimize" type="button">자동 최적화</button>
 </div>
+<details id="testCompare" class="test-log" hidden><summary>인식 비교 결과</summary><pre id="testCompareText">인식 후 표시됩니다.</pre></details>
 <details id="testLog" class="test-log" hidden><summary>테스트 코드 · 위치 목록</summary><pre id="testLogText"></pre></details>
 <output id="testPerformance" class="performance-note test-performance" hidden>같은 이미지를 유지하고 성능 설정을 바꿔 재인식하세요.</output>
 <video id="camera" autoplay muted playsinline aria-hidden="true"></video>

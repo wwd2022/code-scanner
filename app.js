@@ -36,13 +36,14 @@ function switchTab(tab){
  document.getElementById('testControls').hidden=tab!=='test';
  document.getElementById('testPerformance').hidden=tab!=='test';
  document.getElementById('testLog').hidden=tab!=='test';
+ document.getElementById('testCompare').hidden=tab!=='test';
  readImage.disabled=true;
  liveView.hidden=tab!=='camera';liveStatus.hidden=tab!=='camera';
  imageViewport.hidden=true;frozen.hidden=true;
  strength.disabled=false;photoInput.value='';
  liveCanvas.getContext('2d').clearRect(0,0,liveCanvas.width,liveCanvas.height);
  status.textContent=tab==='camera'?'카메라를 켜고 코드 인식을 누르세요.':'사진을 선택해 주세요.';
- if(tab==='test')makeTestImage();
+ if(tab==='test')makeTestImage(true);
  else if(workbook){locations=buildLocations(workbook.sheets[workbook.selected]);excelStatus.textContent=workbook.name+' · '+workbook.selected+' · '+locations.size+'개 코드';}
  else{locations=new Map();excelStatus.textContent='엑셀을 선택해 주세요.';}
 }
@@ -281,13 +282,13 @@ stop.addEventListener('click',stopCamera);
 resume.addEventListener('click',resumeCamera);
 tabButtons.forEach(button=>button.addEventListener('click',()=>switchTab(button.dataset.tab)));
 photoInput.addEventListener('change',loadPhoto);
-document.getElementById('testGenerate').addEventListener('click',makeTestImage);
+document.getElementById('testGenerate').addEventListener('click',()=>makeTestImage());
 document.getElementById('testExport').addEventListener('click',exportTestExcel);
-document.getElementById('testCount').addEventListener('change',makeTestImage);
-document.getElementById('testLayout').addEventListener('change',makeTestImage);
-document.getElementById('testNoise').addEventListener('change',makeTestImage);
-document.getElementById('testScene').addEventListener('change',makeTestImage);
-document.getElementById('testInk').addEventListener('change',makeTestImage);
+document.getElementById('testCount').addEventListener('change',()=>makeTestImage(true));
+document.getElementById('testLayout').addEventListener('change',()=>makeTestImage());
+document.getElementById('testNoise').addEventListener('change',()=>makeTestImage());
+document.getElementById('testScene').addEventListener('change',()=>makeTestImage());
+document.getElementById('testInk').addEventListener('change',()=>makeTestImage());
 // 카메라 정지 상태에서는 재촬영, 그 외에는 코드 인식을 실행한다. (핸들 스캔 버튼)
 // 기존 OCR과 카메라 재개 기능을 변경하지 않고 연결한다.
 function handleScanButton(){
@@ -338,6 +339,7 @@ function appendScanRaw(name,value,failed){
 // 인식 결과 박스와 상태 메시지를 표시한다. (쇼 스캔 리절츠)
 // 같은 결과를 조회 기록과 연결한다.
 function showScanResults(hits,area,stats,seconds,errorCount){
+ if(activeTab==='test')showTestComparison(hits,area,errorCount);
  for(const hit of hits)addRecord(hit);
  refreshRecords();
  showBoxes(hits);
