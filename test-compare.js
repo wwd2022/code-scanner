@@ -1,7 +1,7 @@
 // 비교 화면별 확대·이동·인식 결과를 보관한다.
 // 원본과 보정본은 공통 OCR 경로를 사용한다.
 const testViews=['original','corrected'].map(id=>({id,canvas:document.getElementById('compare-'+id),zoom:1,cx:.5,cy:.5,hits:[],input:null,inputArea:null,points:new Map()}));
-let testCompareMode='both',testPreviewVersion=0,testPreviewTimer=0,testCorrectedPreview=null;
+let testCompareMode=window.matchMedia('(max-width:600px)').matches?'corrected':'both',testPreviewVersion=0,testPreviewTimer=0,testCorrectedPreview=null;
 function testViewSettings(id){
  const settings=getCorrectionSettings();
  return id==='original'?{...settings,mode:'contrast',brightness:0,strength:0,screenNoise:0,removeSpecks:false,removeLines:false}:settings;
@@ -58,7 +58,7 @@ function scheduleTestComparison(){
 // 각 화면의 결과는 독립적으로 표시하고 작업 기록에는 추가하지 않는다.
 async function scanTestComparison(id=null){
  if(busy||starting||!photoReady)return;
- closeTools();
+ closeTools();document.querySelector('.test-options').open=false;
  const targets=testViews.filter(view=>id?view.id===id:testCompareMode==='both'||view.id===testCompareMode);
  const stages=scanStageInputs.filter(input=>input.checked&&(deepScan.checked||input.dataset.scanStage==='corrected')).map(input=>input.dataset.scanStage);
  if(!stages.length){status.textContent='검사 단계를 하나 이상 선택하세요.';return;}
@@ -113,6 +113,15 @@ new ResizeObserver(()=>{for(const view of testViews)drawTestView(view);}).observ
 // 모드를 다시 열 때 이전 이미지와 결과를 비운다.
 // 원본·보정 미리보기의 오래된 픽셀도 해제한다.
 function resetTestComparison(){
+ setTestCompareMode(testCompareMode);
  testPreviewVersion++;if(testCorrectedPreview)testCorrectedPreview.width=testCorrectedPreview.height=1;testCorrectedPreview=null;
  for(const view of testViews){view.zoom=1;view.cx=view.cy=.5;view.points.clear();view.canvas.width=view.canvas.width;document.getElementById('compare-range-'+view.id).value=1;clearTestView(view,'이미지를 생성하세요.');}
 }
+
+// 메뉴를 접어 비교 이미지 공간을 확보한다.
+// 다시 누르면 기본 화면으로 돌아간다.
+document.getElementById('compare-focus').addEventListener('click',()=>{
+ const focused=document.querySelector('main').classList.toggle('comparison-focus');
+ const button=document.getElementById('compare-focus');button.setAttribute('aria-pressed',String(focused));button.textContent=focused?'돌아가기':'넓게';
+ for(const view of testViews)drawTestView(view);
+});

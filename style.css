@@ -229,3 +229,30 @@ button,.file-button{min-height:36px;padding:7px 10px}
 #testComparison{height:100%;display:flex;gap:6px;padding:6px;min-height:0}.compare-panel{display:flex;flex-direction:column;min-width:0;min-height:0;flex:1;background:#fff;border-radius:6px;overflow:hidden}.compare-panel header{display:flex;align-items:center;justify-content:space-between;gap:3px;padding:4px;font-size:11px}.compare-panel header button{font-size:11px;min-height:32px;padding:4px 6px}.compare-zoom{display:flex;gap:4px;align-items:center;padding:0 5px}.compare-zoom input{flex:1;min-width:0}.compare-zoom output{font-size:10px;width:36px}.compare-panel canvas{display:block;width:100%;height:0;flex:1;min-height:0;touch-action:none;cursor:grab}.compare-panel details{font-size:11px;padding:4px;max-height:30%;overflow:auto}.compare-panel pre{margin:4px 0;font-size:10px}.compare-panel summary{cursor:pointer} @media(max-width:600px){#testComparison{flex-direction:column}}
 
 .compare-summary{display:block;padding:4px 6px;font-size:11px;color:#263b51;background:#eaf0f6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* 비교 화면에서는 보기 선택 한 줄만 유지한다. */
+.comparison-active #testControls{display:grid;grid-template-columns:minmax(0,1fr) 52px 62px;gap:4px;align-items:center}
+.comparison-active .compare-tools{order:1;display:block;min-width:0}
+.comparison-active .compare-tools .tabs{gap:3px}
+.comparison-active .test-options{order:2;min-width:0}
+.comparison-active #compare-focus{order:3;padding:4px;min-height:36px;font-size:11px}
+.comparison-active .test-options>summary{font-size:11px;padding:8px 2px}
+.comparison-active #testRescan,.comparison-active #readImage{display:none}
+.compare-settings-actions{display:flex;gap:4px;margin-bottom:4px}
+.compare-settings-actions button{flex:1;min-height:36px}
+.compare-panel details{flex-shrink:0}
+.compare-panel details>summary .compare-summary{display:inline;padding:0;background:transparent;font-size:10px}
+.comparison-focus{max-width:none;padding:4px}
+.comparison-focus .app-header,.comparison-focus .mode-tabs,.comparison-focus .tool-menu,.comparison-focus #status,.comparison-focus #scanSummary{display:none}
+.comparison-focus #testControls{flex-shrink:0}
+@media(max-width:600px){
+ .comparison-active{gap:4px}
+ .comparison-active .app-header{min-height:24px}
+ .comparison-active h1{font-size:14px}
+ .comparison-active #status{max-height:16px;min-height:14px;font-size:10px}
+ #testComparison{gap:4px;padding:3px}
+ .compare-panel header{padding:2px 4px}
+ .compare-panel header button{min-height:32px}
+ .compare-panel .compare-zoom{padding:0 4px}
+ .compare-panel .compare-zoom input{height:14px;margin:0}
+}

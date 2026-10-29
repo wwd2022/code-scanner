@@ -27,6 +27,9 @@ function closeTools(except=null){
 function switchTab(tab){
  if(busy||starting||activeTab===tab)return;
  closeTestEditor();
+ document.querySelector('main').classList.toggle('comparison-active',tab==='test');
+ document.querySelector('main').classList.remove('comparison-focus');
+ document.getElementById('compare-focus').setAttribute('aria-pressed','false');document.getElementById('compare-focus').textContent='넓게';
  document.getElementById('workspace').classList.toggle('compare-mode',tab==='test');
  document.getElementById('testComparison').hidden=tab!=='test';
  clearPhotoTap();
@@ -355,9 +358,9 @@ document.getElementById('testEditApply').addEventListener('click',()=>{
  if(makeTestImage()){closeTestEditor();queueSettingsSave();updateTestPixelSize();}
  else for(const [id,value] of Object.entries(previous))document.getElementById(id).value=value;
 });
-document.getElementById('testGenerate').addEventListener('click',()=>{if(makeTestImage()){closeTestEditor();document.getElementById('testEditButton').hidden=false;}});
+document.getElementById('testGenerate').addEventListener('click',()=>{if(makeTestImage()){closeTestEditor();document.querySelector('.test-options').open=false;document.getElementById('testEditButton').hidden=false;}});
 document.getElementById('testOptionsApply').addEventListener('click',()=>{document.querySelector('.test-options').open=false;status.textContent='설정을 변경했습니다. 이미지 생성을 눌러 적용하세요.';});
-document.getElementById('testExport').addEventListener('click',()=>{if(makeTestImage(true)){closeTestEditor();document.getElementById('testEditButton').hidden=false;}});
+document.getElementById('testExport').addEventListener('click',()=>{if(makeTestImage(true)){closeTestEditor();document.querySelector('.test-options').open=false;document.getElementById('testEditButton').hidden=false;}});
 document.getElementById('testNoise').addEventListener('input',()=>{document.getElementById('testNoiseValue').value=document.getElementById('testNoise').value+'%';});
 // 카메라 정지 상태에서는 재촬영, 그 외에는 코드 인식을 실행한다. (핸들 스캔 버튼)
 // 기존 OCR과 카메라 재개 기능을 변경하지 않고 연결한다.
