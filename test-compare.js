@@ -1,6 +1,7 @@
 // 비교 화면별 확대·이동·인식 결과를 보관한다.
 // 원본과 보정본은 공통 OCR 경로를 사용한다.
-const testViews=['original','corrected'].map(id=>({id,canvas:document.getElementById('compare-'+id),zoom:1,cx:.5,cy:.5,hits:[],input:null,inputArea:null,points:new Map()}));
+const testViews=['original','corrected'].map(id=>({id,canvas:document.getElementById('compare-'+id),zoom:1,cx:.5,cy:.5,hits:[],input:null,inputArea:null,points:new Map(),surface:document.getElementById('compare-surface-'+id),boxes:document.getElementById('compare-boxes-'+id)}));
+let activeTestResultView=null;
 let testCompareMode=window.matchMedia('(max-width:600px)').matches?'corrected':'both',testPreviewVersion=0,testPreviewTimer=0,testCorrectedPreview=null;
 function testViewSettings(id){
  const settings=getCorrectionSettings();
@@ -19,12 +20,12 @@ function drawTestView(view){
  const source=view.id==='corrected'?testCorrectedPreview:photoSource;
  if(source)ctx.drawImage(source,g.dx,g.dy,photoSource.width*g.scale,photoSource.height*g.scale);
  if(view.input&&view.inputArea){const a=view.inputArea;ctx.drawImage(view.input,g.dx+a.x*g.scale,g.dy+a.y*g.scale,a.width*g.scale,a.height*g.scale);}
- if(view.inputArea){const a=view.inputArea;ctx.strokeStyle='#e9aa24';ctx.lineWidth=1;ctx.strokeRect(g.dx+a.x*g.scale,g.dy+a.y*g.scale,a.width*g.scale,a.height*g.scale);}
- ctx.lineWidth=1.5;ctx.strokeStyle='#16bd73';
- for(const hit of view.hits){const b=hit.bbox;ctx.strokeRect(g.dx+b.x0*g.scale,g.dy+b.y0*g.scale,(b.x1-b.x0)*g.scale,(b.y1-b.y0)*g.scale);}
+ renderTestResultOverlay(view,g);
  document.getElementById('compare-zoom-'+view.id).value=Math.round(view.zoom*100)+'%';
 }
 function clearTestView(view,message='화면 변경 · 다시 인식하세요.'){
+ if(activeTestResultView===view){activeTestResultView=null;detectedHits=[];clearReviewSource();updateReviewActions();}
+ view.boxes.replaceChildren();document.getElementById('compare-records-'+view.id).replaceChildren();
  view.hits=[];if(view.input)view.input.width=view.input.height=1;view.input=null;view.inputArea=null;
  document.getElementById('compare-result-'+view.id).textContent=message;document.getElementById('compare-summary-'+view.id).value=message;
 }
@@ -63,6 +64,7 @@ async function scanTestComparison(id=null){
  const stages=scanStageInputs.filter(input=>input.checked&&(deepScan.checked||input.dataset.scanStage==='corrected')).map(input=>input.dataset.scanStage);
  if(!stages.length){status.textContent='검사 단계를 하나 이상 선택하세요.';return;}
  const jobs=targets.map(view=>({view,area:{...testViewGeometry(view).area},settings:testViewSettings(view.id)}));
+ activeTestResultView=null;detectedHits=[];clearReviewSource();
  const run={epoch:++scanEpoch,cancelled:false,running:0,phase:'비교 인식'};activeScan=run;busy=true;showScanStart(stages);
  const isCurrent=()=>activeScan===run&&!run.cancelled&&scanEpoch===run.epoch;
  try{
@@ -71,7 +73,8 @@ async function scanTestComparison(id=null){
    const result=await recognizeCorrected(photoSource,settings,area,1,(input)=>{
     if(!isCurrent())return;view.input=document.createElement('canvas');view.input.width=input.width;view.input.height=input.height;view.input.getContext('2d').drawImage(input,0,0);view.inputArea=area;drawTestView(view);
    },stages,'11',{isCurrent,run});
-   assertOcrCurrent(isCurrent);view.hits=result.hits;
+   assertOcrCurrent(isCurrent);view.hits=result.hits;activateTestResultView(view);
+   renderRecordRows(document.getElementById('compare-records-'+view.id),view.hits);
    const expected=testExpectedRegions.filter(item=>item.bbox.x0>=area.x&&item.bbox.y0>=area.y&&item.bbox.x1<=area.x+area.width&&item.bbox.y1<=area.y+area.height);
    const found=new Set(result.hits.map(hit=>hit.code)),missing=expected.filter(item=>!found.has(item.code));
    const allExpected=new Set(testExpectedCodes),extra=[...found].filter(code=>!allExpected.has(code));
@@ -95,10 +98,10 @@ for(const view of testViews){
   if(busy)return;view.zoom=Number(event.target.value);clearTestView(view);drawTestView(view);
  });
  view.canvas.addEventListener('dblclick',()=>{if(!busy){view.zoom=1;view.cx=view.cy=.5;document.getElementById('compare-range-'+view.id).value=1;clearTestView(view);drawTestView(view);}});
- view.canvas.addEventListener('pointerdown',event=>{
-  if(busy||!photoReady)return;event.preventDefault();view.canvas.setPointerCapture(event.pointerId);view.points.set(event.pointerId,{x:event.clientX,y:event.clientY});
+ view.surface.addEventListener('pointerdown',event=>{
+  if(busy||!photoReady)return;event.preventDefault();view.surface.setPointerCapture(event.pointerId);view.points.set(event.pointerId,{x:event.clientX,y:event.clientY});
  });
- view.canvas.addEventListener('pointermove',event=>{
+ view.surface.addEventListener('pointermove',event=>{
   if(busy||!view.points.has(event.pointerId))return;event.preventDefault();
   const old=[...view.points.values()].map(p=>({...p})),point=view.points.get(event.pointerId),previous={...point};point.x=event.clientX;point.y=event.clientY;
   const now=[...view.points.values()],g=testViewGeometry(view);
@@ -106,7 +109,7 @@ for(const view of testViews){
   else{view.cx=Math.max(0,Math.min(1,view.cx-(point.x-previous.x)/(g.scale*photoSource.width)));view.cy=Math.max(0,Math.min(1,view.cy-(point.y-previous.y)/(g.scale*photoSource.height)));}
   document.getElementById('compare-range-'+view.id).value=view.zoom;clearTestView(view);drawTestView(view);
  });
- for(const type of ['pointerup','pointercancel','lostpointercapture'])view.canvas.addEventListener(type,event=>view.points.delete(event.pointerId));
+ for(const type of ['pointerup','pointercancel','lostpointercapture'])view.surface.addEventListener(type,event=>view.points.delete(event.pointerId));
 }
 new ResizeObserver(()=>{for(const view of testViews)drawTestView(view);}).observe(document.getElementById('testComparison'));
 
@@ -125,3 +128,27 @@ document.getElementById('compare-focus').addEventListener('click',()=>{
  const button=document.getElementById('compare-focus');button.setAttribute('aria-pressed',String(focused));button.textContent=focused?'돌아가기':'넓게';
  for(const view of testViews)drawTestView(view);
 });
+
+// 선택한 비교 화면의 입력을 기존 확인 팝업에 전달한다.
+// 다른 화면을 인식한 뒤에도 해당 입력 영상을 사용한다.
+function activateTestResultView(view){
+ if(!view.input||!view.inputArea)return;
+ activeTestResultView=view;detectedHits=view.hits;
+ clearReviewSource();reviewSource.width=view.input.width;reviewSource.height=view.input.height;
+ reviewSource.getContext('2d').drawImage(view.input,0,0);reviewSourceArea={...view.inputArea};reviewSourceEpoch=scanEpoch;
+ updateReviewActions();
+}
+function renderTestResultOverlay(view,g=testViewGeometry(view)){
+ view.boxes.style.cssText=boxes.style.cssText;view.boxes.hidden=boxes.hidden;
+ if(boxes.hidden||!view.hits.length){view.boxes.replaceChildren();return;}
+ renderHitBoxes(view.boxes,view.hits,g.w,g.h,g.scale,g.scale,g.dx,g.dy,hit=>{
+  if(busy||starting)return;activateTestResultView(view);openCodeReview(hit);
+ });
+}
+function redrawTestResultOverlays(){
+ if(activeTab!=='test')return;
+ for(const view of testViews){
+  if(view.canvas.clientWidth)renderTestResultOverlay(view);
+  renderRecordRows(document.getElementById('compare-records-'+view.id),view.hits);
+ }
+}

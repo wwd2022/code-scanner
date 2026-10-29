@@ -13,6 +13,7 @@ function placeLabel(element,anchor,angle,width,height){
 // 기존 색상·조이스틱 설정을 유지하며 OCR 박스 위 덮개를 제거한다.
 function showBoxes(hits){
  updateReviewActions();
+ if(activeTab==='test'&&typeof redrawTestResultOverlays==='function'){redrawTestResultOverlays();return;}
  const indicator=document.getElementById('boxVisibility');
  indicator.hidden=false;indicator.textContent=boxes.hidden?'박스 숨김':'박스 표시';
  // 숨김 중에는 보존하고 다시 표시할 때 최신 좌표로 만든다.
@@ -20,11 +21,19 @@ function showBoxes(hits){
  const width=boxes.clientWidth,height=boxes.clientHeight;
  if(!width||!height||!frame.width||!frame.height)return;
  boxes.replaceChildren();
+ renderHitBoxes(boxes,hits,width,height,width/frame.width,height/frame.height);
+}
+
+// 코드·위치 라벨을 각 화면 좌표에 배치한다.
+// 카메라·사진·비교 화면에서 같은 표시 설정을 쓴다.
+function renderHitBoxes(target,hits,width,height,scaleX,scaleY,offsetX=0,offsetY=0,onOpen=null){
+ target.replaceChildren();
  const codeAngle=codeDirectionIndex===null?-Math.PI/2:(codeDirectionIndex-4)*Math.PI/8;
  const placeAngle=(locationDirectionIndex-4)*Math.PI/8;
  for(const hit of hits){
   const b=hit.bbox,found=locations.get(hit.code),location=found?.length?found.join(' / '):'ㅡ없음';
-  const anchor={x:b.x0/frame.width*width,y:b.y0/frame.height*height,w:(b.x1-b.x0)/frame.width*width,h:(b.y1-b.y0)/frame.height*height};
+  const anchor={x:offsetX+b.x0*scaleX,y:offsetY+b.y0*scaleY,w:(b.x1-b.x0)*scaleX,h:(b.y1-b.y0)*scaleY};
+  if(anchor.x+anchor.w<0||anchor.y+anchor.h<0||anchor.x>width||anchor.y>height)continue;
   const code=document.createElement('div'),place=document.createElement('div');
   code.className='code-box';
   if(!found?.length)code.classList.add('missing-box');
@@ -33,17 +42,18 @@ function showBoxes(hits){
   code.setAttribute('aria-label',hit.code+' 확인 및 수정');
   code.addEventListener('click',event=>{
    event.stopPropagation();
-   queueMousePhotoTap(event,hit);
+   if(onOpen)onOpen(hit);else queueMousePhotoTap(event,hit);
   });
   code.addEventListener('keydown',event=>{
-   if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();openCodeReview(hit);}
+   if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();if(onOpen)onOpen(hit);else openCodeReview(hit);}
   });
+  if(onOpen)code.addEventListener('pointerdown',event=>event.stopPropagation());
   const codeText=document.createElement('span');codeText.className='box-text';codeText.textContent=hit.code;code.append(codeText);
   code.title=hit.review?'확인 필요: '+hit.code:hit.code;
   place.className='location-box';
   const placeText=document.createElement('span');placeText.className='box-text';placeText.textContent=location;place.append(placeText);
   place.title=hit.code+' / '+location;
-  boxes.append(code,place);
+  target.append(code,place);
   placeLabel(code,anchor,codeAngle,width,height);
   placeLabel(place,anchor,placeAngle,width,height);
  }
@@ -57,19 +67,8 @@ function addRecord(hit){
 
 // 누적 기록은 코드별로 합치고 현재 엑셀의 위치를 조회한다.
 function refreshRecords(){
- const codes=new Map();
- for(const hit of recordedHits)codes.set(hit.code,!!hit.review||!!codes.get(hit.code));
- records.replaceChildren();
- for(const [code,review] of codes){
-  const row=document.createElement('div');row.className='record';
-  const found=locations.get(code);
-  if(!found){row.classList.add('missing');row.textContent=code+' - 위치 없음 (엑셀에 없는 코드)';}
-  else if(!found.length){row.classList.add('missing');row.textContent=code+' - 위치 없음 (엑셀 위치 미입력)';}
-  else row.textContent=code+' - '+found.join(' / ');
-  if(review)row.textContent+=' · 확인 필요';
-  records.append(row);
- }
- recordCount=codes.size;
+ const total=renderRecordRows(records,recordedHits);
+ recordCount=total;
  document.getElementById('empty').hidden=recordCount>0;
  document.getElementById('count').textContent=String(recordCount);
 }
@@ -246,3 +245,21 @@ document.getElementById('testReview').addEventListener('click',openReviewTest);
 document.getElementById('openUncertain').addEventListener('click',()=>openUncertainReview());
 document.getElementById('batchReview').addEventListener('click',()=>openUncertainReview(true));
 document.getElementById('testBatchReview').addEventListener('click',()=>openUncertainReview(true));
+
+// 코드별 위치·확인 상태 목록을 같은 형식으로 표시한다.
+// 테스트 목록은 실제 누적 기록과 분리한다.
+function renderRecordRows(target,hits){
+ const codes=new Map();
+ for(const hit of hits)codes.set(hit.code,!!hit.review||!!codes.get(hit.code));
+ target.replaceChildren();
+ for(const [code,review] of codes){
+  const row=document.createElement('div');row.className='record';
+  const found=locations.get(code);
+  if(!found){row.classList.add('missing');row.textContent=code+' - 위치 없음 (엑셀에 없는 코드)';}
+  else if(!found.length){row.classList.add('missing');row.textContent=code+' - 위치 없음 (엑셀 위치 미입력)';}
+  else row.textContent=code+' - '+found.join(' / ');
+  if(review)row.textContent+=' · 확인 필요';
+  target.append(row);
+ }
+ return codes.size;
+}

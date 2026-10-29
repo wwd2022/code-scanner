@@ -205,7 +205,8 @@ function updateBoxStyle(){
   const value=document.getElementById(group.dataset.choiceFor).value;
   for(const button of group.querySelectorAll('button'))button.setAttribute('aria-pressed',String(button.dataset.value===value));
  }
- if(detectedHits.length)showBoxes(detectedHits);
+ if(activeTab==='test')redrawTestResultOverlays();
+ else if(detectedHits.length)showBoxes(detectedHits);
  updateDesignPreview();
 }
 
