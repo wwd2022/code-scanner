@@ -66,12 +66,12 @@ function normalizeCode(value){
 }
 
 // OCR 문장에서 규격에 맞는 코드와 문자열 위치를 찾는다. (파인드 코즈)
-// 코드 박스를 계산할 수 있도록 각 일치의 시작과 끝을 반환한다.
+// 뒤에 붙은 영숫자는 제외하고 코드 좌표와 확인 표시를 반환한다.
 function findCodes(text){
  const normalized=text.replace(/[‐‑‒–—−﹣－~]/g,'-'),matches=[];
  const patterns=[
   {regex:/(?:^|[^A-Za-z0-9])([A-Za-z0-9]{4}[ \t]*-[ \t]*(?:[A-Za-z0-9]{6}|[0-9]{3}[ \t]+[0-9]{3}))(?![A-Za-z0-9])/g,review:false},
-  {regex:/(?:^|[^A-Za-z0-9])([0-9]{4}[ \t]*-[ \t]*(?:[0-9]{6}|[0-9]{3}[ \t]+[0-9]{3}))(?=[VvYy](?![A-Za-z0-9]))/g,review:true}
+  {regex:/(?:^|[^A-Za-z0-9])([A-Za-z0-9]{4}[ \t]*-[ \t]*(?:[A-Za-z0-9]{6}|[0-9]{3}[ \t]+[0-9]{3}))(?=[A-Za-z0-9])/g,review:true}
  ];
  for(const {regex,review} of patterns)for(const match of normalized.matchAll(regex)){
   const start=match.index+match[0].length-match[1].length,end=start+match[1].length;
