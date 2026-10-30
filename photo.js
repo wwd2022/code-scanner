@@ -16,18 +16,29 @@ function previewPhoto(){
 
 // 엑셀 코드 또는 임시 코드와 위치를 선택한다.
 // 임시 데이터는 테스트 화면에서만 사용한다.
+const testImageLimits={maxEdge:4096,maxPixels:8000000,maxCodes:1000};
 function getTestRows(count,existing=[]){
+ if(!Number.isSafeInteger(count)||count<0||count>testImageLimits.maxCodes)throw new Error('테스트 코드는 최대 1000개까지 생성할 수 있습니다.');
+ const unique=new Map(existing.map(row=>[row[0],row]));
  if(!workbook){
-  const rows=existing.slice(0,count);
+  const rows=[...unique.values()].slice(0,count),used=new Set(rows.map(row=>row[0]));
+  const capacity=9000000000;
+  let cursor=0;
+  const codeAt=index=>String(1000+Math.floor(index/1000000))+'-'+String(index%1000000).padStart(6,'0');
   while(rows.length<count){
-   const code=String(1000+Math.floor(Math.random()*9000))+'-'+String(Math.floor(Math.random()*1000000)).padStart(6,'0');
-   if(!rows.some(row=>row[0]===code))rows.push([code,['T'+String(rows.length+1).padStart(2,'0')]]);
+   let code=codeAt(Math.floor(Math.random()*capacity));
+   if(used.has(code)){
+    while(used.has(codeAt(cursor)))cursor=(cursor+1)%capacity;
+    code=codeAt(cursor);cursor=(cursor+1)%capacity;
+   }
+   used.add(code);rows.push([code,['T'+String(rows.length+1).padStart(2,'0')]]);
   }
   return rows;
  }
  const available=buildLocations(workbook.sheets[workbook.selected]);
- const rows=existing.filter(([code])=>available.has(code)).slice(0,count).map(([code])=>[code,available.get(code)]);
- const remaining=[...available.entries()].filter(([code])=>!rows.some(row=>row[0]===code));
+ const rows=[...unique.values()].filter(([code])=>available.has(code)).slice(0,count).map(([code])=>[code,available.get(code)]);
+ const used=new Set(rows.map(row=>row[0]));
+ const remaining=[...available.entries()].filter(([code])=>!used.has(code));
  for(let i=remaining.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[remaining[i],remaining[j]]=[remaining[j],remaining[i]];}
  return rows.concat(remaining.slice(0,count-rows.length));
 }
@@ -54,17 +65,21 @@ function makeTestImage(newCodes=false){
  const widthCm=Number(document.getElementById('testWidthCm').value),heightCm=Number(document.getElementById('testHeightCm').value),ppi=Number(document.getElementById('testPpi').value);
  const width=Math.round(widthCm*ppi/2.54),height=Math.round(heightCm*ppi/2.54);
  if(!Number.isFinite(ppi)||ppi<1||!Number.isFinite(widthCm)||!Number.isFinite(heightCm)||widthCm<=0||heightCm<=0||!Number.isSafeInteger(width)||!Number.isSafeInteger(height)||width<1||height<1){status.textContent='이미지 크기와 PPI에 올바른 값을 입력하세요.';return;}
+ if(width>testImageLimits.maxEdge||height>testImageLimits.maxEdge||width*height>testImageLimits.maxPixels){status.textContent='테스트 이미지는 한 변 최대 4096px, 총 800만 픽셀까지 가능합니다. 크기 또는 PPI를 줄여주세요.';return;}
  const scale=ppi/254;
  const margin=id=>Math.max(0,Number(document.getElementById(id).value)||0)*scale;
  const left=margin('testLeft'),right=margin('testRight'),top=margin('testTop'),bottom=margin('testBottom');
  const gapX=number('testGapX',0,500)*scale,gapY=number('testGapY',0,500)*scale,font=number('testFont',8,100)*scale;
  const textMode=document.getElementById('testText').value,table=document.getElementById('testTable').value==='on';
+ if(![left,right,top,bottom,gapX,gapY,font].every(Number.isFinite)){status.textContent='여백과 글자 크기에 올바른 값을 입력하세요.';return;}
  const {cols,rows:rowCount,cellW,cellH,pad}=getTestGrid(width-left-right,height-top-bottom,font,gapX,gapY,textMode);
  if(!cols||!rowCount){status.textContent='코드를 넣을 공간이 부족합니다. 표를 늘리거나 글자 크기를 줄여주세요.';return;}
- const rows=getTestRows(cols*rowCount,newCodes||testCodesNeedRefresh?[]:testRows);
- if(!rows.length){status.textContent='엑셀에 유효한 코드가 없습니다.';return;}
+ const count=cols*rowCount;
+ if(!Number.isSafeInteger(count)||count>testImageLimits.maxCodes){status.textContent='테스트 코드는 최대 1000개까지 가능합니다. 글자 크기나 간격을 늘려주세요.';return;}
  if(!confirm(width+' × '+height+' px 이미지를 생성하시겠습니까?'))return;
  try{
+ const rows=getTestRows(count,newCodes||testCodesNeedRefresh?[]:testRows);
+ if(!rows.length){status.textContent='엑셀에 유효한 코드가 없습니다.';return;}
  photoSource.width=width;photoSource.height=height;
  const ctx=photoSource.getContext('2d',{willReadFrequently:true});
  if(!ctx||photoSource.width!==width||photoSource.height!==height)throw new Error('이미지 생성 실패');
@@ -135,6 +150,7 @@ function exportTestExcel(){makeTestImage(true);}
 // 큰 사진은 긴 변 3200픽셀로 줄이고 임시 주소를 해제한다.
 async function loadPhoto(){
  const file=photoInput.files[0];if(!file||busy||starting)return;
+ if(!confirmDiscardReview()){photoInput.value='';return;}
  busy=true;lockInputs(true);excel.disabled=true;sheet.disabled=true;strength.disabled=true;
  const url=URL.createObjectURL(file);
  try{

@@ -15,7 +15,7 @@
 <nav class="tabs mode-tabs" aria-label="이미지 입력 방식">
 <button type="button" data-tab="camera" aria-pressed="true">카메라</button>
 <button type="button" data-tab="photo" aria-pressed="false">사진</button>
-<button type="button" data-tab="test" aria-pressed="false">테스트</button>
+<button type="button" data-tab="test" aria-pressed="false">테스트 · 고급</button>
 </nav>
 <div class="mode-controls" id="cameraControls">
 <button id="start" type="button">카메라 켜기</button>
@@ -35,7 +35,7 @@
 <label>노이즈 <input id="testNoise" type="range" min="0" max="100" step="10" value="0"><output id="testNoiseValue">0%</output></label>
 
 <label>가로 cm <input id="testWidthCm" type="number" min="0.01" step="0.1" value="12"></label><label>세로 cm <input id="testHeightCm" type="number" min="0.01" step="0.1" value="10"></label><label>해상도 PPI <input id="testPpi" type="number" min="1" step="1" value="254"></label><output id="testPixelSize">1200 × 1000 px</output>
-<small>코드 개수는 표 영역·글자 크기·간격에 맞춰 자동 조정됩니다.</small>
+<small>코드 개수는 표 영역·글자 크기·간격에 맞춰 자동 조정됩니다. 최대 한 변 4096px · 총 800만 픽셀 · 코드 1000개.</small>
 <label>위 여백 <input id="testTop" type="number" min="0" value="100"></label><label>아래 여백 <input id="testBottom" type="number" min="0" value="100"></label><label>왼쪽 여백 <input id="testLeft" type="number" min="0" value="80"></label><label>오른쪽 여백 <input id="testRight" type="number" min="0" value="80"></label>
 <label>글자 크기 <input id="testFont" type="number" min="8" max="100" value="32"></label><label>가로 간격 <input id="testGapX" type="number" min="0" max="500" value="0"></label><label>세로 간격 <input id="testGapY" type="number" min="0" max="500" value="0"></label>
 <label>표 <select id="testTable"><option value="on">표시</option><option value="off">숨김</option></select></label>
@@ -283,6 +283,7 @@
 <summary>결과 <span id="count">0</span></summary>
 <div class="drawer-body">
 <h2>조회 기록</h2>
+<p class="history-note">이번 접속의 기록입니다. 새로고침하면 사라집니다. 미확인 코드는 새 촬영 전에 확인하세요.</p>
 <div id="reviewActions" class="review-toolbar" hidden>
 <span id="reviewPendingCount"></span>
 <button id="openUncertain" type="button">순차 확인</button>
@@ -324,6 +325,7 @@
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/tesseract.min.js"></script>
 <script src="state.js"></script>
 <script src="image.js"></script>
+<script src="ocr-core.js"></script>
 <script src="ocr.js"></script>
 <script src="camera.js"></script>
 <script src="photo.js"></script>

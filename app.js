@@ -26,6 +26,7 @@ function closeTools(except=null){
 // 이전 인식 결과와 사진 확대 상태를 초기화한다.
 function switchTab(tab){
  if(busy||starting||activeTab===tab)return;
+ if(!confirmDiscardReview())return;
  closeTestEditor();
  document.querySelector('main').classList.toggle('comparison-active',tab==='test');
  document.querySelector('main').classList.remove('comparison-focus');
@@ -53,6 +54,7 @@ function switchTab(tab){
  if(tab==='test'){resetTestComparison();testCodesNeedRefresh=true;document.getElementById('testLogText').textContent='이미지를 생성하면 표시됩니다.';document.getElementById('testCompareText').textContent='인식 후 표시됩니다.';status.textContent='설정을 선택하고 이미지 생성을 누르세요.';}
  else if(workbook){locations=buildLocations(workbook.sheets[workbook.selected]);excelStatus.textContent=workbook.name+' · '+workbook.selected+' · '+locations.size+'개 코드';}
  else{locations=new Map();excelStatus.textContent='엑셀을 선택해 주세요.';}
+ refreshRecords();
 }
 
 // 두 손가락 중심을 기준으로 사진 배율을 바꾼다. (셋 포토 줌)
@@ -416,8 +418,10 @@ function appendScanRaw(name,value,failed){
 // 같은 결과를 조회 기록과 연결한다.
 function showScanResults(hits,area,stats,seconds,errorCount){
  if(activeTab==='test')showTestComparison(hits,area,errorCount);
- for(const hit of hits)addRecord(hit);
- refreshRecords();
+ if(activeTab!=='test'){
+  for(const hit of hits)addRecord(hit);
+  refreshRecords();
+ }
  showBoxes(hits);
  scanStats.textContent=(area?'확대 영역 · ':'전체 이미지 · ')+stats.join(' · ')+' → 합계 '+hits.length+'곳 · '+seconds+'초'+(errorCount?' · 일부 검사 실패':'');
  status.textContent=hits.length?hits.length+'개 코드 표시 · 확인 표시는 사진과 비교하세요.':'코드를 찾지 못함 · 확대 위치나 보정 설정을 바꿔 재검사하세요.';

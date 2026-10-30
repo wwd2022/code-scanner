@@ -71,6 +71,7 @@ function beginLive(){
 async function resumeCamera(){
  if(busy||starting)return;
  if(!stream){await startCamera();return;}
+ if(!confirmDiscardReview())return;
  try{
   scanEpoch++;liveEpoch++;clearTimeout(liveTimer);cancelAnimationFrame(animationId);
   await camera.play();frozenMode=false;detectedHits=[];boxes.replaceChildren();dots.replaceChildren();
@@ -85,6 +86,7 @@ async function resumeCamera(){
 // 권한 거부와 HTTPS 미사용을 아래 상태 메시지로 안내한다.
 async function startCamera(){
  if(starting||stream||busy)return;
+ if(!confirmDiscardReview())return;
  starting=true;lockInputs(true);start.disabled=true;status.textContent='카메라를 켜는 중…';
  try{
   if(!window.isSecureContext||!navigator.mediaDevices?.getUserMedia)throw new Error('HTTPS 주소에서 Chrome으로 열어주세요.');

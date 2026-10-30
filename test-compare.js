@@ -29,8 +29,8 @@ function clearTestView(view,message='화면 변경 · 다시 인식하세요.'){
  view.hits=[];if(view.input)view.input.width=view.input.height=1;view.input=null;view.inputArea=null;
  document.getElementById('compare-result-'+view.id).textContent=message;document.getElementById('compare-summary-'+view.id).value=message;
 }
-function setTestCompareMode(mode){
- if(busy)return;testCompareMode=mode;
+function setTestCompareMode(mode,allowBusy=false){
+ if(busy&&!allowBusy)return;testCompareMode=mode;
  for(const view of testViews)document.getElementById('compare-panel-'+view.id).hidden=mode!=='both'&&mode!==view.id;
  document.querySelectorAll('[data-compare-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.compareMode===mode)));
  for(const view of testViews)drawTestView(view);
@@ -151,4 +151,25 @@ function redrawTestResultOverlays(){
   if(view.canvas.clientWidth)renderTestResultOverlay(view);
   renderRecordRows(document.getElementById('compare-records-'+view.id),view.hits);
  }
+}
+
+// 최적화된 보정 입력과 결과는 비교 화면에만 반영한다.
+function commitOptimizedTestResult(result,input,area,totalMs){
+ clearTimeout(testPreviewTimer);testPreviewVersion++;
+ const view=testViews.find(item=>item.id==='corrected');
+ clearTestView(view);
+ view.input=document.createElement('canvas');view.input.width=input.width;view.input.height=input.height;
+ view.input.getContext('2d').drawImage(input,0,0);
+ view.inputArea={...area};view.hits=result.hits;view.zoom=1;view.cx=view.cy=.5;
+ document.getElementById('compare-range-corrected').value=1;
+ if(testCompareMode==='original')setTestCompareMode('corrected',true);
+ activateTestResultView(view);
+ renderRecordRows(document.getElementById('compare-records-corrected'),view.hits);
+ const expected=new Set(testExpectedCodes),found=new Set(result.hits.map(hit=>hit.code));
+ const missing=[...expected].filter(code=>!found.has(code)),extra=[...found].filter(code=>!expected.has(code));
+ const summary='최적화 적용 · 발견 '+result.hits.length+' · 누락 '+missing.length+' · 오인식 '+extra.length+' · '+(totalMs/1000).toFixed(2)+'초';
+ document.getElementById('compare-summary-corrected').value=summary;
+ document.getElementById('compare-result-corrected').textContent=summary+'\n입력 '+result.resolution+(result.errors.length?' · 일부 검사 실패':'')+'\n누락: '+(missing.join(', ')||'없음')+'\n오인식: '+(extra.join(', ')||'없음');
+ drawTestView(view);
+ status.textContent='최적화 결과를 보정 화면에 적용했습니다. 실제 조회 기록에는 추가하지 않습니다.';
 }

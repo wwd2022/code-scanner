@@ -67,7 +67,8 @@ function addRecord(hit){
 
 // 누적 기록은 코드별로 합치고 현재 엑셀의 위치를 조회한다.
 function refreshRecords(){
- const total=renderRecordRows(records,recordedHits);
+ const lookup=activeTab==='test'?(workbook?buildLocations(workbook.sheets[workbook.selected]):new Map()):locations;
+ const total=renderRecordRows(records,recordedHits,lookup);
  recordCount=total;
  document.getElementById('empty').hidden=recordCount>0;
  document.getElementById('count').textContent=String(recordCount);
@@ -90,6 +91,7 @@ function resetReviewSession(){
  reviewSuggestions.clear();
  if(!codeReview.open){reviewQueue=[];reviewIndex=-1;}
  document.getElementById('reviewActions').hidden=true;
+ refreshRecords();
 }
 function rememberReviewDraft(){
  if(!reviewHit)return;
@@ -248,18 +250,29 @@ document.getElementById('testBatchReview').addEventListener('click',()=>openUnce
 
 // 코드별 위치·확인 상태 목록을 같은 형식으로 표시한다.
 // 테스트 목록은 실제 누적 기록과 분리한다.
-function renderRecordRows(target,hits){
+function renderRecordRows(target,hits,lookup=locations){
  const codes=new Map();
  for(const hit of hits)codes.set(hit.code,!!hit.review||!!codes.get(hit.code));
  target.replaceChildren();
  for(const [code,review] of codes){
   const row=document.createElement('div');row.className='record';
-  const found=locations.get(code);
+  const found=lookup.get(code);
   if(!found){row.classList.add('missing');row.textContent=code+' - 위치 없음 (엑셀에 없는 코드)';}
   else if(!found.length){row.classList.add('missing');row.textContent=code+' - 위치 없음 (엑셀 위치 미입력)';}
   else row.textContent=code+' - '+found.join(' / ');
-  if(review)row.textContent+=' · 확인 필요';
+  if(review){
+   const current=detectedHits.some(hit=>hit.code===code&&hit.review)&&cropReviewAvailable();
+   row.textContent+=target===records&&!current?' · 미확인 기록 (원본 재촬영 필요)':' · 확인 필요';
+  }
   target.append(row);
  }
  return codes.size;
+}
+
+// 현재 확인 이미지를 버리기 전에 미확인 작업 결과를 안내한다.
+function confirmDiscardReview(){
+ if(activeTab==='test'||!cropReviewAvailable())return true;
+ const pending=detectedHits.filter(hit=>hit.review).length;
+ if(!pending)return true;
+ return confirm('확인하지 않은 코드가 '+pending+'개 있습니다. 계속하면 현재 확인 이미지를 버리고, 미확인 기록은 원본을 다시 촬영해야 수정할 수 있습니다. 계속하시겠습니까?');
 }

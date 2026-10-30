@@ -3,7 +3,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 const vm=require('node:vm');
 const app={};vm.createContext(app);
-for(const file of ['image.js','ocr.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'..',file),'utf8'),app);
+for(const file of ['image.js','ocr-core.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'..',file),'utf8'),app);
 const plain=value=>JSON.parse(JSON.stringify(value));
 const codes=text=>plain(app.findCodes(text)).map(hit=>hit.code);
 assert.deepEqual(codes('2401-004279 2401-004935'),['2401-004279','2401-004935']);
@@ -12,6 +12,8 @@ assert.deepEqual(codes('B076-0201 CA B076-0203 12'),[]);
 assert.deepEqual(codes('2402-001 368✓ 2401 ~003395V 2401-003743V/'),['2402-001368','2401-003395','2401-003743']);
 assert.equal(app.findCodes('2401-003743V')[0].review,true);
 assert.deepEqual(codes('YR07-00001A'),['YR07-00001A']);
+assert.deepEqual(codes('AB12-ABCDEFVQ AB12-ABCDEFVV AB12-ABCDEF1'),[]);
+assert.deepEqual(codes('AB12-ABCDEFV/'),['AB12-ABCDEF']);
 assert.deepEqual(codes('2401-0037439 AB12-ABCDEFQ X2401-003743'),[]);
 assert.deepEqual(codes('2401-00374V'),['2401-00374V']); // 정상 6자리의 마지막 V는 보존한다.
 const word={text:'2401-003743V',confidence:70,bbox:{x0:10,y0:20,x1:130,y1:40},symbols:[]};
@@ -27,8 +29,11 @@ assert.equal(merged[0].review,true);assert.deepEqual(plain(merged[0].alternative
 assert.equal(merged[1].code,'2401-003743'); // 다른 행의 같은 코드는 합치지 않는다.
 const conflict=app.mergeHits([[{...hit,code:'YR07-00001A',confidence:61}],[{...hit,code:'YRO7-000014',confidence:33}],[{...hit,code:'YRO7-000014',confidence:52}]]);
 assert.equal(conflict[0].code,'YR07-00001A');assert.equal(conflict[0].review,true);
-const passes=app.createScanPasses(1152,1536,{deep:true,mode:'print'});
-assert.equal(passes.length,8);
+const stages=['corrected',...Array.from({length:6},(_,i)=>'zoom'+(i+1))];
+const passes=app.createOcrRegions(1152,1536,stages);
+assert.equal(passes.length,7);
+assert.equal(app.createOcrRegions(1152,1536,['corrected']).length,1);
+assert.equal(app.createOcrRegions(1152,1536,[]).length,0);
 for(const p of passes){assert.ok(p.x>=0&&p.y>=0);assert.ok(p.x+p.width<=1152&&p.y+p.height<=1536);}
 const image={width:100,height:100,data:new Uint8ClampedArray(40000).fill(255)};
 for(let y=40;y<60;y++)for(let x=40;x<60;x++)for(let c=0;c<3;c++)image.data[(y*100+x)*4+c]=20;

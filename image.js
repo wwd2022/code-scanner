@@ -67,7 +67,10 @@ function renderLivePreview(){
   liveCanvas.getContext('2d').drawImage(livePreviewBuffer,0,0);
  })();
  livePreviewJob=job;
- job.catch(()=>{}).finally(()=>{
+ job.catch(error=>{
+  console.error('보정 미리보기 실패',error);
+  if(isCurrent())liveStatus.textContent='보정 미리보기 실패: '+(error.message||String(error));
+ }).finally(()=>{
   if(livePreviewJob===job)livePreviewJob=null;
   const queued=livePreviewQueued;livePreviewQueued=false;
   if(!stream||frozenMode||busy||!previewCorrection.checked)livePreviewBuffer.width=livePreviewBuffer.height=1;
@@ -265,30 +268,51 @@ function getPreviewMaxSize(){
 }
 
 // 큰 OCR 입력의 픽셀 연산만 옮기고 필터 구현은 공유한다.
-let correctionWorker=null,correctionWorkerFailed=false,correctionRequestId=0;
+let correctionWorker=null,correctionRequestId=0;
 const correctionRequests=new Map();
-function releaseCorrectionWorker(){
+const correctionWorkerTimeout=15000,correctionWorkerRetryDelay=5000;
+let correctionWorkerFailure='',correctionWorkerRetryAt=0;
+function getCorrectionWorkerDiagnostic(){
+ return {reason:correctionWorkerFailure,retryAt:correctionWorkerRetryAt};
+}
+function releaseCorrectionWorker(error=new Error('보정 워커 종료')){
  if(correctionWorker)correctionWorker.terminate();
  correctionWorker=null;
- for(const request of correctionRequests.values())request.reject(new Error('보정 워커 종료'));
+ for(const request of correctionRequests.values()){
+  clearTimeout(request.timer);request.reject(error);
+ }
  correctionRequests.clear();
 }
+function failCorrectionWorker(error){
+ const reason=error?.message||String(error);
+ // Preserve the cause once, including when several pending requests fail together.
+ if(correctionWorkerFailure!==reason)console.warn('보정 워커 대체 처리:',reason);
+ correctionWorkerFailure=reason;correctionWorkerRetryAt=Date.now()+correctionWorkerRetryDelay;
+ releaseCorrectionWorker(new Error(reason));
+}
 function getCorrectionWorker(){
- if(correctionWorkerFailed||typeof Worker==='undefined')return null;
+ if(typeof Worker==='undefined'||Date.now()<correctionWorkerRetryAt)return null;
  if(correctionWorker)return correctionWorker;
  try{
   const created=new Worker('correction-worker.js');correctionWorker=created;
   created.onmessage=event=>{
+   if(correctionWorker!==created)return;
    const message=event.data,request=correctionRequests.get(message.id);
    if(!request)return;
-   correctionRequests.delete(message.id);
+   clearTimeout(request.timer);correctionRequests.delete(message.id);
    if(message.error)request.reject(new Error(message.error));
-   else request.resolve(message);
+   else{
+    correctionWorkerFailure='';correctionWorkerRetryAt=0;
+    request.resolve(message);
+   }
   };
-  const fail=event=>{event.preventDefault?.();correctionWorkerFailed=true;releaseCorrectionWorker();};
+  const fail=event=>{
+   if(correctionWorker!==created)return;
+   event.preventDefault?.();failCorrectionWorker(new Error(event.message||'보정 워커 메시지 처리 실패'));
+  };
   created.onerror=fail;created.onmessageerror=fail;
   return created;
- }catch(error){correctionWorkerFailed=true;return null;}
+ }catch(error){failCorrectionWorker(error);return null;}
 }
 
 function hasImageCorrection(settings){
@@ -305,19 +329,21 @@ async function correctCanvas(canvas,settings){
   const id=++correctionRequestId;
   try{
    const result=await new Promise((resolve,reject)=>{
-    correctionRequests.set(id,{resolve,reject});
+    const timer=setTimeout(()=>failCorrectionWorker(new Error('보정 워커 응답 시간 초과 (15초)')),correctionWorkerTimeout);
+    correctionRequests.set(id,{resolve,reject,timer});
     try{target.postMessage({id,width,height,buffer:pixels.data.buffer,settings},[pixels.data.buffer]);}
-    catch(error){correctionRequests.delete(id);reject(error);}
+    catch(error){clearTimeout(correctionRequests.get(id)?.timer);correctionRequests.delete(id);reject(error);}
    });
    ctx.putImageData(new ImageData(new Uint8ClampedArray(result.buffer),width,height),0,0);
    return result.path;
   }catch(error){
-   correctionWorkerFailed=true;releaseCorrectionWorker();
+   failCorrectionWorker(error);
    pixels=ctx.getImageData(0,0,width,height);
   }
  }
  applyCorrection(pixels,settings);ctx.putImageData(pixels,0,0);
- return '화면 스레드 · 대체 처리';
+ const reason=typeof Worker==='undefined'?'Web Worker 미지원':correctionWorkerFailure||'워커 사용 불가';
+ return '화면 스레드 · 대체 처리 ('+reason+')';
 }
 
 
